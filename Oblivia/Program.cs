@@ -5,7 +5,6 @@ using System.Reflection.Metadata.Ecma335;
 Console.WriteLine("Hello, World!");
 
 var code = """
-
 {
     Data: class {
         str: "Hello World",
@@ -14,13 +13,9 @@ var code = """
     main(args: string): int {
         a : "hello world",
         print(a),
-        print(a:str): void {
-            
-        }
-
-
+        print(a:str): void { },
         b : 1,
-        b := b + 1,
+        b := b + 2,
 
         data : {
             a : a,
@@ -31,12 +26,11 @@ var code = """
             ^a := u + v
         },
         dict: {
-            true: 5,
-            false: 8
+            [true]: 5,
+            [false]: 8
         },
-
         val: bool(true from dict),
-        e(b:int): int(b = 1 & 122 | 3123),
+        e(b:int): int(1),
         print() : {
         },
     }
@@ -65,26 +59,42 @@ class Parser {
 	//A:B {},
 	//A():B {},
     //A(a:int, b:int): B{}
-
-    //Change to NextDefinitionOrExpression
-	public Element NextDefinition () {
-		var name = tokens[index].value;
+	public Element NextDefinitionOrStatement () {
+		var name = currToken.value;
 		inc();
 		switch(currToken.type) {
 			case TokenType.L_PAREN:
 				inc();
                 var par = NextParList();
-                //inc();
-				return new _DefineVal {
-					key = name,
-					value = NextExpression()
-				};
+                if(currToken.type == TokenType.COLON) {
+                    inc();
+
+					return new _DefineFunc {
+						key = name,
+                        par = par,
+						value = NextExpression()
+					};
+				} else if(currToken.type == TokenType.COMMA) {
+                    return new CallFunc { name = name, args = par };
+                } else {
+                    throw new Exception($"Unexpected token {currToken.type}");
+                }
 			case TokenType.COLON:
 				inc();
-                return new _DefineVal {
-                    key = name,
-                    value = NextExpression()
-				};
+
+                if(currToken.type == TokenType.EQUAL) {
+                    inc();
+                    return new _Reassign {
+                        key = name,
+                        value = NextExpression()
+                    };
+                } else {
+					return new _DefineVal {
+						key = name,
+						value = NextExpression()
+					};
+				}
+                
 		}
         List<Element> NextParList () {
 			var par = new List<Element> { };
@@ -102,13 +112,11 @@ class Parser {
                     goto Check;
             }
             return par;
-
             Element NextPair() {
 				var key = currToken.value;
 				inc();
-
                 if(currToken.type == TokenType.COMMA || currToken.type == TokenType.R_PAREN) {
-                    inc();
+                    //inc();
                     return new _DefineVal { key = key, value = null };
                 }
                 if(currToken.type != TokenType.COLON) {
@@ -158,7 +166,7 @@ class Parser {
 					//Symbol
 					return null;
 			}
-            throw new Exception();
+            throw new Exception($"Unknown token type in expression {currToken.type}");
 
             List<Element> NextArgList () {
 
@@ -197,7 +205,7 @@ class Parser {
         Check:
         switch(currToken.type) {
             case TokenType.NAME:
-                ele.Add(NextDefinition());
+                ele.Add(NextDefinitionOrStatement());
                 goto Check;
             case TokenType.COMMA:
                 inc();
@@ -236,11 +244,13 @@ public class _DefineVal : Element {
 }
 public class _DefineFunc : Element {
 	public string key;
+    public List<Element> par;
 	public Element value;
 }
 
 public class _Reassign : Element {
-
+    public string key;
+    public Element value;
 }
 public interface Element {
 

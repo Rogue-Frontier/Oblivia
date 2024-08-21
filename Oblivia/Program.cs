@@ -18,71 +18,18 @@ range(1, grid.width) | (x:int): int {
 */
 var code = """
 {
-	test(a:int): void * print * argList
-    Data: class {
-        str: str* "Hello World"
-		num: int* 5
-		flag: bool* true
-    }
-	b: 2
-	msg!: "alert"
-	printB: print
-	alert! : printB * "aaa"
-	alertB!: alert!
-	getStr! : "6666"
-	aaaa! : "556"
-    main(args: string): int {
-		test* 0
-        a: "hello world"
-
-		print(range(1, 5))
-
-		lambda: @(a:int) void { print * a }
-		
-		nums: range(1,5) | @(a:int) add(^a, 5)
-		nums | lambda
-
-
-		cond: true
-		nums := cond ?+ print * "yes" ?- print * "no"
-
-		times: 100
-
-		gr(times, 0) ?* {
-			times := sub(times, 1)
-			print * times
+	Data: {
+		grid: array(int 100)
+		step!: {
+			
 		}
-		
-		
-		z: getStr!
-		printB* z
+	}
+    main(args: string): int {
+		Data/step!
+		print(Data/grid/Length)
 
-		msg: "another alert"
-		msg := "not an alert"
-
-		alert!
-		alertB!
-
-
-		printB* "print B"
-		printB* msg
-
-		b: 1
-        b := 10
-        data: {
-            a: a
-            b: 9
-            c: ^^^^b
-			print* c
-        }
-
-        modify(u: int, v: str): int {
-            ^a := u
-            ^data := v
-        },
-        val: bool* true
-
-		printB* val
+		items: range(0 10) | @(a:int) subi(50 a)
+		items | @(a:int) print * muli(a 500)
     }
 }
 """;
@@ -95,19 +42,24 @@ var parser = new Parser(tokens);
 var scope = parser.NextScope();
 var global = new Scope();
 global.locals["int"] = new ValType(typeof(int));
-global.locals["str"] = new ValType(typeof(string));
+global.locals["string"] = new ValType(typeof(string));
 global.locals["bool"] = new ValType(typeof(bool));
 global.locals["void"] = new ValType(null);
 
 global.locals["print"] = new Action<object>(Console.WriteLine);
 global.locals["range"] = new Func<int, int, int[]>((a, b) => Enumerable.Range(a, b - a).ToArray());
 
-global.locals["add"] = new Func<int, int, int>((a, b) => a + b);
-global.locals["gr"] = new Func<int, int, bool>((a, b) => a > b);
-global.locals["sub"] = new Func<int, int, int>((a, b) => a - b);
+global.locals["gr"] = new Func<double, double, bool>((a, b) => a > b);
+global.locals["geq"] = new Func<double, double, bool>((a, b) => a >= b);
+global.locals["lt"] = new Func<double, double, bool>((a, b) => a < b);
+global.locals["leq"] = new Func<double, double, bool>((a, b) => a <= b);
+global.locals["addi"] = new Func<int, int, int>((a, b) => a + b);
+global.locals["subi"] = new Func<int, int, int>((a, b) => a - b);
+global.locals["muli"] = new Func<int, int, int>((a, b) => a * b);
+global.locals["divi"] = new Func<int, int, int>((a, b) => a / b);
 
-var arr = (Type t, int len) => Array.CreateInstance(t, len);
-global.locals["arr"] = arr;
+var arr = (ValType vt, int len) => Array.CreateInstance(vt.type, len);
+global.locals["array"] = arr;
 global.locals["true"] = true;
 global.locals["false"] = false;
 var result = (Scope)scope.Eval(global);
@@ -281,15 +233,36 @@ class Parser {
 				rhs = NextExpression()
 			});
 		}
+
+		if(t == TokenType.SLASH) {
+			inc();
+			t = tokenType;
+			if(t == TokenType.NAME) {
+				var name = currToken.str;
+				inc();
+				return NextExpression(new ExprGet {
+					src = lhs,
+					key = name
+				});
+			}
+			throw new Exception("Name expected");
+		}
+
+		if(t == TokenType.SWIRL) {
+			inc();
+			var index = NextExpression();
+			return NextExpression(new ExprIndex {
+				src = lhs,
+				index = index
+			});
+		}
 		if(t == TokenType.QUESTION) {
 			inc();
-
 			t = tokenType;
 			if(t == TokenType.PLUS) {
 				inc();
 				var positive = NextExpression();
 				var negative = default(INode);
-
 				t = tokenType;
 				if(t == TokenType.QUESTION) {
 					inc();
@@ -309,7 +282,7 @@ class Parser {
 				inc();
 				return NextExpression(new ExprLoop { condition = lhs, positive = NextExpression() });
 			}
-				dec();
+			dec();
 		}
 		return lhs;
 	}
@@ -675,14 +648,31 @@ public class ExprSymbol : INode {
 	}
 }
 public class ExprGet : INode {
-	INode from;
-	string key;
+	public INode src;
+	public string key;
 	public dynamic Eval(Scope ctx) {
-		var scope = from.Eval(ctx);
-		if(scope is Scope s) {
+		var source = src.Eval(ctx);
+		if(source is Scope s) {
 			return s.locals.TryGetValue(key, out var v) ? v : ValError.VARIABLE_NOT_FOUND;
+		} else if(source is object o) {
+			var f = o.GetType().GetProperty(key, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+			return f.GetValue(source);
 		}
 		return ValError.OBJECT_EXPECTED;
+	}
+}
+public class ExprIndex : INode {
+	public INode src;
+	public INode index;
+	public dynamic Eval(Scope ctx) {
+		var scope = src.Eval(ctx);
+		if(scope is IEnumerable e) {
+			var ind = index.Eval(ctx);
+			if(ind is int i) {
+				return e.Cast<object>().ElementAt(i);
+			}
+		}
+		return ValError.SEQUENCE_EXPECTED;
 	}
 }
 
@@ -724,7 +714,7 @@ public class ExprMap : INode {
 			if(r is ValEmpty) {
 				continue;
 			}
-			result.Add(item);
+			result.Add(r);
 		}
 
 		return result.Count == 0 ? ValEmpty.VALUE : result;

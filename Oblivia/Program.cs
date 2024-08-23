@@ -72,7 +72,7 @@ var code = """
 		}
 	}
     main(args: string): int {
-		origin: Point/new(0, 0)
+		origin: Point/new(3, 5)
 		print*origin/x print*origin/y
 		origin/debug!
 		
@@ -608,7 +608,6 @@ class Parser {
 				value = NextExpression()
 			};
 		}
-
 		return NextExpression( new ExprInvoke { symbol = new ExprSymbol { key = name }, args = pars });
 	}
 	List<INode> NextParList () {
@@ -633,20 +632,14 @@ class Parser {
 		return par;
 		INode NextPairOrExpression () {
 			var key = currToken.str;
-
-
 			if(tokens[index + 1].type != TokenType.COLON) {
 				return NextExpression();
 			}
-
 			inc();
 			var t = currToken.type;
 			if(t == TokenType.COMMA || t == TokenType.R_PAREN) {
 				return new ExprSymbol { key = key };
 			}
-
-
-
 			if(currToken.type != TokenType.COLON) {
 				throw new Exception($"Expected colon in parameter list: {currToken.type}");
 			}
@@ -686,6 +679,15 @@ public class ExprCastBlock : INode {
 				parent = ctx,
 				temp = false
 			};
+
+			foreach(var (k,v) in scope.locals) {
+				if(v is ValFunc vf) {
+					//Bind instance methods
+					scope.locals[k] = vf with {
+						owner = scope
+					};
+				}
+			}
 			var o = obj.Apply(scope);
 
 			return o;

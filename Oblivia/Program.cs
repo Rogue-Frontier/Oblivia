@@ -1,5 +1,6 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using System.Collections;
+using System.Collections.ObjectModel;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Metadata.Ecma335;
@@ -74,7 +75,20 @@ var code = """
 		new!: Fib {}
 	}
 
+
+	Test: class {
+		alert!: {
+			print*"aaaaa"
+		}
+	}
 	fib!: {
+		t:Test
+
+		u: Test {
+			
+		}
+
+
 		fib: Fib/new!
 		printLen!:  print*cat*["count: " fib/table/Count]
 		printLen!
@@ -93,6 +107,10 @@ var code = """
 
     main(args: string): int {
 		fib!
+
+		table: Dictionary(int, int)/new()
+		table/Add(1,2)
+		print*addi(5, table@1)
     }
 }
 """;
@@ -132,15 +150,16 @@ global.locals = new Dictionary<string, dynamic> {
 	["leq"] = Val((double a, double b) => a <= b),
 	["eq"] = Val((double a, double b) => a == b),
 
-	["Array"] = Val((Type type, int len) => Array.CreateInstance(type, len)),
-	["List"] = Val((Type type) => typeof(List<>).MakeGenericType(type)),
-	["Dictionary"] = Val((Type key, Type val) => typeof(Dictionary<,>).MakeGenericType(key, val)),
 	["true"] = true,
 	["false"] = false,
 
 	["print"] = Val((object o) => Console.WriteLine(o)),
 	["cat"] = Val((object[] o) => string.Join(null, o)),
 	["range"] = Val((int a, int b) => Enumerable.Range(a, b - a).ToArray()),
+
+	["Array"] = Val((Type type, int len) => Array.CreateInstance(type, len)),
+	["List"] = Val((Type type) => typeof(List<>).MakeGenericType(type)),
+	["Dictionary"] = Val((Type key, Type val) => typeof(Dictionary<,>).MakeGenericType(key, val)),
 };
 var result = (Scope)scope.Eval(global);
 var r  = (result.locals["main"] as ValFunc).Call(result, [new ExprVal<string> { value= "program" }]);
@@ -236,14 +255,15 @@ public record ValInterface {
 }
 public class ValClass {
 	public Scope obj;
-
 	public Scope src_ctx;
 	public INode src;
-
-
-
-	public dynamic MakeInstance () {
+	public dynamic MakeInstance() {
 		return src.Eval(src_ctx);
+	}
+	public dynamic CastBlock(Scope ctx, ExprBlock obj) {
+		var scope = (Scope)src.Eval(src_ctx);
+		scope.parent = ctx;
+		return obj.Apply(scope);
 	}
 }
 public record Scope {
@@ -405,8 +425,22 @@ class Parser {
 			case TokenType.L_CURLY:
 				//Object literal
 				return NextScope();
+			case TokenType.L_PAREN:
+				return NextTuple();
+
 		}
 		throw new Exception($"Unexpected token in expression: {currToken.type}");
+	}
+
+	INode NextTuple () {
+		inc();
+		var expr = NextExpression();
+		var t = tokenType;
+		if(t == TokenType.R_PAREN) {
+			inc();
+			return expr;
+		}
+		throw new Exception("Tuples not supported");
 	}
 	INode NextArray() {
 		List<INode> items = [];
@@ -670,24 +704,19 @@ public class ExprCastBlock : INode {
 			}
 		}
 		if(t is ValClass vc) {
-			var scope = (Scope) vc.src.Eval(vc.src_ctx);
-
-			scope.parent = ctx;
-			var o = obj.Apply(scope);
-			return o;
-		
+			return vc.CastBlock(ctx, obj);
 		}
 		if(t is ValInterface vi) {
 			//return vi.Cast(t);
 		}
-		
-		
-		
-		
 		return ValError.TYPE_EXPECTED;
 		//return result;
 	}
 }
+
+
+
+
 public class ExprEqual : INode {
 	public INode lhs;
 	public INode rhs;
@@ -776,6 +805,23 @@ public class ExprInvoke : INode {
 			}
 			return r;
 		}
+		if(lhs is ValClass vcl) {
+			//Cast
+		}
+		if(lhs is Scope s) {
+			var result = new List<dynamic> { };
+			foreach(var a in args) {
+				var r = a.Eval(s);
+				if(r is ValEmpty) {
+					continue;
+				}
+				result.Add(r);
+			}
+			if(result.Count > 0)
+				return result;
+			else return ValEmpty.VALUE;
+			
+		}
 
 		throw new Exception("Implement function eval");
 	}
@@ -859,6 +905,9 @@ public class ExprIndex : INode {
 	public INode index;
 	public dynamic Eval(Scope ctx) {
 		var scope = src.Eval(ctx);
+		if(scope is IDictionary d) {
+			return d[index.Eval(ctx)];
+		}
 		if(scope is IEnumerable e) {
 			var ind = index.Eval(ctx);
 			if(ind is int i) {
@@ -976,10 +1025,7 @@ public class StmtDefFunc : INode {
 }
 
 public class StmtAssign : INode {
-    
-    
     public ExprSymbol symbol;
-
 
     public INode value;
 
@@ -1058,6 +1104,7 @@ class Tokenizer {
 			'+' => TokenType.PLUS,
 			'-' => TokenType.MINUS,
 			'/' => TokenType.SLASH,
+			'%' => TokenType.PERCENT,
 			_ => default(TokenType?)
 		} is { }tt) {
             index += 1;
@@ -1121,7 +1168,7 @@ public enum TokenType {
 	MINUS,
     SLASH,
 
-    SWIRL, QUERY, SHOUT, SPARK, PIPE, CASH,
+    SWIRL, QUERY, SHOUT, SPARK, PIPE, CASH, PERCENT,
 
 	EOF
 }

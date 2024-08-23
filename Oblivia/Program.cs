@@ -56,42 +56,43 @@ range(1, grid.width) | (x:int): int {
 
 */
 
-
-//fix instance methods
 var code = """
 {
-
-	Point: class {
-		x: int
-		y: int
-		new(x:int y:int): Point { ^x := ^^x, ^y := ^^y }
-		debug!: {
-			print-x
-			print-y
-		}
-	}
-    main(args: string): int {
-		origin: Point/new(3, 5)
-		print*origin/x print*origin/y
-		origin/debug!
-		
-		fib: {
-			table: List-int/new!
-			calc(a:int):
-				lt(a table/Count) ?+ table@a ?- {
-					result:
-						gr(a 1) ?+ addi(fib*subi(a 1) fib*subi(a 2)) ?-
-						eq(a 1) ?+ 1 ?-
+	Fib: class {
+		table: List-int/new!
+		calc(a:int):
+			lt(a table/Count) ?+ table@a ?- {
+				result:
+					gr(a 1) ?+
+						addi(calc*subi(a 1) calc*subi(a 2)) ?-
+					eq(a 1) ?+
+						1 ?-
 						0
-					table/Add-result
-					^: result
-				}
-			^: calc
-		}
+				table/Add-result
+				^: result
+			}
+		new!: Fib {}
+	}
+
+	fib!: {
+		fib: Fib/new!
+		printLen!:  print*cat*["count: " fib/table/Count]
+		printLen!
 		range(0 10) | @(a:int) {
-			print*fib*a
+			print * fib/calc * a
 		}
+		printLen!
+		fib := Fib/new!
+		printLen!
+		range(0 20) | @(a:int) {
+			print * fib/calc * a
+		}
+		printLen!
 		^: 0
+	}
+
+    main(args: string): int {
+		fib!
     }
 }
 """;
@@ -103,43 +104,44 @@ while(tokenizer.Next() is { type: not TokenType.EOF} t) {
 }
 var parser = new Parser(tokens);
 var scope = parser.NextScope();
+
+T Val<T> (T t) => t;
 var global = new Scope();
+global.locals = new Dictionary<string, dynamic> {
+	["void"] = typeof(void),
+	["bool"] = typeof(bool),
+	["int"] = typeof(int),
+	["double"] = typeof(double),
+	["string"] = typeof(string),
 
+	["addi"] = Val((int a, int b) => a + b),
+	["subi"] = Val((int a, int b) => a - b),
+	["muli"] = Val((int a, int b) => a * b),
+	["divi"] = Val((int a, int b) => a / b),
+	["modi"] = Val((int a, int b) => a % b),
+	["xori"] = Val((int a, int b) => a ^ b),
 
-T Val <T>(T t) => t;
-global.locals["int"] = typeof(int);
-global.locals["string"] = typeof(string);
-global.locals["bool"] = typeof(bool);
-global.locals["void"] = typeof(void);
-global.locals["double"] = typeof(double);
+	["addf"] = Val((double a, double b) => a + b),
+	["subf"] = Val((double a, double b) => a - b),
+	["mulf"] = Val((double a, double b) => a * b),
+	["divf"] = Val((double a, double b) => a / b),
 
-global.locals["print"] = Val((object o) => Console.WriteLine(o));
-global.locals["range"] = Val((int a, int b) => Enumerable.Range(a, b - a).ToArray());
+	["gr"] = Val((double a, double b) => a > b),
+	["geq"] = Val((double a, double b) => a >= b),
+	["lt"] = Val((double a, double b) => a < b),
+	["leq"] = Val((double a, double b) => a <= b),
+	["eq"] = Val((double a, double b) => a == b),
 
-global.locals["gr"] = Val((double a, double b) => a > b);
-global.locals["geq"] = Val((double a, double b) => a >= b);
-global.locals["lt"] = Val((double a, double b) => a < b);
-global.locals["leq"] = Val((double a, double b) => a <= b);
-global.locals["eq"] = Val((double a, double b) => a == b);
+	["Array"] = Val((Type type, int len) => Array.CreateInstance(type, len)),
+	["List"] = Val((Type type) => typeof(List<>).MakeGenericType(type)),
+	["Dictionary"] = Val((Type key, Type val) => typeof(Dictionary<,>).MakeGenericType(key, val)),
+	["true"] = true,
+	["false"] = false,
 
-global.locals["addi"] = Val((int a, int b) =>	a + b);
-global.locals["subi"] = Val((int a, int b) =>	a - b);
-global.locals["muli"] = Val((int a, int b) =>	a * b);
-global.locals["divi"] = Val((int a, int b) =>	a / b);
-global.locals["modi"] = Val((int a, int b) =>	a % b);
-
-global.locals["add"] = Val((double a, double b) => a + b);
-global.locals["sub"] = Val((double a, double b) => a - b);
-global.locals["mul"] = Val((double a, double b) => a * b);
-global.locals["div"] = Val((double a, double b) => a / b);
-
-global.locals["array"] = Val((Type type, int len) => Array.CreateInstance(type, len));
-
-
-
-global.locals["List"] = Val((Type type) => typeof(List<>).MakeGenericType(type));
-global.locals["true"] = true;
-global.locals["false"] = false;
+	["print"] = Val((object o) => Console.WriteLine(o)),
+	["cat"] = Val((object[] o) => string.Join(null, o)),
+	["range"] = Val((int a, int b) => Enumerable.Range(a, b - a).ToArray()),
+};
 var result = (Scope)scope.Eval(global);
 var r  = (result.locals["main"] as ValFunc).Call(result, [new ExprVal<string> { value= "program" }]);
 return;
@@ -293,14 +295,11 @@ public record Scope {
 class Parser {
     int index;
     List<Token> tokens;
-
     public Parser(List<Token> tokens) {
         this.tokens = tokens;
     }
-
 	void inc () => index++;
 	void dec() => index--;
-
     public Token currToken => tokens[index];
     public TokenType tokenType => currToken.type;
 	public INode NextExpression () {
@@ -337,7 +336,6 @@ class Parser {
 				rhs = NextExpression()
 			});
 		}
-
 		if(t == TokenType.SLASH) {
 			inc();
 			t = tokenType;
@@ -351,7 +349,6 @@ class Parser {
 			}
 			throw new Exception("Name expected");
 		}
-
 		if(t == TokenType.SWIRL) {
 			inc();
 			var index = NextExpression();
@@ -742,6 +739,9 @@ public class ExprInvoke : INode {
     public List<INode> args;
 	public string Source => $"{symbol.Source}{(args.Count > 1 ? $"({string.Join(", ", args.Select(a => a.Source))})" : args.Count == 1 ? $"*{args.Single().Source}" : $"!")}";
 	public dynamic Eval(Scope ctx) {
+		if(symbol is ExprSymbol { key: "declare", up: -1 }) {
+		}
+
 		var lhs = symbol.Eval(ctx);
 		if(lhs is ValEmpty) {
 			return ValError.FUNCTION_NOT_FOUND;
@@ -1082,8 +1082,9 @@ class Tokenizer {
 			while(dest < src.Length && src[dest] != '"') {
 				dest += 1;
 			}
+
 			dest += 1;
-			var v = src[index..dest];
+			var v = src[(index+1)..(dest-1)];
 			index = dest;
 			return new Token { type = TokenType.STRING, str = v };
 		}

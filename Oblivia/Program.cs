@@ -60,12 +60,11 @@ range(1, grid.width) | (x:int): int {
 //fix instance methods
 var code = """
 {
+
 	Point: class {
 		x: int
 		y: int
-
 		new(x:int y:int): Point { ^x := ^^x, ^y := ^^y }
-
 		debug!: {
 			print-x
 			print-y
@@ -186,35 +185,35 @@ public record ValFunc {
 
 	//TODO: Make sure instance functions point to the instance and not the class
 
-	public dynamic Call(Scope frame, List<INode> args) {
-		var ctx = new Scope(owner, false);
+	public dynamic Call(Scope ctx, List<INode> args) {
+		var frame = new Scope(owner, false);
 		var argList = new List<dynamic>();
 		var argDict = new Dictionary<string, dynamic>();
-		ctx.locals["argList"] = argList;
-		ctx.locals["argDict"] = argDict;
+		frame.locals["argList"] = argList;
+		frame.locals["argDict"] = argDict;
 		foreach(var p in pars) {
-			var val = p.value.Eval(frame);
-			StmtKeyVal.Define(ctx, p.key, val);
+			var val = p.value.Eval(ctx);
+			StmtKeyVal.Define(frame, p.key, val);
 		}
 		int ind = 0;
 		foreach(var arg in args) {
 			if(arg is StmtKeyVal kv) {
 				ind = -1;
 
-				var val = StmtAssign.Assign(ctx, kv.key, 1, () => kv.value.Eval(frame));
+				var val = StmtAssign.Assign(frame, kv.key, 1, () => kv.value.Eval(ctx));
 			} else if(ind > -1) {
 				var p = pars[ind];
-				var val = StmtAssign.Assign(ctx, p.key, 1, () => arg.Eval(frame));
+				var val = StmtAssign.Assign(frame, p.key, 1, () => arg.Eval(ctx));
 				ind += 1;
 			}
 		}
 
 		foreach(var p in pars) {
-			var val = ctx.locals[p.key];
+			var val = frame.locals[p.key];
 			argList.Add(val);
 			argDict[p.key] = val;
 		}
-		var result = expr.Eval(ctx);
+		var result = expr.Eval(frame);
 		return result;
 	}
 }
@@ -236,8 +235,13 @@ public record ValInterface {
 public class ValClass {
 	public Scope obj;
 
+	public Scope src_ctx;
+	public INode src;
+
+
+
 	public dynamic MakeInstance () {
-		return null;
+		return src.Eval(src_ctx);
 	}
 }
 public record Scope {
@@ -547,11 +551,6 @@ class Parser {
 		}
 		throw new Exception($"Unexpected token: {tokenType}");
 	}
-
-
-	public INode NextTernary () {
-		return null;
-	}
 	INode NextDefineOrReassign (string name) {
 		inc();
 		switch(currToken.type) {
@@ -670,26 +669,14 @@ public class ExprCastBlock : INode {
 		}
 		if(type == "class") {
 			if(getResult() is Scope s) {
-				return new ValClass { obj = s };
+				return new ValClass { obj = s, src = obj, src_ctx = ctx };
 			}
 		}
 		if(t is ValClass vc) {
-			var scope = vc.obj with {
-				locals = new(vc.obj.locals),
-				parent = ctx,
-				temp = false
-			};
+			var scope = (Scope) vc.src.Eval(vc.src_ctx);
 
-			foreach(var (k,v) in scope.locals) {
-				if(v is ValFunc vf) {
-					//Bind instance methods
-					scope.locals[k] = vf with {
-						owner = scope
-					};
-				}
-			}
+			scope.parent = ctx;
 			var o = obj.Apply(scope);
-
 			return o;
 		
 		}
@@ -720,13 +707,13 @@ public class ExprBranch : INode {
 
 	public string Source => $"{condition.Source} ?+ {positive.Source}{(negative != null ? $" ?- {negative.Source}" : $"")}";
 
-	public dynamic Eval(Scope frame) {
-		var cond = condition.Eval(frame);
+	public dynamic Eval(Scope ctx) {
+		var cond = condition.Eval(ctx);
 		if(cond == true) {
-			return positive.Eval(frame);
+			return positive.Eval(ctx);
 		}
 		if(negative != null) {
-			return negative.Eval(frame);
+			return negative.Eval(ctx);
 		}
 		return ValEmpty.VALUE;
 	}
@@ -754,15 +741,13 @@ public class ExprInvoke : INode {
     public INode symbol;
     public List<INode> args;
 	public string Source => $"{symbol.Source}{(args.Count > 1 ? $"({string.Join(", ", args.Select(a => a.Source))})" : args.Count == 1 ? $"*{args.Single().Source}" : $"!")}";
-
-	public dynamic Eval(Scope frame) {
-		var lhs = symbol.Eval(frame);
+	public dynamic Eval(Scope ctx) {
+		var lhs = symbol.Eval(ctx);
 		if(lhs is ValEmpty) {
 			return ValError.FUNCTION_NOT_FOUND;
 		}
-
 		if(lhs is ValConstructor vc) {
-			var rhs = args.Select(arg => arg.Eval(frame)).ToArray();
+			var rhs = args.Select(arg => arg.Eval(ctx)).ToArray();
 			var c = vc.t.GetConstructor(rhs.Select(arg => (arg as object).GetType()).ToArray());
 			if(c == null) {
 				return ValError.CONSTRUCTOR_NOT_FOUND;
@@ -772,19 +757,19 @@ public class ExprInvoke : INode {
 
 
 		if(lhs is ValMethod vm) {
-			var vals = args.Select(arg => arg.Eval(frame)).ToArray();
+			var vals = args.Select(arg => arg.Eval(ctx)).ToArray();
 			return vm.m.Invoke(vm.src, vals);
 		}
 		if(lhs is Type t) {
-			var d = args.Single().Eval(frame);
+			var d = args.Single().Eval(ctx);
 			return new ValType(t).Cast(d);
 		}
 		if(lhs is ValFunc vf) {
-			return vf.Call(frame, args);
+			return vf.Call(ctx, args);
 		}
 		if(lhs is Delegate f) {
 			
-			var r = f.DynamicInvoke(args.Select(a => a.Eval(frame)).ToArray());
+			var r = f.DynamicInvoke(args.Select(a => a.Eval(ctx)).ToArray());
 
 			if(f.Method.ReturnType == typeof(void)) {
 				return ValEmpty.VALUE;
@@ -808,8 +793,8 @@ public class ExprBlock : INode {
     public List<INode> statements;
     public XElement ToXML () => new ("Block", statements.Select(i => i.ToXML()));
 	public string Source => $"{{{string.Join(", ", statements.Select(i => i.Source))}}}";
-	public dynamic Eval(Scope frame) {
-		return Apply(new Scope(frame, false));
+	public dynamic Eval(Scope ctx) {
+		return Apply(new Scope(ctx, false));
 
 	}
 
@@ -817,7 +802,6 @@ public class ExprBlock : INode {
 		dynamic r = ValEmpty.VALUE;
 		foreach(var s in statements) {
 			r = s.Eval(f);
-
 			if(r is ValReturn vr) {
 				return vr.data;
 			}
@@ -889,7 +873,7 @@ public class ExprVal<T> : INode {
     public T value;
     public XElement ToXML () => new("Value", new XAttribute("value", value));
 	public string Source => $"{value}";
-	public dynamic Eval(Scope frame) {
+	public dynamic Eval(Scope ctx) {
 		return value;
 	}
 }
@@ -902,8 +886,8 @@ public class ExprMap : INode {
 
 	public XElement ToXML () => new("Map", from.ToXML(), map.ToXML());
 	public string Source => $"{from.Source} | {map.Source}";
-	public dynamic Eval (Scope frame) {
-		var _from = from.Eval(frame);
+	public dynamic Eval (Scope ctx) {
+		var _from = from.Eval(ctx);
 		
 		if(_from is ValEmpty) {
 			return ValError.VARIABLE_NOT_FOUND;
@@ -912,14 +896,14 @@ public class ExprMap : INode {
 			return ValError.SEQUENCE_EXPECTED;
 		}
 
-		var _map = map.Eval(frame);
+		var _map = map.Eval(ctx);
 		if(_map is not ValFunc vf) {
 			return ValError.FUNCTION_EXPECTED;
 		}
 
 		var result = new List<dynamic>();
 		foreach(var item in e) {
-			var r = vf.Call(frame, [new ExprVal<dynamic> { value = item }]);
+			var r = vf.Call(ctx, [new ExprVal<dynamic> { value = item }]);
 			if(r is ValEmpty) {
 				continue;
 			}
@@ -956,11 +940,11 @@ public class ExprFunc : INode {
 	public string Source => $"@({string.Join(", ", pars.Select(p => p.Source))}) {result.Source}";
 
 
-	public dynamic Eval (Scope frame) =>
+	public dynamic Eval (Scope ctx) =>
 		new ValFunc {
 			expr = result,
 			pars = pars.Cast<StmtKeyVal>().ToList(),
-			owner = frame
+			owner = ctx
 		};
 }
 
@@ -978,8 +962,8 @@ public class StmtDefFunc : INode {
 
 	public XElement ToXML () => new("DefineFunc", [new XAttribute("key", key), ..pars.Select(i => i.ToXML()), value.ToXML()]);
     public string Source => $"{key}({string.Join(", ",pars.Select(p => p.Source))}): {value.Source}";
-	public dynamic Eval(Scope frame) {
-		Define(frame);
+	public dynamic Eval(Scope ctx) {
+		Define(ctx);
 		return ValEmpty.VALUE;
 	}
 	public void Define(Scope owner) {
@@ -1031,7 +1015,7 @@ public interface INode {
 
     String Source => "";
 
-	dynamic Eval (Scope frame) => null;
+	dynamic Eval (Scope ctx) => null;
 }
 
 class Tokenizer {

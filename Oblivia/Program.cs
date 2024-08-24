@@ -59,62 +59,80 @@ range(1, grid.width) | (x:int): int {
 
 var code = """
 {
-	Fib: class {
-		table: List-int/new!
-		calc(a:int):
-			lt(a table/Count) ?+ table@a ?- {
-				result:
-					gr(a 1) ?+
-						addi(calc*subi(a 1) calc*subi(a 2)) ?-
-					eq(a 1) ?+
-						1 ?-
-						0
-				table/Add-result
-				^: result
+	Life: class {
+		width:int	height:int	grid: Grid-bool
+		adj(n:int max:int):
+			modi(lt(n 0) ?+ addi(n max) ?- n max)
+		GetCell(x:int y:int): {
+			x := adj(x width)
+			y := adj(y height)
+			^: array_get(grid [#int x y])
+		}
+		SetCell(x:int y:int b:bool): {
+			x := adj(x width)
+			y := adj(y height)
+			array_set(grid [#int x y] b)
+		}
+		new(width:int height:int): Life {
+			width := ^^width
+			height := ^^height
+			grid := Grid-bool/new(width height)
+
+			debug!
+		}
+		debug!: {
+			print*cat*["width: " width]
+			print*cat*["height: " height]
+		}
+		update!: {
+			p: XY/new
+			n: 0
+			range(0 width) | @(x:int) {
+				range(0 height) | @(y:int) {
+					left:	subi(x 1)
+					up:		addi(y 1)
+					right:	addi(x 1)
+					down:	subi(y 1)
+					c: count([#bool
+						GetCell(left up)	GetCell(x up)	GetCell(right up)
+						GetCell(left y)						GetCell(right y)
+						GetCell(left down)	GetCell(x down)	GetCell(right down)
+					] true)
+					active: GetCell(x y)
+					active :=
+						active ?+
+							(lt(c 2) ?+
+								false ?-
+							gt(c 3) ?+
+								false ?-
+								active) ?-
+						eq(c 3) ?+
+							true ?-
+							active
+					SetCell(x y active)
+					n := active ?+ addi(n 1) ?- n
+				}
 			}
-		new!: Fib {}
-	}
-
-
-	Test: class {
-		alert!: {
-			print*"aaaaa"
+			print*cat*["active: " n]
+			^: n
 		}
 	}
-	fib!: {
-		t:Test
-
-		u: Test {
-			
-		}
-
-
-		fib: Fib/new!
-		printLen!:  print*cat*["count: " fib/table/Count]
-		printLen!
-		range(0 10) | @(a:int) {
-			print * fib/calc * a
-		}
-		printLen!
-		fib := Fib/new!
-		printLen!
-		range(0 20) | @(a:int) {
-			print * fib/calc * a
-		}
-		printLen!
-		^: 0
-	}
-
     main(args: string): int {
-		fib!
-
-		table: Dictionary(int, int)/new()
-		table/Add(1,2)
-		print*addi(5, table@1)
+		life: Life/new(32 32)
+		range(0 life/width) | @(x:int)
+			range(0 life/height) | @(y:int)
+				life/SetCell(x y randb!)
+		count:1
+		prevCount:0
+		run: true
+		run ?* { 
+			prevCount := count
+			count := life/update!
+			run := neq(count prevCount)
+		}
     }
 }
 """;
-
 var tokenizer = new Tokenizer(code);
 var tokens = new List<Token> { };
 while(tokenizer.Next() is { type: not TokenType.EOF} t) {
@@ -144,11 +162,19 @@ global.locals = new Dictionary<string, dynamic> {
 	["mulf"] = Val((double a, double b) => a * b),
 	["divf"] = Val((double a, double b) => a / b),
 
-	["gr"] = Val((double a, double b) => a > b),
+	["sumi"] = Val((int[] a) => a.Sum()),
+
+	["count"] = Val((IEnumerable data, object value) => data.Cast<object>().Count(d => {
+		var result = d.Equals(value);
+		return result;
+	})),
+
+	["gt"] = Val((double a, double b) => a > b),
 	["geq"] = Val((double a, double b) => a >= b),
 	["lt"] = Val((double a, double b) => a < b),
 	["leq"] = Val((double a, double b) => a <= b),
 	["eq"] = Val((double a, double b) => a == b),
+	["neq"] = Val((double a, double b) => a != b),
 
 	["true"] = true,
 	["false"] = false,
@@ -157,10 +183,26 @@ global.locals = new Dictionary<string, dynamic> {
 	["cat"] = Val((object[] o) => string.Join(null, o)),
 	["range"] = Val((int a, int b) => Enumerable.Range(a, b - a).ToArray()),
 
-	["Array"] = Val((Type type, int len) => Array.CreateInstance(type, len)),
+	["Array"] = Val((Type type, int dim) => type.MakeArrayType(dim)),
+	["array_get"] = Val((Array a, int[] ind) => a.GetValue(ind)),
+	["array_set"] = Val((Array a, int[] ind, object value) => a.SetValue(value, ind)),
+
+	["row_from"] = Val((Type t, object[] items) => {
+		var result = Array.CreateInstance(t, items.Length);
+		Array.Copy(items, result, items.Length);
+		return result;
+	}),
+
+	["randb"] = Val(() => new Random().Next(2) == 1),
+
+	["Row"] = Val((Type type) => type.MakeArrayType(1)),
+	["Grid"] = Val((Type type) => type.MakeArrayType(2)),
 	["List"] = Val((Type type) => typeof(List<>).MakeGenericType(type)),
 	["Dictionary"] = Val((Type key, Type val) => typeof(Dictionary<,>).MakeGenericType(key, val)),
 };
+
+
+
 var result = (Scope)scope.Eval(global);
 var r  = (result.locals["main"] as ValFunc).Call(result, [new ExprVal<string> { value= "program" }]);
 return;
@@ -267,13 +309,13 @@ public class ValClass {
 	}
 }
 public record Scope {
-	public bool temp;
+	public bool temp = false;
 	public Scope parent = null;
+	public Dictionary<string, dynamic> locals = [];
 	public Scope (Scope parent = null, bool temp = false) {
 		this.temp = temp;
 		this.parent = parent;
 	}
-	public Dictionary<string, dynamic> locals = [];
 	public dynamic Get(string key, int up = -1) =>
 		up == -1 ? GetAll(key) : GetAt(key, up);
 	public dynamic GetAt(string key, int up) {
@@ -409,6 +451,7 @@ class Parser {
 	}
 
 	INode NextTerm () {
+
 		switch(tokenType) {
 			case TokenType.L_SQUARE:
 				return NextArray();
@@ -445,14 +488,28 @@ class Parser {
 	INode NextArray() {
 		List<INode> items = [];
 		inc();
-		Check:
+
+		INode type = null;
 		var t = tokenType;
+		if(t == TokenType.HASH) {
+			inc();
+			type = NextExpression();
+
+		}
+
+		Check:
+		t = tokenType;
+		if(t == TokenType.COMMA) {
+			inc();
+			goto Check;
+		}
+
 		if(t != TokenType.R_SQUARE) {
 			items.Add(NextExpression());
 			goto Check;
 		}
 		inc();
-		return new ExprSeq { items = items };
+		return new ExprSeq { items = items, type = type };
 	}
 	INode NextLambda () {
 		inc();
@@ -650,13 +707,12 @@ class Parser {
 			case TokenType.COMMA:
 				inc();
 				goto Check;
-			case TokenType.CARET:
-			case TokenType.INTEGER:
-			case TokenType.STRING:
-				par.Add(NextExpression());
-				goto Check;
+
 			case TokenType.NAME:
 				par.Add(NextPairOrExpression());
+				goto Check;
+			default:
+				par.Add(NextExpression());
 				goto Check;
 		}
 		return par;
@@ -797,8 +853,8 @@ public class ExprInvoke : INode {
 			return vf.Call(ctx, args);
 		}
 		if(lhs is Delegate f) {
-			
-			var r = f.DynamicInvoke(args.Select(a => a.Eval(ctx)).ToArray());
+			var arg = args.Select(a => a.Eval(ctx)).ToArray();
+			var r = f.DynamicInvoke(arg);
 
 			if(f.Method.ReturnType == typeof(void)) {
 				return ValEmpty.VALUE;
@@ -870,14 +926,12 @@ public class ExprGet : INode {
 	public string key;
 
 	public dynamic Eval(Scope ctx) {
-
 		var FL = BindingFlags.Public | BindingFlags.Instance;
 
 		var source = src.Eval(ctx);
 		if(source is Scope s) {
 			return s.locals.TryGetValue(key, out var v) ? v : ValError.VARIABLE_NOT_FOUND;
 		}
-
 		if(source is ValClass vc) {
 			return vc.obj.locals.TryGetValue(key, out var v) ? v : ValError.VARIABLE_NOT_FOUND;
 		}
@@ -998,10 +1052,18 @@ public class ExprFunc : INode {
 }
 
 public class ExprSeq : INode {
+	public INode type;
 	public List<INode> items;
 
 	public dynamic Eval(Scope ctx) {
-		return items.Select(i => i.Eval(ctx)).ToArray();
+		var src = (dynamic)items.Select(i => i.Eval(ctx)).ToArray();
+		var _type = type?.Eval(ctx);
+		if(_type is Type t) {
+			var result = Array.CreateInstance(t, src.Length);
+			Array.Copy(src, result, src.Length);
+			src = result;
+		}
+		return src;
 	}
 }
 public class StmtDefFunc : INode {
@@ -1105,6 +1167,7 @@ class Tokenizer {
 			'-' => TokenType.MINUS,
 			'/' => TokenType.SLASH,
 			'%' => TokenType.PERCENT,
+			'#' => TokenType.HASH,
 			_ => default(TokenType?)
 		} is { }tt) {
             index += 1;
@@ -1114,9 +1177,9 @@ class Tokenizer {
 			inc();
 			goto Check;
 		}
-		if(c is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z')) {
+		if(c is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or '_') {
 			int dest = index + 1;
-			while(dest < src.Length && src[dest] is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z')) {
+			while(dest < src.Length && src[dest] is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or '_') {
 				dest += 1;
 			}
 			var v = src[index..dest];
@@ -1168,7 +1231,7 @@ public enum TokenType {
 	MINUS,
     SLASH,
 
-    SWIRL, QUERY, SHOUT, SPARK, PIPE, CASH, PERCENT,
+    SWIRL, QUERY, SHOUT, SPARK, PIPE, CASH, PERCENT, HASH,
 
 	EOF
 }

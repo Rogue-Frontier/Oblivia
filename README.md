@@ -35,7 +35,6 @@ The following code implements a Conway's Game of Life and updates until the coun
 			print*cat*["height: " height]
 		}
 		update!: {
-			p: XY/new
 			n: 0
 			range(0 width) | @(x:int) {
 				range(0 height) | @(y:int) {
@@ -109,10 +108,8 @@ There are no arithmetic operators. See global function table for arithmetic func
 - `^A`: Get value of identifier `A` from the current scope
 - `^^A`: Get value of identifier `A` from the parent scope. And so on.
 - `A ?+ B ?- C`: If A then B else C
-
 - `A | B`: Map array A by function B
-- `A ?* B`: While A, do B
-
+- `A ?* B`: While A, evaluate B
 - `A/B`: From A get member named B
 - `A@B`: From array A get item at index of value B
 - `[A B C]`: Make an object array

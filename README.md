@@ -120,9 +120,9 @@ There are no arithmetic operators. See global function table for arithmetic func
 - `@(A,B) C`: Creates a lambda with arguments A,B and output `C`
 ## Design philosophy
 
-- Noise
+- We define the *noise* of an expression based on two factors:
   - Width: The number of columns needed to write
-  - Ink: The amount of "ink" needed to write
+  - Ink: The amount of "ink" needed to write (e.g. `;` > `:` > `,` > `.`) 
 
 - The complexity of a statement corresponds to the noise needed to write it.
 - Whitespace is the simplest operator.

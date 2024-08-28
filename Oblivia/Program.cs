@@ -711,6 +711,7 @@ public class ExprInvoke : INode {
 		if(lhs is Type t) {
 			var d = args.Single().Eval(ctx);
 
+			return new ValType(t).Cast(d);
 			if(t.IsPrimitive) {
 				return new ValType(t).Cast(d);
 			} else {
@@ -996,17 +997,19 @@ public class StmtAssign : INode {
 		if(curr == ValError.VARIABLE_NOT_FOUND) {
 			return curr;
 		}
-		if(curr is ValClass vc) {
+
+		var t = curr.GetType();
+		if(curr is ValDeclared vd) {
+			t = vd.type;
+		}
+		if(curr is ValClassScope vc) {
 			var next = getNext();
-			if(next is ValClassScope vcs && vcs.fromClass == vc) {
+			if(next is ValClassScope vcs && vcs.fromClass == vc.fromClass) {
 				return vcs;
 			}
 			return ValError.TYPE_MISMATCH;
 		} else {
-			if(curr is ValDeclared vd) {
-				var currType = vd.type;
-			}
-			var t = curr.GetType();
+			
 			var next = getNext();
 			if(t != next.GetType()) {
 				return ValError.TYPE_MISMATCH;

@@ -75,7 +75,6 @@ public record ValFunc {
 			var val = p.value.Eval(caller_ctx);
 			StmtKeyVal.Init(callee_ctx, p.key, val);
 		}
-
 		int ind = 0;
 		foreach(var arg in args) {
 			if(arg is StmtKeyVal kv) {
@@ -87,7 +86,6 @@ public record ValFunc {
 				ind += 1;
 			}
 		}
-
 		foreach(var p in pars) {
 			var val = callee_ctx.locals[p.key];
 			argList.Add(val);
@@ -141,16 +139,18 @@ public record ValInterface {
 
 }
 public class ValClass {
-	public ValDictScope obj;
-	public ValDictScope src_ctx;
 
-	public INode src;
-	public dynamic MakeInstance() {
-		return src.Eval(src_ctx);
-	}
-	public dynamic VarBlock(ValDictScope ctx, ExprBlock obj) {
-		var scope = (ValDictScope)src.Eval(src_ctx);
-		var r = obj.Apply(new ValDictScope { locals = scope.locals, parent = ctx, temp = false});
+	public string name;
+	public ValDictScope _static;
+
+	public INode source_expr;
+	public ValDictScope source_ctx;
+
+	public dynamic MakeInstance() =>
+		source_expr.Eval(source_ctx);
+	public dynamic VarBlock(ValDictScope ctx, ExprBlock block) {
+		var scope = (ValDictScope)source_expr.Eval(source_ctx);
+		var r = block.Apply(new ValDictScope { locals = scope.locals, parent = ctx, temp = false});
 		return r;
 	}
 }
@@ -331,6 +331,7 @@ public class Parser {
 			if(tokenType == TokenType.L_CURLY) {
 				return NextExpression(new ExprApplyBlock { lhs = lhs, rhs = NextBlock() });
 			} else {
+				//return NextExpression(new ExprApplyBlock { lhs = lhs, rhs = NextExpression() });
 				throw new Exception("Expected block");
 			}
 		}
@@ -430,7 +431,7 @@ public class Parser {
 
 		var t = tokenType;
 		if(t == TokenType.L_CURLY) {
-			return new ExprVarBlock { type = name, src = NextBlock() };
+			return new ExprVarBlock { type = name, source_block = NextBlock() };
 		}
 
 		return new ExprSymbol { key = name };
@@ -457,6 +458,17 @@ public class Parser {
 			return s;
 		}
 
+		if(t == TokenType.SLASH) {
+			inc();
+			t = tokenType;
+			if(t == TokenType.NAME) {
+				var r = new ExprGet { key = currToken.str, src = new ExprSelf { up = up } };
+				inc();
+				return r;
+			} else {
+				throw new Exception();
+			}
+		}
 
 		if(t == TokenType.NAME) {
 			var s = new ExprSymbol { up = up, key = currToken.str };
@@ -504,7 +516,7 @@ public class Parser {
         var t = tokenType;
         if(t == TokenType.COMMA) {
             return symbol;
-        } else if(t == TokenType.COLON) {
+        } else if(t == TokenType.EQUAL) {
             inc();
 			t = tokenType;
 			if(t == TokenType.EQUAL) {
@@ -512,7 +524,6 @@ public class Parser {
                 var exp = NextExpression();
                 return new StmtAssign { symbol = (ExprSymbol)symbol, value = exp };
             }
-            throw new Exception($"Reassign expected: {tokenType}");
         } else if(t == TokenType.L_PAREN) {
 			inc();
 			var args = NextParList();
@@ -648,17 +659,14 @@ public class ExprSpread : INode {
 }
 public class ExprVarBlock : INode {
     public string type;
-    public ExprBlock src;
-    public XElement ToXML () => new("VarBlock", new XAttribute("type", type), src.ToXML());
-    public string Source => $"{type} {src.Source}";
+    public ExprBlock source_block;
+    public XElement ToXML () => new("VarBlock", new XAttribute("type", type), source_block.ToXML());
+    public string Source => $"{type} {source_block.Source}";
 	public dynamic Eval(ValDictScope ctx) {
-		var getResult = () => src.Eval(ctx);
-
-
-
+		var getResult = () => source_block.Eval(ctx);
 		if(type == "class") {
 			if(getResult() is ValDictScope s) {
-				return new ValClass { obj = s, src = src, src_ctx = ctx };
+				return new ValClass { _static = s, source_expr = source_block, source_ctx = ctx };
 			} else {
 				throw new Exception("Class expected");
 			}
@@ -674,18 +682,17 @@ public class ExprVarBlock : INode {
 			return new ValType(tt).Cast(getResult());
 		}
 		if(type == "interface") {
+			return null;
 			if(getResult() is ValDictScope s) {
 			}
 		}
 		if(type == "enum") {
-
 			var locals = new Dictionary<string, dynamic> { };
 			var rhs = getResult();
 			return new ValDictScope { locals = [], parent = ctx, temp = false };
 		}
-
 		if(t is ValClass vc) {
-			return vc.VarBlock(ctx, src);
+			return vc.VarBlock(ctx, source_block);
 		}
 		if(t is ValInterface vi) {
 			//return vi.Cast(t);
@@ -706,7 +713,6 @@ public class ExprBranch : INode {
 	public INode positive;
 	public INode negative;
 	public string Source => $"{condition.Source} ?+ {positive.Source}{(negative != null ? $" ?- {negative.Source}" : $"")}";
-
 	public dynamic Eval(ValDictScope ctx) {
 		var cond = condition.Eval(ctx);
 		if(cond == true) {
@@ -744,8 +750,6 @@ public class ExprInvoke : INode {
 		if(symbol is ExprSymbol { key:"get", up: -1 }) {
 			return new ValGetter { ctx = ctx, expr = args.Single() };
 		}
-
-
 		var lhs = symbol.Eval(ctx);
 		if(lhs is ValEmpty) {
 			throw new Exception("Function not found");
@@ -763,19 +767,15 @@ public class ExprInvoke : INode {
 			}
 			return c.Invoke(rhs);
 		}
-
-
 		if(lhs is ValMethod vm) {
 			var vals = args.Select(arg => arg.Eval(ctx)).ToArray();
 			return vm.m.Invoke(vm.src, vals);
 		}
 		if(lhs is ValMember vm2) {
-
 			var vals = args.Select(arg => arg.Eval(ctx)).ToArray();
 		}
 		if(lhs is Type t) {
 			var d = args.Single().Eval(ctx);
-
 			return new ValType(t).Cast(d);
 			if(t.IsPrimitive) {
 				return new ValType(t).Cast(d);
@@ -814,8 +814,7 @@ public class ExprInvoke : INode {
 				return result;
 			else return ValEmpty.VALUE;	
 		}
-
-		throw new Exception("Implement function eval");
+		throw new Exception();
 	}
 }
 public class ExprApplyBlock : INode {
@@ -823,22 +822,17 @@ public class ExprApplyBlock : INode {
 	public ExprBlock rhs;
 	public dynamic Eval(ValDictScope ctx) {
 		var lhs = this.lhs.Eval(ctx);
-
 		if(lhs is ValDictScope vds) {
-			return rhs.Apply(vds);
+			return rhs.Apply(new ValDictScope { locals = vds.locals, parent = ctx, temp = false });
 		}
-
 		if(lhs is IScope s) {
 			//return block.Apply(s);
-			
 		} else if(lhs is object o) {
 			//return block.Apply(new ValObjectScope { obj = o, parent = ctx });
 		}
-		throw new Exception("aaaa");
-
+		throw new Exception();
 	}
 }
-
 public class StmtReturn : INode {
 	public INode val;
 	public dynamic Eval(ValDictScope ctx) {
@@ -855,6 +849,35 @@ public class ExprBlock : INode {
 	public dynamic Apply(ValDictScope f) {
 		dynamic r = ValEmpty.VALUE;
 		foreach(var s in statements) {
+			r = s.Eval(f);
+			if(r is ValReturn vr) {
+				return vr.data;
+			}
+		}
+		return f;
+	}
+	public dynamic MakeScope (ValDictScope ctx) => new ValDictScope(ctx, false);
+	public dynamic StagedEval (ValDictScope ctx) => StagedApply(MakeScope(ctx));
+	public dynamic StagedApply (ValDictScope f) {
+		dynamic r = ValEmpty.VALUE;
+		var stageB = () => { };
+		var stageC = new List<INode> { };
+		foreach(var s in statements) {
+			if(s is StmtKeyVal { value: ExprVarBlock { type: "class", source_block: {}block } } kv) {
+				var _static = block.MakeScope(f);
+				f.locals[kv.key] = new ValClass {
+					name = kv.key,
+					source_ctx = f,
+					source_expr = block,
+					_static = _static
+				};
+				stageB += () => block.StagedApply(_static);
+			} else {
+				stageC.Add(s);
+			}
+		}
+		stageB();
+		foreach(var s in stageC) {
 			r = s.Eval(f);
 			if(r is ValReturn vr) {
 				return vr.data;
@@ -896,18 +919,20 @@ public class ExprGet : INode {
 			} else { throw new Exception("Variable not found"); }
 		}
 		if(source is ValClass vc) {
-			return vc.obj.locals.TryGetValue(key, out var v) ? v : throw new Exception("Variable not found");
+			return vc._static.locals.TryGetValue(key, out var v) ? v : throw new Exception("Variable not found");
 		}
 		if(source is Type t) {
 			var FLS = BindingFlags.Static | BindingFlags.Public;
 			if(key == "new") {
 				return new ValConstructor(t);
 			}
-			if(t.GetMethod(key, FL) is { } m) {
-				return new ValMethod(null, m);
-			}
 			if(t.GetField(key, FLS) is { } f) {
 				return f.GetValue(null);
+			}
+
+			//return new ValMember(null, key);
+			if(t.GetMethod(key, FL) is { } m) {
+				return new ValMethod(null, m);
 			}
 			throw new Exception($"Unknown static member {key}");
 		}
@@ -921,7 +946,9 @@ public class ExprGet : INode {
 			}
 			if(ot.GetField(key, FL) is { } f) {
 				return f.GetValue(o);
-			}	
+			}
+			//return new ValMember(null, key);
+
 			throw new Exception($"Unknown instance member {key}");
 		}
 		throw new Exception("Object expected");

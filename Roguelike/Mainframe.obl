@@ -1,54 +1,145 @@
 {
+	BufferedList: class {
+		items: HashSet-object/new!
+		toAdd: HashSet-object/new!
+		toRemove: HashSet-object/new!
+
+		new!: BufferedList{}
+		Add: toAdd/Add
+		Remove: toRemove/Remove
+		Update!: {
+			items/UnionWith-toAdd
+			items/ExceptWith-toRemove
+			toAdd/Clear!
+			toRemove/Clear!
+		}
+	}
 	XY: class {
-		x:double
-		y:double
+		x: double_from-0
+		y: double_from-0
 		xi: get* int_from-x
 		yi: get* int_from-y
+		xyi: get* Pt/new(xi yi)
+
 		i(x:int y:int): XY {
 			x := double_from-^^x
 			y := double_from-^^y
 		}
 		f(x:double y:double): XY {
-			x :=^^x
+			x := ^^x
 			y := ^^y
 		}
-		plus(rhs: object): XY {
+		plus(rhs: XY): XY {
 			x := addf(^^^x rhs/x)
 			y := addf(^^^y rhs/y)
 		}
 	}
 	Tile: class {
-		glyph: "%" # 0
-		front: ABGR/White
+		glyph: "@"#0
+		front: ABGR/Magenta
 		back: ABGR/Black
-		print(sf:Sf pos:XY): 
-			sf/PrintChar(pos/xi pos/yi glyph front back)
+		print(sf:Sf pos:XY): {
+			pos % { sf/PrintChar(^/xi ^/yi glyph front back) }
+		}
+	}
+	Entity: interface {
+		active: bool
+	}
+	Enemy: class {
+		pos:XY
+		tile: Tile {}
+		world: World
+		new(pos:XY world:World): Enemy {
+			pos := ^^pos
+			world := ^^world
+		}
+		update!: {
+
+		}
 	}
 	Player: class {
 		pos: XY
 		tile: Tile {}
-		new(pos:XY): Player {
+		busy: false
+		world: World
+		new(pos:XY world:World): Player {
 			pos := ^^pos
+			world := ^^world
 		}
-		update(delta:double): {
-			dest: pos/plus * XY/f(delta double_from*0)
-			pos := dest
+		update!: {
+			busy := false
+		}
+		move(disp:XY): {
+			pos := pos/plus-disp
+			busy := true
 		}
 	}
-	player: Player/new(XY/i(0 0))
+	World: class {
+		tick: 0
+		entities: BufferedList/new!
+		updateGrid: true
+		grid: ConcurrentDictionary(Pt HashSet-object)/new!
+		new!: World{}
+		addEntity(e:object): {
+			entities/Add(e)
+		}
+		update(): {
+			entities/Update!
+			entities/items | ?(e:object)
+				e/update!
+			updateGrid := true
+			tick := addi(tick 1)
+		}
+		getGrid!: {
+			updateGrid ?+ {
+				grid/Clear!
+				entities/items | ?(e:object)
+					grid/GetOrAdd(e/pos/xyi, HashSet-object/new!)/Add(e)
+			}
+			^: grid
+		}
+
+	}
 	time: addf(0 0)
+	move: false
+	player: Player
+	world: World
+	init!: {
+		world := World/new!
+		player := Player/new(XY/i(0 0) world)
+		world/addEntity* player
+		world/addEntity* Enemy/new(XY/i(10 10) world)
+	}
 	update(delta:TimeSpan): {
 		time := addf(time delta/TotalSeconds)
-		player/update * delta/TotalSeconds
+		player/busy ?+
+			world/update!
 	}
 	render(delta:TimeSpan): {
 		sf: Sf/new(Runner/WIDTH Runner/HEIGHT scene/FONT_8x8)
 		range(0 sf/GridHeight) | ?(y:int)
 			range(0 sf/GridWidth) | ?(x:int)
-				sf/PrintStr(x y "." ABGR/White ABGR/Black)
+				sf/PrintStr(x y " " ABGR/White ABGR/Black)
 
-		player/tile/print(sf player/pos)
-		sf/PrintStr(0 5 cat-["test" time] ABGR/White ABGR/Black)
+		world/entities/items | ?(e:object)
+			e/tile/print(sf e/pos)
+
+		sf/PrintStr(1 1 cat-["tick: " world/tick] ABGR/White ABGR/Black)
 		scene/Draw/Invoke(sf)
+	}
+	handle_key(kb:KB): {
+		not(player/busy) ?+ {
+			kb/IsPress(KC/Left) ?+
+				player/move*XY/f(subf(0 1) subf(0 0))
+			kb/IsPress(KC/Right) ?+
+				player/move*XY/f(addf(0 1) subf(0 0))
+			kb/IsPress(KC/Up) ?+
+				player/move*XY/f(subf(0 0) subf(0 1))
+			kb/IsPress(KC/Down) ?+
+				player/move*XY/f(addf(0 0) addf(0 1))
+		}
+	}
+	handle_mouse(state:HandState): {
+	
 	}
 }

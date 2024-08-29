@@ -3,10 +3,15 @@ using ExtSadConsole;
 using System.Text;
 using Oblivia;
 using System.Collections;
+using SadConsole.Effects;
+using SadConsole.Input;
+using System.Collections.Concurrent;
 
 var tokenizer = new Tokenizer(File.ReadAllText("Mainframe.obl"));
 var parser = new Parser(tokenizer.GetAllTokens());
 var block = parser.NextBlock();
+
+
 T Val<T> (T t) => t;
 var global = new ValDictScope {
 	locals = new Dictionary<string, dynamic> {
@@ -14,6 +19,11 @@ var global = new ValDictScope {
 		["ABGR"] = typeof(ABGR),
 		["TimeSpan"] = typeof(TimeSpan),
 		["Runner"] = typeof(Runner),
+		["KB"] = typeof(KB),
+		["Hand"] = typeof(Hand),
+		["HandState"] = typeof(HandState),
+		["KC"] = typeof(KC),
+		["Pt"] = typeof((int,int)),
 
 		["double_from"] = Val((int i) => (double)i),
 		["int_from"] = Val((double d) => (int)d),
@@ -28,6 +38,7 @@ var global = new ValDictScope {
 		["string"] = typeof(string),
 		["object"] = typeof(object),
 
+		["null"] = null,
 
 		["addi"] = Val((int a, int b) => a + b),
 		["subi"] = Val((int a, int b) => a - b),
@@ -42,6 +53,10 @@ var global = new ValDictScope {
 		["divf"] = Val((double a, double b) => a / b),
 
 		["sumi"] = Val((int[] a) => a.Sum()),
+
+		["not"] = Val((bool b) => !b),
+		["and"] = Val((bool a, bool b) => a && b),
+		["or"] = Val((bool a, bool b) => a || b),
 
 		["count"] = Val((IEnumerable data, object value) => data.Cast<object>().Count(d => {
 			var result = d.Equals(value);
@@ -76,28 +91,31 @@ var global = new ValDictScope {
 		["array_at"] = Val((Array a, int[] ind) => new ValRef { src = a, index = ind }),
 
 		["str_append"] = Val((StringBuilder sb, object o) => sb.Append(o)),
-
-
-
 		["row_from"] = Val((Type t, object[] items) => {
 			var result = Array.CreateInstance(t, items.Length);
 			Array.Copy(items, result, items.Length);
 			return result;
 		}),
-
 		["rand_bool"] = Val(() => new Random().Next(2) == 1),
 
 		["Row"] = Val((Type type) => type.MakeArrayType(1)),
 		["Grid"] = Val((Type type) => type.MakeArrayType(2)),
 		["List"] = Val((Type type) => typeof(List<>).MakeGenericType(type)),
+		["HashSet"] = Val((Type type) => typeof(HashSet<>).MakeGenericType(type)),
 		["Dictionary"] = Val((Type key, Type val) => typeof(Dictionary<,>).MakeGenericType(key, val)),
+		["ConcurrentDictionary"] = Val((Type key, Type val) => typeof(ConcurrentDictionary<,>).MakeGenericType(key, val)),
 		["StringBuilder"] = typeof(StringBuilder)
 	}
 };
-var result = (ValDictScope)block.Eval(global);
-
-
-
+var result = (ValDictScope)block.StagedEval(global);
+/*
+	A: class {
+		a:B{}
+	}
+	B: class {
+		b:A{}
+	}
+ */
 Runner.Run("Assets/font/IBMCGA+_8x8.font", r => {
 	r.Go(new Mainframe(result));
 });
@@ -113,6 +131,7 @@ class Mainframe : IScene {
 	public Mainframe (ValDictScope ctx) {
 		this.ctx = ctx;
 		ctx.locals["scene"] = this;
+		(ctx.locals["init"] as ValFunc).CallData(ctx, []);
 	}
 	void IScene.Update(System.TimeSpan delta) {
 		(ctx.locals["update"] as ValFunc).CallData(ctx, [delta]);
@@ -120,4 +139,16 @@ class Mainframe : IScene {
 	void IScene.Render(System.TimeSpan delta) {
 		(ctx.locals["render"] as ValFunc).CallData(ctx, [delta]);
 	}
+	void IScene.HandleKey(LibGamer.KB kb) {
+		(ctx.locals["handle_key"] as ValFunc).CallData(ctx, [kb]);
+	} 
+	void IScene.HandleMouse(LibGamer.HandState mouse) {
+		(ctx.locals["handle_mouse"] as ValFunc).CallData(ctx, [mouse]);
+	}
+}
+class A {
+	public static int a = B.b;
+}
+class B {
+	public static int b = A.a;
 }

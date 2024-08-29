@@ -516,7 +516,7 @@ public class Parser {
         var t = tokenType;
         if(t == TokenType.COMMA) {
             return symbol;
-        } else if(t == TokenType.EQUAL) {
+        } else if(t == TokenType.COLON) {
             inc();
 			t = tokenType;
 			if(t == TokenType.EQUAL) {

@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Oblivia", "Oblivia\Oblivia.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Life", "Life\Life.csproj", "{E3ED1C8D-2E23-4137-9975-88364B82CF83}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Roguelike", "Roguelike\Roguelike.csproj", "{FBBED64C-AA69-4D8F-837E-1CAF606794E0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{E3ED1C8D-2E23-4137-9975-88364B82CF83}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E3ED1C8D-2E23-4137-9975-88364B82CF83}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E3ED1C8D-2E23-4137-9975-88364B82CF83}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FBBED64C-AA69-4D8F-837E-1CAF606794E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FBBED64C-AA69-4D8F-837E-1CAF606794E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FBBED64C-AA69-4D8F-837E-1CAF606794E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FBBED64C-AA69-4D8F-837E-1CAF606794E0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

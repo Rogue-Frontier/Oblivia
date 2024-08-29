@@ -1,0 +1,54 @@
+{
+	XY: class {
+		x:double
+		y:double
+		xi: get* int_from-x
+		yi: get* int_from-y
+		i(x:int y:int): XY {
+			x := double_from-^^x
+			y := double_from-^^y
+		}
+		f(x:double y:double): XY {
+			x :=^^x
+			y := ^^y
+		}
+		plus(rhs: object): XY {
+			x := addf(^^^x rhs/x)
+			y := addf(^^^y rhs/y)
+		}
+	}
+	Tile: class {
+		glyph: "%" # 0
+		front: ABGR/White
+		back: ABGR/Black
+		print(sf:Sf pos:XY): 
+			sf/PrintChar(pos/xi pos/yi glyph front back)
+	}
+	Player: class {
+		pos: XY
+		tile: Tile {}
+		new(pos:XY): Player {
+			pos := ^^pos
+		}
+		update(delta:double): {
+			dest: pos/plus * XY/f(delta double_from*0)
+			pos := dest
+		}
+	}
+	player: Player/new(XY/i(0 0))
+	time: addf(0 0)
+	update(delta:TimeSpan): {
+		time := addf(time delta/TotalSeconds)
+		player/update * delta/TotalSeconds
+	}
+	render(delta:TimeSpan): {
+		sf: Sf/new(Runner/WIDTH Runner/HEIGHT scene/FONT_8x8)
+		range(0 sf/GridHeight) | ?(y:int)
+			range(0 sf/GridWidth) | ?(x:int)
+				sf/PrintStr(x y "." ABGR/White ABGR/Black)
+
+		player/tile/print(sf player/pos)
+		sf/PrintStr(0 5 cat-["test" time] ABGR/White ABGR/Black)
+		scene/Draw/Invoke(sf)
+	}
+}

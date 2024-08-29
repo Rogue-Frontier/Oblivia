@@ -1,0 +1,86 @@
+{
+	Life: class {
+		width:int
+		height:int
+		grid: Grid-bool
+		adj(n:int max:int):
+			modi(lt(n 0) ?+ addi(n max) ?- n max)
+		GetPointer(x:int y:int):
+			array_at(grid [#int adj(x width) adj(y height)])	
+		GetCell(x:int y:int):
+			GetPointer(x y)/Get!
+		SetCell(x:int y:int b:bool):
+			GetPointer(x y)/Set-b
+		new(width:int height:int): Life {
+			width := ^^width
+			height := ^^height
+			grid := Grid-bool/new(width height)
+			debug!
+		}
+		debug!: {
+			print*cat*["width: " width]
+			print*cat*["height: " height]
+		}
+		activeCount: 0
+		txt: StringBuilder/new!
+		update!: {
+			activeCount := 0
+			get: GetCell
+
+			txt/Clear!
+			range(0 height) | ?(y:int) {
+				range(0 width) | ?(x:int) {
+					left:	subi(x 1)
+					up:		addi(y 1)
+					right:	addi(x 1)
+					down:	subi(y 1)
+					c: count([#bool
+						get(left up)    get(x up)   get(right up)
+						get(left y)                 get(right y)
+						get(left down)  get(x down) get(right down)
+					] true)
+					active: bool* {
+						active: GetCell(x y)
+						^:
+							active ?+
+								(lt(c 2) ?+
+									false ?-
+								gt(c 3) ?+
+									false ?-
+									active) ?-
+							eq(c 3) ?+
+								true ?-
+								active
+					}
+					SetCell(x y active)
+					activeCount := active ?+ addi(activeCount 1) ?- activeCount
+					str_append(txt active ?+ "*" ?- ".")
+				}
+				str_append(txt newline)
+			}
+			print*cat*["active: " activeCount]
+		}
+	}
+    main(args: string): int {
+		life: Life/new(32 32)
+
+		print * array_at(life/grid [#int 0 0])/Get!
+
+		range(0 life/width) | ?(x:int)
+			range(0 life/height) | ?(y:int)
+				life/SetCell(x y rand_bool!)
+		count:1
+		prevCount:0
+		run: true
+		Console/Clear!
+		run ?* { 
+			life/update!
+			prevCount := count
+			count := life/activeCount
+			run := neq(count prevCount)
+
+			Console/SetCursorPosition(0 0)
+			print * str * life/txt
+		}
+    }
+}

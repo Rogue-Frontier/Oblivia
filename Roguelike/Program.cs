@@ -10,8 +10,7 @@ using System.Collections.Concurrent;
 var tokenizer = new Tokenizer(File.ReadAllText("Mainframe.obl"));
 var parser = new Parser(tokenizer.GetAllTokens());
 var block = parser.NextBlock();
-
-
+//new HashSet<int> { }.remo
 T Val<T> (T t) => t;
 var global = new ValDictScope {
 	locals = new Dictionary<string, dynamic> {
@@ -22,12 +21,16 @@ var global = new ValDictScope {
 		["KB"] = typeof(KB),
 		["Hand"] = typeof(Hand),
 		["HandState"] = typeof(HandState),
+		["RectOptions"] = typeof(RectOptions),
 		["KC"] = typeof(KC),
-		["Pt"] = typeof((int,int)),
+		["Pt"] = typeof((int, int)),
+
+		["pairi"] = Val((int a, int b) => (a, b)),
 
 		["double_from"] = Val((int i) => (double)i),
 		["int_from"] = Val((double d) => (int)d),
-		["uint_from"] = Val((int d) => (uint)d),
+		["uint_from"] = Val((int i) => (uint)i),
+		["char_from"] = Val((int i) => (char)i),
 
 		["void"] = typeof(void),
 		["char"] = typeof(char),
@@ -38,6 +41,8 @@ var global = new ValDictScope {
 		["string"] = typeof(string),
 		["object"] = typeof(object),
 
+		["default"] = Val((Type t) => t.IsValueType ? Activator.CreateInstance(t) : null),
+
 		["null"] = null,
 
 		["addi"] = Val((int a, int b) => a + b),
@@ -47,10 +52,17 @@ var global = new ValDictScope {
 		["modi"] = Val((int a, int b) => a % b),
 		["xori"] = Val((int a, int b) => a ^ b),
 
+		["mini"] = Val((int a, int b) => Math.Min(a, b)),
+		["maxi"] = Val((int a, int b) => Math.Max(a, b)),
+
 		["addf"] = Val((double a, double b) => a + b),
 		["subf"] = Val((double a, double b) => a - b),
 		["mulf"] = Val((double a, double b) => a * b),
 		["divf"] = Val((double a, double b) => a / b),
+
+
+		["minf"] = Val((double a, double b) => Math.Min(a, b)),
+		["maxf"] = Val((double a, double b) => Math.Max(a, b)),
 
 		["sumi"] = Val((int[] a) => a.Sum()),
 
@@ -66,8 +78,8 @@ var global = new ValDictScope {
 		["geq"] = Val((double a, double b) => a >= b),
 		["lt"] = Val((double a, double b) => a < b),
 		["leq"] = Val((double a, double b) => a <= b),
-		["eq"] = Val((double a, double b) => a == b),
-		["neq"] = Val((double a, double b) => a != b),
+		["eq"] = Val((object a, object b) => Equals(a, b)),
+		["neq"] = Val((object a, object b) => !Equals(a,b)),
 
 		["true"] = true,
 		["false"] = false,
@@ -107,6 +119,7 @@ var global = new ValDictScope {
 		["StringBuilder"] = typeof(StringBuilder)
 	}
 };
+
 var result = (ValDictScope)block.StagedEval(global);
 /*
 	A: class {
@@ -118,6 +131,7 @@ var result = (ValDictScope)block.StagedEval(global);
  */
 Runner.Run("Assets/font/IBMCGA+_8x8.font", r => {
 	r.Go(new Mainframe(result));
+
 });
 return;
 class Mainframe : IScene {

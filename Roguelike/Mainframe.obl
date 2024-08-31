@@ -5,11 +5,24 @@
 		toRemove: HashSet-object/new!
 
 		new!: BufferedList{}
-		Add: toAdd/Add
-		Remove: toRemove/Remove
+		Add(e:object): {
+			items/Contains-e ?+
+				print*"already added" ?-
+				toAdd/Add-e
+		}
+		Remove(e:object): {
+			items/Contains-e ?+
+				toRemove/Add-e ?-
+				print*"already removed"
+		}
 		Update!: {
 			items/UnionWith-toAdd
 			items/ExceptWith-toRemove
+			~
+				pr: ?(e:object) print* e/name
+				(items | pr)
+				(toRemove | pr)
+			~
 			toAdd/Clear!
 			toRemove/Clear!
 		}
@@ -19,7 +32,12 @@
 		y: double_from-0
 		xi: get* int_from-x
 		yi: get* int_from-y
-		xyi: get* Pt/new(xi yi)
+		xyi: get* pairi(xi yi)
+		
+		left: get* XY/i(subi(0 1) 0)
+		right: get* XY/i(addi(0 1) 0)
+		up: get* XY/i(0 subi(0 1))
+		down: get* XY/i(0 addi(0 1))
 
 		i(x:int y:int): XY {
 			x := double_from-^^x
@@ -33,35 +51,81 @@
 			x := addf(^^^x rhs/x)
 			y := addf(^^^y rhs/y)
 		}
+		sub(rhs: XY): XY {
+			x := subf(^^^x rhs/x)
+			y := subf(^^^y rhs/y)
+		}
+		div(scale:int): XY {
+			x := divf(^^^x scale)
+			y := divf(^^^y scale)
+		}
 	}
 	Tile: class {
-		glyph: "@"#0
+		glyph: "@"@0
 		front: ABGR/Magenta
 		back: ABGR/Black
 		print(sf:Sf pos:XY): {
-			pos % { sf/PrintChar(^/xi ^/yi glyph front back) }
+			pos % { sf/PrintChar(xi yi ^^^^glyph ^^^^front ^^^^back) }
 		}
 	}
 	Entity: interface {
 		active: bool
 	}
-	Enemy: class {
+	Floor: class {
+		name: "Floor"
 		pos:XY
-		tile: Tile {}
+		env: true
+		active:true
+		tile: Tile {
+			glyph := char_from-249
+			front := ABGR/Gray
+			back := ABGR/Transparent
+		}
+		update!:null
+		new(pos:XY): Floor {
+			^pos := ^^pos
+		}
+		#register(Entity)
+	}
+	Enemy: class {
+		hp: 100
+		active: true
+		name: "Enemy"
+		pos: XY
+
+		this: ^$
+		tile: Tile {
+			glyph := "E"[0]
+			front := ABGR/Red }
 		world: World
 		new(pos:XY world:World): Enemy {
 			pos := ^^pos
 			world := ^^world
 		}
 		update!: {
-
+			not-active ?+ {
+				world/removeEntity*this	
+			} ?- {
+				print * "active"
+			}
+		}
+		damage(hp: int): {
+			^^^hp := subi(^^^hp hp)
+			active := gt(^^^hp 0)
+			#print * ^^^hp
 		}
 	}
 	Player: class {
+		name: "Player"
 		pos: XY
-		tile: Tile {}
+		tile: Tile {
+			glyph := "@"[0]
+			front := ABGR/Magenta
+		}
+		active:true
 		busy: false
 		world: World
+		log: List-string/new!
 		new(pos:XY world:World): Player {
 			pos := ^^pos
 			world := ^^world
@@ -70,7 +134,25 @@
 			busy := false
 		}
 		move(disp:XY): {
-			pos := pos/plus-disp
+			dest: pos/plus*disp
+			grid: world/getGrid
+			others: grid[dest/xyi]
+
+			attack: false
+			neq(others null) ?+ {
+				others |<not*attack> ?(e:object) {
+					eq(e/name "Enemy") ?+ {
+						log/Add*cat*["Attack " e/name]
+						e/damage*20
+						attack := true
+					}
+				}
+			}
+			not-attack ?+ {
+				world/hasFloor-dest ?+ {
+					pos := dest
+				}
+			}
 			busy := true
 		}
 	}
@@ -80,35 +162,66 @@
 		updateGrid: true
 		grid: ConcurrentDictionary(Pt HashSet-object)/new!
 		new!: World{}
-		addEntity(e:object): {
-			entities/Add(e)
-		}
-		update(): {
+		addEntity:
+			entities/Add
+		removeEntity:
+			entities/Remove
+		update!: {
+			entities/items | ?(e:object) {
+				not(e/active) ?+ {
+					entities/Remove* e
+				} ?- {
+					e/update!
+					#print* e/name
+				}
+			}
 			entities/Update!
-			entities/items | ?(e:object)
-				e/update!
 			updateGrid := true
 			tick := addi(tick 1)
 		}
-		getGrid!: {
+		getGrid: get* {
 			updateGrid ?+ {
 				grid/Clear!
+				#print* grid/Count
 				entities/items | ?(e:object)
-					grid/GetOrAdd(e/pos/xyi, HashSet-object/new!)/Add(e)
+					grid/GetOrAdd(e/pos/xyi HashSet-object/new!)/Add-e
 			}
+			updateGrid := false
 			^: grid
 		}
+		hasFloor(p:XY): {
+			loc: getGrid[p/xyi]
 
+
+			b:false
+			neq(loc null) ?+ 
+				loc | ?(e:object)
+					e/name ?{
+						"Floor": {
+							b := true
+						}
+					}
+			^: b
+		}
 	}
 	time: addf(0 0)
 	move: false
 	player: Player
 	world: World
+	sf: Sf
+	sf_ui: Sf
 	init!: {
 		world := World/new!
+		range(0 30) | ?(y:int)
+			range(0 30) | ?(x:int)
+				world/addEntity* Floor/new* XY/i(x y)
 		player := Player/new(XY/i(0 0) world)
 		world/addEntity* player
 		world/addEntity* Enemy/new(XY/i(10 10) world)
+		world/update!
+
+		sf := Sf/new(Runner/WIDTH Runner/HEIGHT scene/FONT_8x8)
+		sf_ui := Sf/new(divi(muli(4 Runner/WIDTH) 3) Runner/HEIGHT scene/FONT_6x8)
 	}
 	update(delta:TimeSpan): {
 		time := addf(time delta/TotalSeconds)
@@ -116,30 +229,34 @@
 			world/update!
 	}
 	render(delta:TimeSpan): {
-		sf: Sf/new(Runner/WIDTH Runner/HEIGHT scene/FONT_8x8)
-		range(0 sf/GridHeight) | ?(y:int)
-			range(0 sf/GridWidth) | ?(x:int)
-				sf/PrintStr(x y " " ABGR/White ABGR/Black)
-
-		world/entities/items | ?(e:object)
-			e/tile/print(sf e/pos)
-
-		sf/PrintStr(1 1 cat-["tick: " world/tick] ABGR/White ABGR/Black)
-		scene/Draw/Invoke(sf)
-	}
-	handle_key(kb:KB): {
-		not(player/busy) ?+ {
-			kb/IsPress(KC/Left) ?+
-				player/move*XY/f(subf(0 1) subf(0 0))
-			kb/IsPress(KC/Right) ?+
-				player/move*XY/f(addf(0 1) subf(0 0))
-			kb/IsPress(KC/Up) ?+
-				player/move*XY/f(subf(0 0) subf(0 1))
-			kb/IsPress(KC/Down) ?+
-				player/move*XY/f(addf(0 0) addf(0 1))
+		neq(sf null) ?+ {
+			sf/Clear!
+			grid: world/getGrid
+			center: XY/i(sf/GridWidth sf/GridHeight)/div*2
+			grid/Keys | ?(p:Pt)
+				grid@p | ?(e:object) {
+					e/tile/print(sf center/plus * e/pos/sub* player/pos)
+				}
+			sf_ui/PrintStr(1 1 cat*["tick: " world/tick] ABGR/White ABGR/Black)
+			ro: RectOptions/new(ABGR/White ABGR/Black)
+			Sf/DrawRect(sf_ui 0 32 64 32 ro)
+			y:33
+			player/log | ?(str:string) {
+				sf_ui/PrintStr(1 y str ABGR/White ABGR/Black)
+				y := mini(addi(y 1) subi(sf_ui/GridHeight 1))
+			}
+			,[:Sf sf sf_ui] | scene/Draw/Invoke
 		}
 	}
+	handle_key(kb:KB): {
+		player/busy ?+ { ^^ := null }
+		kb/IsPress ?[:object
+			KC/Left:	XY/left
+			KC/Right:	XY/right
+			KC/Up:		XY/up
+			KC/Down:	XY/down
+		] | player/move
+	}
 	handle_mouse(state:HandState): {
-	
 	}
 }

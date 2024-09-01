@@ -328,9 +328,27 @@ public class Parser {
 		}
 		if(t == TokenType.EQUAL) {
 			inc();
-			return NextExpression(new ExprEqual{
+
+			t = tokenType;
+
+			bool invert;
+			if(t == TokenType.PLUS) {
+				inc();
+				invert = false;
+				goto Done;
+			}
+			if(t == TokenType.DASH) {
+				inc();
+				invert = true;
+				goto Done;
+			}
+			throw new Exception();
+
+			Done:
+			return NextExpression(new ExprEqual {
 				lhs = lhs,
-				rhs = NextExpression()
+				rhs = NextTerm(),
+				invert = invert
 			});
 		}
 		if(t == TokenType.SLASH) {
@@ -380,16 +398,8 @@ public class Parser {
 			if(t == TokenType.L_CURLY) {
 				inc();
 				var items = new List<(INode antecedent, INode consequent)> { };
+
 				Read:
-				var ante = NextExpression();
-				t = tokenType;
-				if(t == TokenType.COLON) {
-					inc();
-					var cons = NextExpression();
-					items.Add((ante, cons));
-				} else {
-					throw new Exception();
-				}
 				t = tokenType;
 				if(t == TokenType.R_CURLY) {
 					inc();
@@ -397,9 +407,21 @@ public class Parser {
 						item = lhs,
 						branches = items
 					});
-				} else {
+				}
+				var ante = NextExpression();
+				if(ante is ExprFunc ef) {
+					//Handle lambda
+					//If this lambda accepts this object as argument, then treat it as a branch.
 					goto Read;
 				}
+				t = tokenType;
+				if(t == TokenType.COLON) {
+					inc();
+					var cons = NextExpression();
+					items.Add((ante, cons));
+					goto Read;
+				}
+				throw new Exception();
 			}
 			//Conditional sequence
 			if(t == TokenType.L_SQUARE) {
@@ -856,8 +878,16 @@ public class ExprVarBlock : INode {
 public class ExprEqual : INode {
 	public INode lhs;
 	public INode rhs;
+
+	public bool invert;
 	public dynamic Eval(ValDictScope scope) {
-		return lhs.Eval(scope) == rhs.Eval(scope);
+		var l = lhs.Eval(scope);
+		var r = rhs.Eval(scope);
+		var b = Equals(l, r);
+		if(invert) {
+			b = !b;
+		}
+		return b;
 	}
 }
 public class ExprBranch : INode {
@@ -904,6 +934,9 @@ public class ExprInvoke : INode {
 		}
 		var lhs = symbol.Eval(ctx);
 		return Invoke(ctx, lhs, args);
+	}
+	public static object GetReturnType(object f) {
+		throw new Exception("Implement");
 	}
 	public static dynamic Invoke(ValDictScope ctx, object lhs, List<INode?> args) {
 		if(lhs is ValEmpty) {
@@ -1212,8 +1245,6 @@ public class ExprMap : INode {
 		if(_from is ValEmpty) {
 			throw new Exception("Variable not found");
 		}
-
-
 		if(_from is ICollection c) {
 			var result = new List<dynamic>();
 			var f = map.Eval(ctx);
@@ -1236,7 +1267,7 @@ public class ExprMap : INode {
 				}
 				result.Add(r);
 			}
-			return result.Count == 0 ? ValEmpty.VALUE : result;
+			return result.Count == 0 ? ValEmpty.VALUE : result.ToArray();
 		} else if(_from is IEnumerable e) {
 
 			var result = new List<dynamic>();
@@ -1259,7 +1290,7 @@ public class ExprMap : INode {
 				}
 				result.Add(r);
 			}
-			return result.Count == 0 ? ValEmpty.VALUE : result;
+			return result.Count == 0 ? ValEmpty.VALUE : result.ToArray();
 		} else {
 			throw new Exception("Sequence expected");
 		}
@@ -1306,7 +1337,12 @@ public class ExprFunc : INode {
 	public dynamic Eval (ValDictScope ctx) =>
 		new ValFunc {
 			expr = result,
-			pars = pars.Cast<StmtKeyVal>().ToList(),
+			pars = pars.Select(p => p switch {
+				StmtKeyVal kv => kv,
+				ExprSymbol s => new StmtKeyVal { key = s.key, value = new ExprVal<Type> { value = typeof(object) } },
+				_ => throw new Exception("Symbol or KeyVal expected")
+
+			}).ToList(),
 			parent_ctx = ctx
 		};
 }
@@ -1355,14 +1391,15 @@ public class StmtAssign : INode {
     XElement ToXML () => new("Reassign", symbol.ToXML(), value.ToXML());
     public string Source => $"{symbol.Source} := {value.Source}";
 	public dynamic Eval(ValDictScope ctx) {
-		return Assign(ctx, symbol.key, symbol.up, () => value.Eval(ctx));
+		ctx.locals["_"] = ctx.Get(symbol.key, symbol.up);
+		var r = Assign(ctx, symbol.key, symbol.up, () => value.Eval(ctx));
+		ctx.locals.Remove("_");
+		return r;
 	}
 	public static dynamic Assign (ValDictScope ctx, string key, int up, Func<object> getNext) {
 		var curr = (object)ctx.Get(key, up);
 
 
-		if(key == "pos") {
-		}
 		if(curr is ValError ve) {
 			throw new Exception(ve.msg);
 		}
@@ -1402,7 +1439,8 @@ public class StmtAssign : INode {
 		}
 		dynamic MatchType(Type t) {
 			var next = getNext();
-			if(!t.IsAssignableFrom(next.GetType())) {
+			var nt = next.GetType();
+			if(!t.IsAssignableFrom(nt)) {
 				
 				throw new Exception("Type mismatch");
 			}

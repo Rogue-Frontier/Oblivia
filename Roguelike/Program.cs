@@ -41,6 +41,8 @@ var global = new ValDictScope {
 		["string"] = typeof(string),
 		["object"] = typeof(object),
 
+		["empty"] = ValEmpty.VALUE,
+
 		["default"] = Val((Type t) => t.IsValueType ? Activator.CreateInstance(t) : null),
 
 		["null"] = null,
@@ -51,7 +53,6 @@ var global = new ValDictScope {
 		["divi"] = Val((int a, int b) => a / b),
 		["modi"] = Val((int a, int b) => a % b),
 		["xori"] = Val((int a, int b) => a ^ b),
-
 		["mini"] = Val((int a, int b) => Math.Min(a, b)),
 		["maxi"] = Val((int a, int b) => Math.Max(a, b)),
 
@@ -59,8 +60,6 @@ var global = new ValDictScope {
 		["subf"] = Val((double a, double b) => a - b),
 		["mulf"] = Val((double a, double b) => a * b),
 		["divf"] = Val((double a, double b) => a / b),
-
-
 		["minf"] = Val((double a, double b) => Math.Min(a, b)),
 		["maxf"] = Val((double a, double b) => Math.Max(a, b)),
 
@@ -162,6 +161,15 @@ class Mainframe : IScene {
 }
 class A {
 	public static int a = B.b;
+
+	int b;
+	int c {
+		set => b = value;
+	}
+
+	void CC () {
+		int z = c;
+	}
 }
 class B {
 	public static int b = A.a;

@@ -1391,9 +1391,24 @@ public class StmtAssign : INode {
     XElement ToXML () => new("Reassign", symbol.ToXML(), value.ToXML());
     public string Source => $"{symbol.Source} := {value.Source}";
 	public dynamic Eval(ValDictScope ctx) {
-		ctx.locals["_"] = ctx.Get(symbol.key, symbol.up);
-		var r = Assign(ctx, symbol.key, symbol.up, () => value.Eval(ctx));
-		ctx.locals.Remove("_");
+		dynamic r;
+		//Note: Not thread safe
+		if(ctx.locals.TryGetValue("_", out var _prev)) {
+			Do();
+			ctx.locals["_"] = _prev;
+		} else {
+			Do();
+			ctx.locals.Remove("_");
+		}
+		void Do () {
+			ctx.locals["_"] = ctx.Get(symbol.key, symbol.up);
+
+			var inner_ctx = new ValDictScope { locals = {
+				["_"] = ctx.Get(symbol.key, symbol.up)
+			}, parent = ctx, temp = true };
+
+			r = Assign(ctx, symbol.key, symbol.up, () => value.Eval(ctx));
+		}
 		return r;
 	}
 	public static dynamic Assign (ValDictScope ctx, string key, int up, Func<object> getNext) {

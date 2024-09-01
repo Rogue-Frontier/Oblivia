@@ -159,18 +159,3 @@ class Mainframe : IScene {
 		(ctx.locals["handle_mouse"] as ValFunc).CallData(ctx, [mouse]);
 	}
 }
-class A {
-	public static int a = B.b;
-
-	int b;
-	int c {
-		set => b = value;
-	}
-
-	void CC () {
-		int z = c;
-	}
-}
-class B {
-	public static int b = A.a;
-}

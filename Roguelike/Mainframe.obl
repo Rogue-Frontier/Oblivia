@@ -4,9 +4,12 @@
 	test(?): match {
 		string{}: print * args
 		2: print * args
-		(): print * "test"
+		!: print * "test"
 	}
-	~
+	init: match {
+	}
+
+
 	BufferedList: class {
 		items: HashSet-object/new!
 		toAdd: HashSet-object/new!
@@ -40,14 +43,27 @@
 	XY: class {
 		x: double_from-0
 		y: double_from-0
-		xi: get* int_from-x
-		yi: get* int_from-y
-		xyi: get* pairi(xi yi)
-		
-		left: get* XY/i(subi(0 1) 0)
-		right: get* XY/i(addi(0 1) 0)
-		up: get* XY/i(0 subi(0 1))
-		down: get* XY/i(0 addi(0 1))
+		xi:	get* int_from-x
+		yi:	get* int_from-y
+		xf: get* x
+		yf: get* y
+		xyi:get* pairi(xi yi)
+
+		left:	get* XY/i(subi(0 1) 0)
+		right:	get* XY/i(addi(0 1) 0)
+		up:		get* XY/i(0 subi(0 1))
+		down:	get* XY/i(0 addi(0 1))
+
+		~
+		l: prop(
+			get:null	
+			set:_ null
+		)
+		left:	set* { x := _arg }
+
+		d: var-double
+		e: val-double
+		~
 
 		i(x:int y:int): XY {
 			x := double_from-^^x
@@ -105,12 +121,14 @@
 		name: "Enemy"
 		pos: XY
 
+		world: World
+
 		this: get* ^$
 		tile: Tile {
 			glyph := "E"[0]
 			front := ABGR/Red
 		}
-		world: World
+		
 		new(pos:XY world:World): Enemy {
 			pos := ^^pos
 			world := ^^world
@@ -126,13 +144,23 @@
 		}
 	}
 	Player: class {
+		~
+		^(a:int): {
+		}
+		^[a:int]: {
+		
+		}
+		data[a:int]: {
+		
+		}
+		~
 		name: "Player"
 		pos: XY
 		tile: Tile {
 			glyph := "@"[0]
 			front := ABGR/Magenta
 		}
-		active:true
+		active: true
 		busy: false
 		world: World
 		log: List-string/new!
@@ -147,17 +175,19 @@
 			dest: pos/add*disp
 			grid: world/getGrid
 			others: grid[dest/xyi]
-
 			attack: false
 			others =- null ?+ {
 				others |<not*attack> ?(e) {
-					e/name =+ "Enemy" ?+ {
+					e/class =+ Enemy ?+ {
 						log/Add*cat*["Attack " e/name]
 						e/damage*20
 						attack := true
 					}
 				}
 			}
+
+			others ?= 
+
 			not-attack ?+ {
 				world/hasFloor-dest ?+ {
 					pos := dest
@@ -181,7 +211,6 @@
 		}
 		name: get* type/name
 	}
-
 	ItemType: class {
 		name: string
 	}
@@ -195,13 +224,15 @@
 		removeEntity: entities/Remove
 		menu: object
 		update!: {
-			entities/items | ?(e)
-				not(e/active) ?+ {
-					entities/Remove-e
-				} ?- {
-					e/update!
-					#print* e/name
-				}
+			entities % {
+				items | ?(e)
+					not(e/active) ?+ {
+						Remove-e
+					} ?- {
+						e/update!
+						#print* e/name
+					}
+			}
 			entities/Update!
 			updateGrid := true
 			tick := addi(_ 1)
@@ -222,7 +253,7 @@
 			b:false
 			loc =- null ?+ 
 				loc | ?(e)
-					e/name =+ "Floor" ?+ {
+					e/class =+ Floor ?+ {
 						b := true
 					}
 			^: b
@@ -234,19 +265,23 @@
 	world: World
 	sf: Sf
 	sf_ui: Sf
+	menu: object * null
+
 	init!: {
 		world := World/new!
+		add: world/addEntity
 		range(0 30) | ?(y:int)
 			range(0 30) | ?(x:int)
-				world/addEntity* Floor/new* XY/i(x y)
+				add* Floor/new* XY/i(x y)
 		player := Player/new(XY/i(0 0) world)
-		world/addEntity* player
-		world/addEntity* Enemy/new(XY/i(10 10) world)
-		world/addEntity* Item/new(ItemType { name := "gun" } XY/i(5 5))
+		,[
+			player
+			Enemy/new(XY/i(10 10) world)
+			Item/new(ItemType { name := "gun" } XY/i(5 5))
+		] | add
 		world/update!
 		sf := Sf/new(Runner/WIDTH Runner/HEIGHT scene/FONT_8x8)
 		sf_ui := Sf/new(divi(muli(4 Runner/WIDTH) 3) Runner/HEIGHT scene/FONT_6x8)
-
 	}
 	update(delta:TimeSpan): {
 		time := addf(_ delta/TotalSeconds)
@@ -255,6 +290,7 @@
 	}
 	render(delta:TimeSpan): {
 		sf/Clear!
+		sf_ui/Clear!
 		grid: world/getGrid
 		center: XY/i(sf/GridWidth sf/GridHeight)/div*2
 		grid/Keys | ?(p:Pt)
@@ -270,26 +306,72 @@
 			sf_ui/PrintStr(1 y str ABGR/White ABGR/Black)
 			y := mini(addi(_ 1) subi(sf_ui/GridHeight 1))
 		}
+
+		menu =- null ?+ menu/render!
+
+
 		,[:Sf sf sf_ui] | scene/Draw/Invoke
 	}
 	handle_key(kb:KB): {
 		player/busy ?+ { ^^ := null }
+
+		menu =- null ?+ {
+			menu/handle_key-kb
+			^^ := null
+		}
 		kb/IsPress ?[
 			KC/Left:	XY/left
 			KC/Right:	XY/right
 			KC/Up:		XY/up
 			KC/Down:	XY/down
 		] | player/move
-
 		kb/IsPress ?[
-			KC/G:	print*"get"
+			KC/G: {
+				menu := GetMenu/new!
+			}
 			KC/N: null
 		]
-
 	}
 	handle_mouse(state:HandState): {
 	}
-
 	border: RectOptions/new(ABGR/White ABGR/Black)
+	GetMenu: class {
+		
+		new!: GetMenu {
+		}
+		handle_key(kb:KB): {
+			kb/IsPress ?[
+				KC/Escape: {
+					menu := null
+				}
+			]
+			kb/Press | ?(k) beq(k 65 90) ?+ {
+				ind: subi(k 65)
+				print * cat * ["get " ind]
+			}
+		}
+		render!: {
+			y:16
+			Sf/DrawRect(sf_ui 0 y 32 32 border)
+			y := addi(y 1)
+			sf_ui/PrintStr(2 y "Get" ABGR/White ABGR/Black)
+			y := addi(y 1)
+			Sf/DrawRect(sf_ui 0 y 32 32 border)
 
+			others: world/getGrid[player/pos/xyi]
+			others =- null ?+ {
+				ind: 0
+				others | ?(it) {
+					it/class =+ Item ?+ {
+						y := addi(y 1)
+						sf_ui/Print(2 y it/tile/glyph it/tile/front it/tile/back)
+						sf_ui/Print(4 y it/name ABGR/White ABGR/Black)
+						sf_ui/Print(subi(32 3) y ABC@ind ABGR/White ABGR/Black)
+						ind := addi(ind 1)
+					}
+				}
+			}
+		}
+	}
+	ABC: "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 }

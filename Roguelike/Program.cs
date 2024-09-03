@@ -10,7 +10,7 @@ using System.Collections.Concurrent;
 var tokenizer = new Tokenizer(File.ReadAllText("Mainframe.obl"));
 var parser = new Parser(tokenizer.GetAllTokens());
 var block = parser.NextBlock();
-//new HashSet<int> { }.remo
+
 T Val<T> (T t) => t;
 var global = new ValDictScope {
 	locals = new Dictionary<string, dynamic> {
@@ -76,6 +76,11 @@ var global = new ValDictScope {
 		["gt"] = Val((double a, double b) => a > b),
 		["geq"] = Val((double a, double b) => a >= b),
 		["lt"] = Val((double a, double b) => a < b),
+
+		["bt"] = Val((double a, double b, double c) => a > b && a < c),
+		["beq"] = Val((double a, double b, double c) => a >= b && a <= c),
+
+
 		["leq"] = Val((double a, double b) => a <= b),
 		["eq"] = Val((object a, object b) => Equals(a, b)),
 		["neq"] = Val((object a, object b) => !Equals(a,b)),
@@ -112,12 +117,14 @@ var global = new ValDictScope {
 		["Row"] = Val((Type type) => type.MakeArrayType(1)),
 		["Grid"] = Val((Type type) => type.MakeArrayType(2)),
 		["List"] = Val((Type type) => typeof(List<>).MakeGenericType(type)),
-		["HashSet"] = Val((Type type) => typeof(HashSet<>).MakeGenericType(type)),
+		["List"] = Val((object item) => MakeGeneric(typeof(List<>), item)),
+		["HashSet"] = Val((object item) => MakeGeneric(typeof(HashSet<>), item)),
 		["Dictionary"] = Val((Type key, Type val) => typeof(Dictionary<,>).MakeGenericType(key, val)),
 		["ConcurrentDictionary"] = Val((Type key, Type val) => typeof(ConcurrentDictionary<,>).MakeGenericType(key, val)),
 		["StringBuilder"] = typeof(StringBuilder)
 	}
 };
+Type MakeGeneric (Type gen, object item) => item is Type t ? gen.MakeGenericType(t) : typeof(List<>).MakeGenericType(typeof(object));
 
 var result = (ValDictScope)block.StagedEval(global);
 /*

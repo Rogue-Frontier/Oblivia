@@ -87,7 +87,7 @@ public record ValFunc {
 	public INode expr;
 	public List<StmtKeyVal> pars;
 	public ValDictScope parent_ctx;
-	public dynamic Call(ValDictScope caller_ctx, List<INode> args) {
+	public dynamic Call(ValDictScope caller_ctx, IEnumerable<INode> args) {
 		var func_ctx = new ValDictScope(parent_ctx, false);
 		var argData = new Args { };
 		func_ctx.locals["_arg"] = argData;
@@ -115,7 +115,7 @@ public record ValFunc {
 		var result = expr.Eval(func_ctx);
 		return result;
 	}
-	public dynamic CallData (ValDictScope caller_ctx, List<object> args) {
+	public dynamic CallData (ValDictScope caller_ctx, IEnumerable<object> args) {
 		var func_ctx = new ValDictScope(parent_ctx, false);
 		var argData = new Args { };
 		func_ctx.locals["_arg"] = argData;
@@ -126,7 +126,7 @@ public record ValFunc {
 		int ind = 0;
 		foreach(var arg in args) {
 			var p = pars[ind];
-			var val = StmtAssign.Assign(func_ctx, p.key, 1, () => args[ind]);
+			var val = StmtAssign.Assign(func_ctx, p.key, 1, () => arg);
 			ind += 1;
 		}
 		foreach(var p in pars) {
@@ -137,7 +137,7 @@ public record ValFunc {
 		var result = expr.Eval(func_ctx);
 		return result;
 	}
-	public dynamic ApplyData (ValDictScope caller_ctx, ValDictScope target_ctx, List<object> args) {
+	public dynamic ApplyData (ValDictScope caller_ctx, ValDictScope target_ctx, IEnumerable<object> args) {
 		var func_ctx = new ValDictScope(parent_ctx, false);
 		var argData = new Args { };
 		func_ctx.locals["_arg"] = argData;
@@ -149,7 +149,7 @@ public record ValFunc {
 		int ind = 0;
 		foreach(var arg in args) {
 			var p = pars[ind];
-			var val = StmtAssign.Assign(func_ctx, p.key, 1, () => args[ind]);
+			var val = StmtAssign.Assign(func_ctx, p.key, 1, () => arg);
 			ind += 1;
 		}
 		foreach(var p in pars) {
@@ -912,7 +912,6 @@ public class ExprSingleMatch : INode {
 		var l = lhs.Eval(ctx);
 
 		var inner_ctx = ctx.MakeTemp(l);
-		//?=
 		var r = rhs.Eval(inner_ctx);
 		if(r is not bool) {
 			throw new Exception();
@@ -969,7 +968,7 @@ public class ExprInvoke : INode {
 	public static object GetReturnType(object f) {
 		throw new Exception("Implement");
 	}
-	public static dynamic Invoke(ValDictScope ctx, object lhs, List<INode?> args) {
+	public static dynamic Invoke(ValDictScope ctx, object lhs, IEnumerable<INode> pars) {
 		if(lhs is ValEmpty) {
 			throw new Exception("Function not found");
 			//return ValError.FUNCTION_NOT_FOUND;
@@ -977,11 +976,9 @@ public class ExprInvoke : INode {
 		if(lhs is ValError ve) {
 			throw new Exception(ve.msg);
 		}
-
-		var evalArgs = () => args.Select(a => a.Eval(ctx)).ToArray();
-
+		var args = pars.Select(a => a.Eval(ctx));
 		if(lhs is ValConstructor vc) {
-			var rhs = evalArgs();
+			var rhs = args.ToArray();
 			var c = vc.t.GetConstructor(rhs.Select(arg => (arg as object).GetType()).ToArray());
 			if(c == null) {
 				throw new Exception("Constructor not found");
@@ -990,16 +987,15 @@ public class ExprInvoke : INode {
 			return c.Invoke(rhs);
 		}
 		if(lhs is ValInstanceMember vim) {
-			var vals = evalArgs();
+			var vals = args.ToArray();
 			return vim.Call(vals);
 		}
 		if(lhs is ValStaticMember vsm) {
-
-			var vals = evalArgs();
+			var vals = args.ToArray();
 			return vsm.Call(vals);
 		}
 		if(lhs is Type t) {
-			var d = args.Single().Eval(ctx);
+			var d = args.Single();
 			return new ValType(t).Cast(d, d?.GetType());
 			if(t.IsPrimitive) {
 				//return new ValType(t).Cast(d);
@@ -1011,10 +1007,77 @@ public class ExprInvoke : INode {
 			}
 		}
 		if(lhs is ValFunc vf) {
-			return vf.Call(ctx, args);
+			return vf.Call(ctx, pars);
 		}
 		if(lhs is Delegate f) {
-			var argValues = evalArgs();
+			var argArr = args.ToArray();
+			var r = f.DynamicInvoke(argArr);
+			if(f.Method.ReturnType == typeof(void))
+				return ValEmpty.VALUE;
+			return r;
+		}
+		if(lhs is ValClass vcl) {
+			//Cast
+		}
+		if(lhs is ValDictScope s) {
+
+			throw new Exception("Illegal");
+			var result = new List<dynamic> { };
+			foreach(var a in pars) {
+				var r = a.Eval(s);
+				if(r is ValEmpty)
+					continue;
+				result.Add(r);
+			}
+			if(result.Count > 0)
+				return result;
+			else return ValEmpty.VALUE;
+		}
+		throw new Exception();
+	}
+	public static dynamic InvokeData (ValDictScope ctx, object lhs, IEnumerable<dynamic> evalArgs) {
+		if(lhs is ValEmpty) {
+			throw new Exception("Function not found");
+			//return ValError.FUNCTION_NOT_FOUND;
+		}
+		if(lhs is ValError ve) {
+			throw new Exception(ve.msg);
+		}
+		if(lhs is ValConstructor vc) {
+			var rhs = evalArgs.ToArray();
+			var c = vc.t.GetConstructor(rhs.Select(arg => (arg as object).GetType()).ToArray());
+			if(c == null) {
+				throw new Exception("Constructor not found");
+				//return ValError.CONSTRUCTOR_NOT_FOUND;
+			}
+			return c.Invoke(rhs);
+		}
+		if(lhs is ValInstanceMember vim) {
+			var vals = evalArgs.ToArray();
+			return vim.Call(vals);
+		}
+		if(lhs is ValStaticMember vsm) {
+
+			var vals = evalArgs.ToArray();
+			return vsm.Call(vals);
+		}
+		if(lhs is Type t) {
+			var d = evalArgs.Single();
+			return new ValType(t).Cast(d, d?.GetType());
+			if(t.IsPrimitive) {
+				//return new ValType(t).Cast(d);
+			} else {
+				var o = t.GetConstructor([]).Invoke([]);
+				var sc = new ValObjectScope { obj = o, parent = ctx };
+				//args.Single().Eval(sc);
+				return o;
+			}
+		}
+		if(lhs is ValFunc vf) {
+			return vf.CallData(ctx, evalArgs.ToList());
+		}
+		if(lhs is Delegate f) {
+			var argValues = evalArgs.ToArray();
 			var r = f.DynamicInvoke(argValues);
 			if(f.Method.ReturnType == typeof(void))
 				return ValEmpty.VALUE;
@@ -1027,7 +1090,7 @@ public class ExprInvoke : INode {
 
 			throw new Exception("Illegal");
 			var result = new List<dynamic> { };
-			foreach(var a in args) {
+			foreach(var a in evalArgs) {
 				var r = a.Eval(s);
 				if(r is ValEmpty)
 					continue;
@@ -1232,16 +1295,14 @@ public class ExprCondSeq : INode {
 
 	public List<(INode cond, INode yes, INode no)> items;
 	public dynamic Eval(ValDictScope ctx) {
-
 		var f = filter.Eval(ctx);
 		var lis =(List<object>)(
 			type == null ?
 				new List<object> { } :
 				(typeof(List<>).MakeGenericType(type.Eval(ctx)) as Type).GetConstructor([]).Invoke([])
 				);
-
 		foreach(var (cond, yes, no) in items) {
-			var b = ExprInvoke.Invoke(ctx, f, new List<INode?> { cond });
+			var b = ExprInvoke.Invoke(ctx, f, new INode[] { cond });
 			if(b == true) {
 				if(yes != null) {
 					var v = yes.Eval(ctx);
@@ -1266,19 +1327,15 @@ public class ExprCondSeq : INode {
 		return arr;
 	}
 }
-
-
-
-
 public class ExprMatch : INode {
 	public INode item;
-	public List<(INode antecedent, INode consequent)> branches;
+	public List<(INode cond, INode yes)> branches;
 	public dynamic Eval (ValDictScope ctx) {
 		var subject = item.Eval(ctx);
-		foreach(var (a, c) in branches) {
-			var b = a.Eval(ctx);
+		foreach(var (cond, yes) in branches) {
+			var b = cond.Eval(ctx);
 			if(Is(b)) {
-				return c.Eval(ctx);
+				return yes.Eval(ctx);
 			}
 		}
 		bool Is(dynamic pattern) {
@@ -1290,15 +1347,11 @@ public class ExprMatch : INode {
 		throw new Exception("Fell out of match expression");
 	}
 }
-
-
 public class ExprMap : INode {
 	public INode from;
 	public INode map;
 	public INode cond;
 	public INode type;
-
-
 	public XElement ToXML () => new("Map", from.ToXML(), map.ToXML());
 	public string Source => $"{from.Source} | {map.Source}";
 	public dynamic Eval (ValDictScope ctx) {

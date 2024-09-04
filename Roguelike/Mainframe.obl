@@ -10,6 +10,9 @@
 	}
 
 
+	func(a:int void)
+	func(int void)
+	~
 	BufferedList: class {
 		items: HashSet-object/new!
 		toAdd: HashSet-object/new!
@@ -186,7 +189,6 @@
 				}
 			}
 
-			others ?= 
 
 			not-attack ?+ {
 				world/hasFloor-dest ?+ {
@@ -306,15 +308,11 @@
 			sf_ui/PrintStr(1 y str ABGR/White ABGR/Black)
 			y := mini(addi(_ 1) subi(sf_ui/GridHeight 1))
 		}
-
 		menu =- null ?+ menu/render!
-
-
 		,[:Sf sf sf_ui] | scene/Draw/Invoke
 	}
 	handle_key(kb:KB): {
 		player/busy ?+ { ^^ := null }
-
 		menu =- null ?+ {
 			menu/handle_key-kb
 			^^ := null
@@ -336,8 +334,9 @@
 	}
 	border: RectOptions/new(ABGR/White ABGR/Black)
 	GetMenu: class {
-		
-		new!: GetMenu {
+		items: List-object
+		new(items:List-object): GetMenu {
+			items := ^^items
 		}
 		handle_key(kb:KB): {
 			kb/IsPress ?[

@@ -1,5 +1,5 @@
 {
-
+	
 	~
 	test(?): match {
 		string{}: print * args
@@ -8,8 +8,6 @@
 	}
 	init: match {
 	}
-
-
 	func(a:int void)
 	func(int void)
 	~
@@ -38,7 +36,6 @@
 				(items | pr)
 				(toRemove | pr)
 			~
-			
 			toAdd/Clear!
 			toRemove/Clear!
 		}
@@ -103,35 +100,49 @@
 	Floor: class {
 		name: "Floor"
 		pos:XY
-		env: true
-		active:true
+		env: b1
+		active: b1
 		tile: Tile {
 			glyph := char_from-249
 			front := ABGR/Gray
 			back := ABGR/Transparent
 		}
 		update!: {
-			
 		}
 		new(pos:XY): Floor {
 			pos := ^^pos
 		}
 		#register(Entity)
 	}
+	~
+	Msg: class {
+		new(str:Row-Tile time:double tick:int): Msg {
+			str := ^^str
+			time := ^^time
+			tick := ^^tick
+		}
+
+		str: Row-Tile
+		time: double
+		tick: int
+
+		repeats: 1
+		once: get* repeats =+ 1
+		fadeTime: double_from-0
+		text: get* str | ?(t:Tile) t/glyph
+	}
+	~
 	Enemy: class {
 		hp: 100
-		active: true
+		active: b1
 		name: "Enemy"
 		pos: XY
-
 		world: World
-
 		this: get* ^$
 		tile: Tile {
 			glyph := "E"[0]
 			front := ABGR/Red
 		}
-		
 		new(pos:XY world:World): Enemy {
 			pos := ^^pos
 			world := ^^world
@@ -163,45 +174,44 @@
 			glyph := "@"[0]
 			front := ABGR/Magenta
 		}
-		active: true
-		busy: false
+		active: b1
+		busy: b0
 		world: World
 		log: List-string/new!
+		cargo: List-Item/new!
 		new(pos:XY world:World): Player {
 			pos := ^^pos
 			world := ^^world
 		}
 		update!: {
-			busy := false
+			busy := b0
 		}
 		move(disp:XY): {
 			dest: pos/add*disp
 			grid: world/getGrid
 			others: grid[dest/xyi]
-			attack: false
+			attack: b0
 			others =- null ?+ {
 				others |<not*attack> ?(e) {
 					e/class =+ Enemy ?+ {
-						log/Add*cat*["Attack " e/name]
+						log/Add*cat["Attack " e/name]
 						e/damage*20
-						attack := true
+						attack := b1
 					}
 				}
 			}
-
-
 			not-attack ?+ {
 				world/hasFloor-dest ?+ {
 					pos := dest
 				}
 			}
-			busy := true
+			busy := b1
 		}
 	}
 	Item: class {
 		type: ItemType
 		pos: XY
-		active: true
+		active: b1
 		tile: Tile { glyph := "r"@0  front := ABGR/White }
 		new(type:ItemType pos:XY): Item {
 			type := ^^type
@@ -219,7 +229,7 @@
 	World: class {
 		tick: 0
 		entities: BufferedList/new!
-		updateGrid: true
+		updateGrid: b1
 		grid: ConcurrentDictionary(Pt HashSet-object)/new!
 		new!: World{}
 		addEntity: entities/Add
@@ -236,8 +246,12 @@
 					}
 			}
 			entities/Update!
-			updateGrid := true
+			updateGrid := b1
 			tick := addi(_ 1)
+		}
+		forceUpdate!: {
+			entities/Update!
+			updateGrid := b1
 		}
 		getGrid: get* {
 			not-updateGrid ?+ {
@@ -247,28 +261,27 @@
 			#print* grid/Count
 			entities/items | ?(e)
 				grid/GetOrAdd(e/pos/xyi HashSet-object/new!)/Add-e
-			updateGrid := false
+			updateGrid := b0
 			^: grid
 		}
 		hasFloor(p:XY): {
 			loc: getGrid[p/xyi]
-			b:false
+			b: b0
 			loc =- null ?+ 
 				loc | ?(e)
 					e/class =+ Floor ?+ {
-						b := true
+						b := b1
 					}
 			^: b
 		}
 	}
 	time: addf(0 0)
-	move: false
+	move: b0
 	player: Player
 	world: World
 	sf: Sf
 	sf_ui: Sf
 	menu: object * null
-
 	init!: {
 		world := World/new!
 		add: world/addEntity
@@ -299,23 +312,44 @@
 			grid@p | ?(e) {
 				e/tile/print(sf center/add * e/pos/sub* player/pos)
 			}
-		sf_ui/PrintStr(1 1 cat*["tick: " world/tick] ABGR/White ABGR/Black)
-		
-		y: subi(sf/GridHeight 32)
-		Sf/DrawRect(sf_ui 0 y 64 32 border)
-		y := addi(_ 1)
-		player/log | ?(str:string) {
-			sf_ui/PrintStr(1 y str ABGR/White ABGR/Black)
-			y := mini(addi(_ 1) subi(sf_ui/GridHeight 1))
+		sf_ui/PrintStr(1 1 cat["tick: " world/tick] ABGR/White ABGR/Black)
+
+
+		invMenu: {
+			y: subi(sf/GridHeight 64)
+			Sf/DrawRect(sf_ui 0 y 32 32 border)
+			y := addi(_ 1)
+			sf_ui/Print(1 y "Inventory" ABGR/White ABGR/Black)
+			y := addi(_ 1)
+			Sf/DrawRect(sf_ui 0 y 32 1 border)
+			player/cargo | ?(it:Item) {
+				y := addi(_ 1)
+				it/tile/print(sf_ui XY/i(1 y))
+				sf_ui/Print(3 y it/name ABGR/White ABGR/Black)
+			}
 		}
+		log: {
+			y: subi(sf/GridHeight 32)
+			Sf/DrawRect(sf_ui 0 y 64 32 border)
+			y := addi(_ 1)
+			sf_ui/Print(1 y "Log" ABGR/White ABGR/Black)
+			y := addi(_ 1)
+			Sf/DrawRect(sf_ui 0 y 64 1 border)
+			y := addi(_ 1)
+			player/log | ?(str:string) {
+				sf_ui/PrintStr(1 y str ABGR/White ABGR/Black)
+				y := mini(addi(_ 1) subi(sf_ui/GridHeight 1))
+			}
+		}
+
 		menu =- null ?+ menu/render!
 		,[:Sf sf sf_ui] | scene/Draw/Invoke
 	}
 	handle_key(kb:KB): {
-		player/busy ?+ { ^^ := null }
+		player/busy ?+ { ^^ := empty }
 		menu =- null ?+ {
 			menu/handle_key-kb
-			^^ := null
+			^^ := empty
 		}
 		kb/IsPress ?[
 			KC/Left:	XY/left
@@ -325,18 +359,39 @@
 		] | player/move
 		kb/IsPress ?[
 			KC/G: {
-				menu := GetMenu/new!
+				getItems: get* world/getGrid[player/pos/xyi] | ?(it)
+					it/class =+ Item ?+ 
+						it ?-
+						empty
+				menu := GetMenu/new(
+					getItems
+					?(ind) {
+						it: menu/items@ind
+
+						world/removeEntity*it
+						player/cargo/Add*it
+						world/forceUpdate!
+
+						menu/setItems*getItems
+					}
+				)
 			}
 			KC/N: null
 		]
 	}
 	handle_mouse(state:HandState): {
 	}
-	border: RectOptions/new(ABGR/White ABGR/Black)
+	border: RectOptions/new(ABGR/DeepPink ABGR/Black)
+	borderMenu: RectOptions/new(ABGR/DeepPink ABGR/Black b1 b0)
 	GetMenu: class {
-		items: List-object
-		new(items:List-object): GetMenu {
+		items: Row-object
+		setItems(items:Row-object): {
+			^^^items := items
+		}
+		invoke: ValFunc * null
+		new(items:Row-object invoke): GetMenu {
 			items := ^^items
+			invoke := ^^invoke
 		}
 		handle_key(kb:KB): {
 			kb/IsPress ?[
@@ -346,29 +401,27 @@
 			]
 			kb/Press | ?(k) beq(k 65 90) ?+ {
 				ind: subi(k 65)
-				print * cat * ["get " ind]
+				lt(ind items/Length) ?+
+					invoke*ind
 			}
 		}
 		render!: {
+			x:32
 			y:16
-			Sf/DrawRect(sf_ui 0 y 32 32 border)
+			w:32
+			Sf/DrawRect(sf_ui x y w 32 border)
 			y := addi(y 1)
-			sf_ui/PrintStr(2 y "Get" ABGR/White ABGR/Black)
+			sf_ui/PrintStr(addi(x 2) y "Get Items" ABGR/White ABGR/Black)
 			y := addi(y 1)
-			Sf/DrawRect(sf_ui 0 y 32 32 border)
-
-			others: world/getGrid[player/pos/xyi]
-			others =- null ?+ {
-				ind: 0
-				others | ?(it) {
-					it/class =+ Item ?+ {
-						y := addi(y 1)
-						sf_ui/Print(2 y it/tile/glyph it/tile/front it/tile/back)
-						sf_ui/Print(4 y it/name ABGR/White ABGR/Black)
-						sf_ui/Print(subi(32 3) y ABC@ind ABGR/White ABGR/Black)
-						ind := addi(ind 1)
-					}
-				}
+			Sf/DrawRect(sf_ui x y w 1 borderMenu)
+			
+			ind: 0
+			items | ?(it) {
+				y := addi(y 1)
+				sf_ui/Print(addi(x 2) y it/tile/glyph it/tile/front it/tile/back)
+				sf_ui/Print(addi(x 4) y it/name ABGR/White ABGR/Black)
+				sf_ui/Print(subi(addi(x w) 3) y ABC@ind ABGR/White ABGR/Black)
+				ind := addi(ind 1)
 			}
 		}
 	}

@@ -41,6 +41,10 @@ var global = new ValDictScope {
 		["string"] = typeof(string),
 		["object"] = typeof(object),
 
+		["bit"] = typeof(bool),
+		["b1"] = true,
+		["b0"] = false,
+
 		["empty"] = ValEmpty.VALUE,
 
 		["default"] = Val((Type t) => t.IsValueType ? Activator.CreateInstance(t) : null),
@@ -121,9 +125,11 @@ var global = new ValDictScope {
 		["HashSet"] = Val((object item) => MakeGeneric(typeof(HashSet<>), item)),
 		["Dictionary"] = Val((Type key, Type val) => typeof(Dictionary<,>).MakeGenericType(key, val)),
 		["ConcurrentDictionary"] = Val((Type key, Type val) => typeof(ConcurrentDictionary<,>).MakeGenericType(key, val)),
-		["StringBuilder"] = typeof(StringBuilder)
+		["StringBuilder"] = typeof(StringBuilder),
+		["ValFunc"] = typeof(ValFunc)
 	}
 };
+
 Type MakeGeneric (Type gen, object item) => item is Type t ? gen.MakeGenericType(t) : typeof(List<>).MakeGenericType(typeof(object));
 
 var result = (ValDictScope)block.StagedEval(global);

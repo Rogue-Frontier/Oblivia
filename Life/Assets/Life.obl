@@ -26,7 +26,6 @@
 		update!: {
 			activeCount := 0
 			g: GetCell
-
 			txt/Clear!
 			range(0 height) | ?(y:int) {
 				range(0 width) | ?(x:int) {

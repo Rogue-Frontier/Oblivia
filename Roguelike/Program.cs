@@ -6,6 +6,7 @@ using System.Collections;
 using SadConsole.Effects;
 using SadConsole.Input;
 using System.Collections.Concurrent;
+using Common;
 
 var tokenizer = new Tokenizer(File.ReadAllText("Mainframe.obl"));
 var parser = new Parser(tokenizer.GetAllTokens());
@@ -118,19 +119,21 @@ var global = new ValDictScope {
 		}),
 		["rand_bool"] = Val(() => new Random().Next(2) == 1),
 
-		["Row"] = Val((Type type) => type.MakeArrayType(1)),
+		["Row"] = Val((object type) => (type as Type ?? typeof(object)).MakeArrayType(1)),
 		["Grid"] = Val((Type type) => type.MakeArrayType(2)),
-		["List"] = Val((Type type) => typeof(List<>).MakeGenericType(type)),
+		["List"] = Val((object type) => typeof(List<>).MakeGenericType(type as Type ?? typeof(object))),
 		["List"] = Val((object item) => MakeGeneric(typeof(List<>), item)),
 		["HashSet"] = Val((object item) => MakeGeneric(typeof(HashSet<>), item)),
 		["Dictionary"] = Val((Type key, Type val) => typeof(Dictionary<,>).MakeGenericType(key, val)),
 		["ConcurrentDictionary"] = Val((Type key, Type val) => typeof(ConcurrentDictionary<,>).MakeGenericType(key, val)),
 		["StringBuilder"] = typeof(StringBuilder),
-		["ValFunc"] = typeof(ValFunc)
+		["ValFunc"] = typeof(ValFunc),
+
+		["Common"] = typeof(Main),
 	}
 };
 
-Type MakeGeneric (Type gen, object item) => item is Type t ? gen.MakeGenericType(t) : typeof(List<>).MakeGenericType(typeof(object));
+Type MakeGeneric (Type gen, object item) => item is Type t ? gen.MakeGenericType(t) : gen.MakeGenericType(typeof(object));
 
 var result = (ValDictScope)block.StagedEval(global);
 /*

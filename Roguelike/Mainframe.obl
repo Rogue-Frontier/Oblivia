@@ -92,7 +92,7 @@
 		back: ABGR/Black
 		arr(str:string): str | ?(c:char) Tile { glyph := c front := ABGR/White back := ABGR/Black }
 		print(sf:Sf pos:XY): {
-			pos / { sf/PrintChar(xi yi ^^^^glyph ^^^^front ^^^^back) }
+			sf/PrintChar(%pos/(xi yi) %^^/(glyph front back))
 		}
 	}
 	Entity: interface {

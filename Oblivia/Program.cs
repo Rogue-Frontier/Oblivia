@@ -681,6 +681,7 @@ public class Parser {
 				inc();
 				return r;
 			} else {
+				return NextExpression(new ExprApply { lhs = new ExprSelf { up = up }, rhs = NextExpression() });
 				throw new Exception();
 			}
 		}
@@ -882,11 +883,15 @@ public class ExprSpread : INode {
 	public INode value;
 	public dynamic Eval(ValDictScope ctx) {
 		if(value is ExprSeq s) {
-			return s.items.Select(i => i.Eval(ctx)).ToArray();
+			return new ValSpread { value = s.items.Select(i => i.Eval(ctx)).ToArray() };
 		}
-		return value.Eval(ctx);
+		return new ValSpread { value = value.Eval(ctx) };
 	}
 }
+public class ValSpread {
+	public dynamic value;
+}
+
 public class ExprVarBlock : INode {
     public string type;
     public ExprBlock source_block;
@@ -995,6 +1000,9 @@ public class ExprLoop: INode {
 public class ExprInvoke : INode {
     public INode expr;
     public List<INode> args;
+
+	public ExprTuple realArgs;
+
 	public string Source => $"{expr.Source}{(args.Count > 1 ? $"({string.Join(", ", args.Select(a => a.Source))})" : args.Count == 1 ? $"*{args.Single().Source}" : $"!")}";
 	public dynamic Eval(ValDictScope ctx) {
 		if(expr is ExprSymbol { key: "decl", up: -1 }) {
@@ -1562,6 +1570,9 @@ public class ExprTuple : INode {
 	public List<INode> items;
 	public dynamic Eval (ValDictScope ctx) {
 		var it = items.Select(i => i.Eval(ctx)).ToArray();
+
+		var _it = new List<(string key, dynamic val)> { };
+
 		return new ValTuple { items = it };
 	}
 }
@@ -1570,10 +1581,34 @@ public class ValTuple {
 }
 public class ExprRealTuple : INode {
 	public (string key, INode value)[] items;
+
+	public dynamic Eval (ValDictScope ctx) {
+		var it = new List<(string key, dynamic val)> { };
+		foreach(var(key, val) in items) {
+			if(val is ExprSpread es) {
+				if(es.value is ExprRealTuple vt) {
+					vt.Spread(ctx, it);
+				} else if(es.value is ValRealTuple vrt) {
+					vrt.Spread(it);
+				}
+			}
+		}
+		return new ValRealTuple { items = it.ToArray() };
+	}
+	public void Spread(ValDictScope ctx, List<(string key, dynamic val)> it) {
+		foreach(var(key,val) in items) {
+			it.Add((key, val.Eval(ctx)));
+		}
+	}
 }
 public class ValRealTuple : INode {
 	public (string key, dynamic val)[] items;
 	public dynamic Eval (ValDictScope ctx) => this;
+	public void Spread (List<(string key, dynamic val)> it) {
+		foreach(var (key, val) in items) {
+			it.Add((key, val));
+		}
+	}
 }
 public class StmtDefFunc : INode {
 	public string key;

@@ -3,8 +3,10 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using System.ComponentModel.Design;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
+using System.Net.WebSockets;
 using System.Reflection;
 using System.Reflection.Metadata.Ecma335;
 using System.Text;
@@ -86,30 +88,39 @@ public record Args {
 }
 public record ValFunc {
 	public INode expr;
-	public List<StmtKeyVal> pars;
+	public ValTuple pars;
 	public ValDictScope parent_ctx;
-	public dynamic Call(ValDictScope caller_ctx, IEnumerable<INode> args) {
+	public dynamic Call(ValDictScope caller_ctx, ExprTuple args) {
 		var func_ctx = new ValDictScope(parent_ctx, false);
 		var argData = new Args { };
 		func_ctx.locals["_arg"] = argData;
 
-		foreach(var p in pars) {
-			var val = p.value.Eval(caller_ctx);
-			StmtKeyVal.Init(func_ctx, p.key, val);
+		foreach(var (k, v) in pars.items) {
+
+			StmtKeyVal.Init(func_ctx, k, v);
+			/*
+			if(v == null) {
+				StmtKeyVal.Init(func_ctx, k, null);
+			} else {
+
+				var val = v?.Eval(caller_ctx);
+				StmtKeyVal.Init(func_ctx, k, val);
+			}
+			*/
 		}
 		int ind = 0;
-		foreach(var arg in args) {
-			if(arg is StmtKeyVal kv) {
+		foreach(var(k, v) in args.items) {
+			if(k != null) {
 				ind = -1;
-				var val = StmtAssign.Assign(func_ctx, kv.key, 1, () => kv.value.Eval(caller_ctx));
-			} else if(ind > -1) {
-				var p = pars[ind];
-				var val = StmtAssign.Assign(func_ctx, p.key, 1, () => arg.Eval(caller_ctx));
+				var val = StmtAssign.Assign(func_ctx, k, 1, () => v.Eval(caller_ctx));
+			} else {
+				var p = pars.items[ind];
+				var val = StmtAssign.Assign(func_ctx, p.key, 1, () => v.Eval(caller_ctx));
 				ind += 1;
 			}
 		}
 		ind = 0;
-		foreach(var p in pars) {
+		foreach(var p in pars.items) {
 			var val = func_ctx.locals[p.key];
 			argData.list.Add(val);
 			argData.dict[p.key] = val;
@@ -124,19 +135,19 @@ public record ValFunc {
 		var func_ctx = new ValDictScope(parent_ctx, false);
 		var argData = new Args { };
 		func_ctx.locals["_arg"] = argData;
-		foreach(var p in pars) {
-			var val = p.value.Eval(caller_ctx);
-			StmtKeyVal.Init(func_ctx, p.key, val);
+		foreach(var (k,v) in pars.items) {
+			//var val = v.Eval(caller_ctx);
+			StmtKeyVal.Init(func_ctx, k, v);
 		}
 		int ind = 0;
 		foreach(var arg in args) {
-			var p = pars[ind];
+			var p = pars.items[ind];
 			var val = StmtAssign.Assign(func_ctx, p.key, 1, () => arg);
 			ind += 1;
 		}
 
 		ind = 0;
-		foreach(var p in pars) {
+		foreach(var p in pars.items) {
 			var val = func_ctx.locals[p.key];
 			argData.list.Add(val);
 			argData.dict[p.key] = val;
@@ -152,18 +163,18 @@ public record ValFunc {
 		var argData = new Args { };
 		func_ctx.locals["_arg"] = argData;
 
-		foreach(var p in pars) {
-			var val = p.value.Eval(caller_ctx);
+		foreach(var p in pars.items) {
+			var val = p.val.Eval(caller_ctx);
 			StmtKeyVal.Init(func_ctx, p.key, val);
 		}
 		int ind = 0;
 		foreach(var arg in args) {
-			var p = pars[ind];
+			var p = pars.items[ind];
 			var val = StmtAssign.Assign(func_ctx, p.key, 1, () => arg);
 			ind += 1;
 		}
 		ind = 0;
-		foreach(var p in pars) {
+		foreach(var p in pars.items) {
 			var val = func_ctx.locals[p.key];
 			argData.list.Add(val);
 			argData.dict[p.key] = val;
@@ -190,7 +201,6 @@ public record ValType(Type type) {
 		if(type == typeof(void)) {
 			return ValEmpty.VALUE;
 		}
-
 		if(nextType == null) return next;
 		if(nextType != type) {
 			//return ValError.TYPE_MISMATCH;
@@ -317,10 +327,8 @@ public class Parser {
 		var t = tokenType;
 		if(t == TokenType.PIPE) {
 			inc();
-
 			var cond = default(INode);
 			var type = default(INode);
-
 			t = tokenType;
 			if(t == TokenType.L_ANGLE) {
 				inc();
@@ -333,102 +341,80 @@ public class Parser {
 					throw new Exception("Closing expected");
 				}
 			}
-
 			if(t == TokenType.COLON) {
 				inc();
 				type = NextExpression();
-
 			}
-
 			return NextExpression(new ExprMap { from = lhs, cond = cond, type = type, map = NextExpression() });
 		}
 		if(t == TokenType.L_PAREN) {
 			inc();
-			return NextExpression(new ExprInvoke { expr = lhs, args = NextParList() });
+			return NextExpression(new ExprInvoke { expr = lhs, args = NextArgTuple() });
 		}
 		if(t == TokenType.SPARK) {
-			inc();
-			return NextExpression(new ExprInvoke { expr = lhs, args = [NextExpression()] });
+			return NextSpark(lhs);
 		}
 		if(t == TokenType.DASH) {
 			inc();
-			return NextExpression(new ExprInvoke { expr = lhs, args = [NextTerm()] });
+			return NextExpression(new ExprInvoke { expr = lhs, args = new ExprTuple { items = [(null, NextTerm())] } });
 		}
 		if(t == TokenType.SHOUT) {
 			inc();
-			return NextExpression(new ExprInvoke { expr = lhs, args = [] });
+			return NextExpression(new ExprInvoke { expr = lhs, args = new ExprTuple { items = [] } });
 		}
 		if(t == TokenType.EQUAL) {
 			inc();
-
 			t = tokenType;
-
 			bool invert;
-			if(t == TokenType.PLUS) {
-				inc();
-				invert = false;
-				goto Done;
-			}
-			if(t == TokenType.DASH) {
-				inc();
-				invert = true;
-				goto Done;
-			}
-			throw new Exception();
 
-			Done:
-			return NextExpression(new ExprEqual {
+			INode Make() => NextExpression(new ExprEqual {
 				lhs = lhs,
 				rhs = NextTerm(),
 				invert = invert
 			});
+			if(t == TokenType.PLUS) {
+				inc();
+				invert = false;
+				return Make();
+			}
+			if(t == TokenType.DASH) {
+				inc();
+				invert = true;
+				return Make();
+			}
+			throw new Exception();
 		}
 		if(t == TokenType.SLASH) {
 			inc();
 			t = tokenType;
-
 			if(t == TokenType.NAME) {
 				var name = currToken.str;
 				inc();
-				return NextExpression(new ExprGet {
-					src = lhs,
-					key = name
-				});
+				return NextExpression(new ExprGet { src = lhs, key = name });
 			}
 			return NextExpression(new ExprApply { lhs = lhs, rhs = NextExpression() });
-			throw new Exception("Name expected");
 		}
 		if(t == TokenType.SWIRL) {
 			inc();
 			var index = NextTerm();
-			return NextExpression(new ExprIndex {
-				src = lhs,
-				index = [index]
-			});
+			return NextExpression(new ExprIndex { src = lhs, index = [index] });
 		}
 		//Index
 		if(t == TokenType.L_SQUARE) {
 			inc();
 			List<INode> index = new List<INode> { NextExpression() };
-
 			Check:
 			t = tokenType;
 			if(t == TokenType.R_SQUARE) {
 				inc();
-				return NextExpression(new ExprIndex {
-					src = lhs,
-					index = index
-				});
-			} else {
-				index.Add(NextExpression());
-				goto Check;
+				return NextExpression(new ExprIndex { src = lhs, index = index });
 			}
-			throw new Exception("Expected closing delimiter");
+			index.Add(NextExpression());
+			goto Check;
 		}
 		if(t == TokenType.QUERY) {
 			inc();
 			t = tokenType;
-
 			if(t == TokenType.COLON) {
 				inc();
 				var cond = NextExpression();
@@ -474,7 +460,6 @@ public class Parser {
 				}
 				throw new Exception();
 			}
-			//Conditional sequence
 			if(t == TokenType.L_SQUARE) {
 				inc();
 				INode type = null;
@@ -553,7 +538,7 @@ public class Parser {
 			case TokenType.QUERY:
 				return NextLambda();
 			case TokenType.NAME:
-				return NextSymbolicExpression();
+				return NextSymbolOrBlock();
 			case TokenType.CARET:
 				return NextSymbolOrReturn();
 			case TokenType.PERCENT:
@@ -583,18 +568,42 @@ public class Parser {
 			return expr;
 		}
 		return NextTuple(expr);
-		INode NextTuple(INode first) {
-			var items = new List<INode> { first };
-			Check:
-			items.Add(NextExpression());
+	}
+
+	ExprTuple NextArgTuple () {
+		var t = tokenType;
+		if(t == TokenType.R_PAREN) {
+			return new ExprTuple { items = [] };
+		}
+		return NextTuple(NextExpression());
+	}
+	ExprTuple NextTuple (INode first) {
+		var items = new List<(string key, INode val)> { };
+		return AddEntry(first);
+		ExprTuple AddEntry (INode lhs) {
 			var t = tokenType;
+			if(t == TokenType.COLON) {
+				NextPair(lhs);
+			} else {
+				items.Add((null, lhs));
+			}
+			t = tokenType;
 			if(t == TokenType.R_PAREN) {
 				inc();
-				return new ExprTuple { items = items };
+				return new ExprTuple { items = items.ToArray() };
+			} else {
+				return AddEntry(NextExpression());
 			}
-			goto Check;
 		}
-		throw new Exception("Tuples not supported");
+		void NextPair (INode lhs) {
+			if(lhs is ExprSymbol { up: -1, key: { } key }) {
+				inc();
+				var val = NextExpression();
+				items.Add((key, val));
+			} else {
+				throw new Exception("Name expected");
+			}
+		}
 	}
 	INode NextArray() {
 		List<INode> items = [];
@@ -624,17 +633,15 @@ public class Parser {
 		if(t == TokenType.SHOUT) {
 			inc();
 			var result = NextExpression();
-			return new ExprFunc { pars = [], result = result };
+			return new ExprFunc { pars = new ExprTuple { items = [] }, result = result };
 		}
 		if(t == TokenType.L_PAREN) {
 			inc();
-			var pars = NextParList();
-			var result = NextExpression();
-			return new ExprFunc { pars = pars, result = result };
+			return new ExprFunc { pars = NextArgTuple().ParTuple(), result = NextExpression() };
 		}
 		throw new Exception($"Unexpected token {t}");
 	}
-	INode NextSymbolicExpression () {
+	INode NextSymbolOrBlock () {
 		//May be cast object, variable, or a function call / literal.
 		var name = currToken.str;
 		inc();
@@ -657,7 +664,7 @@ public class Parser {
 					inc();
 					return new StmtReturn { val = NextExpression(), up = up };
 				}
-				throw new Exception("Long return must be assignment");
+				throw new Exception("Multi-level return must be assignment");
 			} else {
 				return new StmtReturn { val = NextExpression(), up = up };
 			}
@@ -682,10 +689,8 @@ public class Parser {
 				return r;
 			} else {
 				return NextExpression(new ExprApply { lhs = new ExprSelf { up = up }, rhs = NextExpression() });
-				throw new Exception();
 			}
 		}
-
 		if(t == TokenType.NAME) {
 			var s = new ExprSymbol { up = up, key = currToken.str };
 			inc();
@@ -751,13 +756,11 @@ public class Parser {
 			t = tokenType;
 			if(t == TokenType.EQUAL) {
                 inc();
-                var exp = NextExpression();
-                return new StmtAssign { symbol = (ExprSymbol)symbol, value = exp };
+                return new StmtAssign { symbol = (ExprSymbol)symbol, value = NextExpression() };
             }
         } else if(t == TokenType.L_PAREN) {
 			inc();
-			var args = NextParList();
-			return NextExpression(new ExprInvoke { expr = symbol, args = args });
+			return NextExpression(new ExprInvoke { expr = symbol, args = NextArgTuple() });
         }
         throw new Exception($"Unexpected token in reassign or expression {tokenType}");
 	}
@@ -795,20 +798,17 @@ public class Parser {
 				};
 		}
 	}
+	INode NextSpark(INode lhs) {
+		inc();
+		return NextExpression(new ExprInvoke {
+			expr = lhs,
+			args = new ExprTuple { items = [(null, new ExprSpread { value = NextExpression() })] },
+		});
+	}
 	INode NextFuncOrExpression (string name) {
 		var t = tokenType;
 		if(t == TokenType.SPARK) {
-			inc();
-			bool spread = false;
-			t = tokenType;
-			if(t == TokenType.SPARK) {
-				inc();
-			}
-			var a = NextExpression();
-			return NextExpression( new ExprInvoke {
-				expr = new ExprSymbol { key = name },
-				args = [new ExprSpread { value = a }],
-			});
+			return NextSpark(new ExprSymbol { key = name });
 		}
 		if (t == TokenType.SHOUT) {
 			inc();
@@ -817,66 +817,25 @@ public class Parser {
 				inc();
 				return new StmtDefFunc {
 					key = name,
-					pars = [],
+					pars = new ExprTuple { items = [] },
 					value = NextExpression()
 				};
 			} else {
 				return NextExpression( new ExprInvoke {
 					expr = new ExprSymbol { key = name },
-					args = [],
+					args = new ExprTuple { items = [] },
 				});
 			}
 		}
 		inc();
-		var pars = NextParList();
+		var args = NextArgTuple();
 		t = currToken.type;
 		if(t == TokenType.COLON) {
 			inc();
-			return new StmtDefFunc {
-				key = name,
-				pars = ExprFunc.ToKV(pars).ToList(),
-				value = NextExpression()
-			};
+			var pars = args.ParTuple();
+			return new StmtDefFunc { key = name, pars = pars, value = NextExpression() };
 		}
-		return NextExpression( new ExprInvoke { expr = new ExprSymbol { key = name }, args = pars });
-	}
-	List<INode> NextParList () {
-		var par = new List<INode> { };
-		Check:
-		switch(currToken.type) {
-			case TokenType.R_PAREN:
-				inc();
-				return par;
-			case TokenType.COMMA:
-				inc();
-				goto Check;
-
-			case TokenType.NAME:
-				par.Add(NextPairOrExpression());
-				goto Check;
-			default:
-				par.Add(NextExpression());
-				goto Check;
-		}
-		return par;
-		INode NextPairOrExpression () {
-			var key = currToken.str;
-			if(tokens[index + 1].type != TokenType.COLON) {
-				return NextExpression();
-			}
-			inc();
-			var t = currToken.type;
-			if(t == TokenType.COMMA || t == TokenType.R_PAREN) {
-				return new ExprSymbol { key = key };
-			}
-			if(currToken.type != TokenType.COLON) {
-				throw new Exception($"Expected colon in parameter list: {currToken.type}");
-			}
-			inc();
-			var val = NextExpression();
-			var result = new StmtKeyVal { key = key, value = val };
-			return result;
-		}
+		return NextExpression(new ExprInvoke { expr = new ExprSymbol { key = name }, args = args });
 	}
 }
 public class ExprSpread : INode {
@@ -885,7 +844,12 @@ public class ExprSpread : INode {
 		if(value is ExprSeq s) {
 			return new ValSpread { value = s.items.Select(i => i.Eval(ctx)).ToArray() };
 		}
-		return new ValSpread { value = value.Eval(ctx) };
+
+		var val = value.Eval(ctx);
+		if(val is ValTuple vt) {
+			return new ValSpread { value = vt };
+		}
+		return val;
 	}
 }
 public class ValSpread {
@@ -999,16 +963,15 @@ public class ExprLoop: INode {
 }
 public class ExprInvoke : INode {
     public INode expr;
-    public List<INode> args;
 
-	public ExprTuple realArgs;
+	public ExprTuple args;
 
-	public string Source => $"{expr.Source}{(args.Count > 1 ? $"({string.Join(", ", args.Select(a => a.Source))})" : args.Count == 1 ? $"*{args.Single().Source}" : $"!")}";
+	//public string Source => $"{expr.Source}{(args.Count > 1 ? $"({string.Join(", ", args.Select(a => a.Source))})" : args.Count == 1 ? $"*{args.Single().Source}" : $"!")}";
 	public dynamic Eval(ValDictScope ctx) {
 		if(expr is ExprSymbol { key: "decl", up: -1 }) {
 		}
 		if(expr is ExprSymbol { key:"get", up: -1 }) {
-			return new ValGetter { ctx = ctx, expr = args.Single() };
+			return new ValGetter { ctx = ctx, expr = args.items.Single().value };
 		}
 		var lhs = expr.Eval(ctx);
 		return Invoke(ctx, lhs, args);
@@ -1016,7 +979,7 @@ public class ExprInvoke : INode {
 	public static object GetReturnType(object f) {
 		throw new Exception("Implement");
 	}
-	public static dynamic Invoke(ValDictScope ctx, object lhs, IEnumerable<INode> pars) {
+	public static dynamic Invoke(ValDictScope ctx, object lhs, ExprTuple pars) {
 		if(lhs is ValEmpty) {
 			throw new Exception("Function not found");
 			//return ValError.FUNCTION_NOT_FOUND;
@@ -1024,9 +987,9 @@ public class ExprInvoke : INode {
 		if(lhs is ValError ve) {
 			throw new Exception(ve.msg);
 		}
-		var args = pars.Select(a => a.Eval(ctx));
+		var args = pars.EvalTuple(ctx);
 		if(lhs is ValConstructor vc) {
-			var rhs = args.ToArray();
+			var rhs = args.items.Select(pair=>pair.val).ToArray();
 			var c = vc.t.GetConstructor(rhs.Select(arg => (arg as object).GetType()).ToArray());
 			if(c == null) {
 				throw new Exception("Constructor not found");
@@ -1035,15 +998,15 @@ public class ExprInvoke : INode {
 			return c.Invoke(rhs);
 		}
 		if(lhs is ValInstanceMember vim) {
-			var vals = args.ToArray();
+			var vals = args.items.Select(pair=>pair.val).ToArray();
 			return vim.Call(vals);
 		}
 		if(lhs is ValStaticMember vsm) {
-			var vals = args.ToArray();
+			var vals = args.items.Select(pair => pair.val).ToArray();
 			return vsm.Call(vals);
 		}
 		if(lhs is Type tl) {
-			var d = args.Single();
+			var d = args.items.Single().val;
 			return new ValType(tl).Cast(d, d?.GetType());
 			if(tl.IsPrimitive) {
 				//return new ValType(t).Cast(d);
@@ -1055,9 +1018,9 @@ public class ExprInvoke : INode {
 			}
 		}
 		if(lhs is ValTuple vt) {
-			var parTypes = vt.items.OfType<Type>().ToArray();
-			var argArr = args.ToArray();
-			var argTypes = argArr.Select(a => (Type)a.GetType()).ToArray();
+			//var parTypes = vt.items.OfType<Type>().ToArray();
+			var argArr = args;
+			var argTypes = argArr.items.Select(a => (Type)a.GetType()).ToArray();
 			var tt = argTypes.Length switch {
 				2 => typeof(ValueTuple<,>),
 				3 => typeof(ValueTuple<,,>),
@@ -1067,7 +1030,7 @@ public class ExprInvoke : INode {
 				7 => typeof(ValueTuple<,,,,,,>),
 				8 => typeof(ValueTuple<,,,,,,,>),
 			};
-			var aa = (object)(argArr switch {
+			var aa = (object)(argArr.items switch {
 			[{ } a, { } b] => (a, b),
 			[{ } a, { } b, { } c] => (a, b, c),
 			[{ } a, { } b, { } c, { } d] => (a, b, c, d),
@@ -1083,8 +1046,7 @@ public class ExprInvoke : INode {
 			return vf.Call(ctx, pars);
 		}
 		if(lhs is Delegate de) {
-			var argArr = args.ToArray();
-			var r = de.DynamicInvoke(argArr);
+			var r = de.DynamicInvoke(args.items.Select(pair=>pair.val).ToArray());
 			if(de.Method.ReturnType == typeof(void))
 				return ValEmpty.VALUE;
 			return r;
@@ -1096,8 +1058,8 @@ public class ExprInvoke : INode {
 
 			throw new Exception("Illegal");
 			var result = new List<dynamic> { };
-			foreach(var a in pars) {
-				var r = a.Eval(s);
+			foreach(var a in pars.items) {
+				var r = a.value.Eval(s);
 				if(r is ValEmpty)
 					continue;
 				result.Add(r);
@@ -1358,7 +1320,9 @@ public class ExprIndex : INode {
 			throw new Exception();
 		}
 		if(call is ValFunc vf) {
-			return vf.Call(ctx, index);
+			//return vf.Call(ctx, new ValRealTuple { items = [(null, index.Select(i => i.Eval(ctx)).ToArray())] });
+
+			throw new Exception("ugly");
 		}
 		if(call is Delegate de) {
 			return de.DynamicInvoke([index.Select(a => a.Eval(ctx)).ToArray()]);
@@ -1391,7 +1355,9 @@ public class ExprCondSeq : INode {
 				(typeof(List<>).MakeGenericType(type.Eval(ctx)) as Type).GetConstructor([]).Invoke([])
 				);
 		foreach(var (cond, yes, no) in items) {
-			var b = ExprInvoke.Invoke(ctx, f, new INode[] { cond });
+
+			var c = cond.Eval(ctx);
+			var b = ExprInvoke.Invoke(ctx, f, c is ValTuple vrt ? vrt.expr : new ExprTuple { items = [(null, new ExprVal { value= c } )] });
 			if(b == true) {
 				if(yes != null) {
 					var v = yes.Eval(ctx);
@@ -1478,9 +1444,9 @@ public class ExprMap : INode {
 				var inner_ctx = ctx.MakeTemp(item);
 
 
-				var r = ExprInvoke.InvokeData(inner_ctx, f,
-					item is ValTuple vt ? vt.items :
-					new dynamic[] { item });
+				var r = ExprInvoke.Invoke(inner_ctx, f,
+					item is ValTuple vt ? vt.expr :
+					new ExprTuple { items = [(null, new ExprVal { value = item })] });
 				if(r is ValEmpty) {
 					continue;
 				}
@@ -1509,9 +1475,7 @@ public class StmtKeyVal : INode {
 	public string Source => $"{key}:{value?.Source ?? "null"}";
 	public dynamic Eval(ValDictScope ctx) {
 		var val = value.Eval(ctx);
-
 		if(val is ValError ve) throw new Exception(ve.msg);
-
 		if(value is ExprVarBlock { type: "class" }) {
 			Set(ctx, key, val);
 			return ValEmpty.VALUE;
@@ -1533,23 +1497,16 @@ public class StmtKeyVal : INode {
 }
 
 public class ExprFunc : INode {
-	public List<INode> pars;
+	public ExprTuple pars;
 	public INode result;
-	public XElement ToXML () => new("ExprFunc", [.. pars.Select(i => i.ToXML()), result.ToXML()]);
-	public string Source => $"@({string.Join(", ", pars.Select(p => p.Source))}) {result.Source}";
+	//public XElement ToXML () => new("ExprFunc", [.. pars.Select(i => i.ToXML()), result.ToXML()]);
+	//public string Source => $"@({string.Join(", ", pars.Select(p => p.Source))}) {result.Source}";
 	public dynamic Eval (ValDictScope ctx) =>
 		new ValFunc {
 			expr = result,
-			pars = ToKV(pars).ToList(),
+			pars = pars.EvalTuple(ctx),
 			parent_ctx = ctx
 		};
-	public static IEnumerable<StmtKeyVal> ToKV(IEnumerable<INode> items) {
-		return items.Select(p => p switch {
-			StmtKeyVal kv => kv,
-			ExprSymbol s => new StmtKeyVal { key = s.key, value = new ExprVal { value = typeof(object) } },
-			_ => throw new Exception("Symbol or KeyVal expected")
-		});
-	}
 }
 public class ExprSeq : INode {
 	public INode type;
@@ -1566,42 +1523,46 @@ public class ExprSeq : INode {
 		return src;
 	}
 }
+
 public class ExprTuple : INode {
-	public List<INode> items;
-	public dynamic Eval (ValDictScope ctx) {
-		var it = items.Select(i => i.Eval(ctx)).ToArray();
-
-		var _it = new List<(string key, dynamic val)> { };
-
-		return new ValTuple { items = it };
-	}
-}
-public class ValTuple {
-	public dynamic[] items;
-}
-public class ExprRealTuple : INode {
 	public (string key, INode value)[] items;
-
-	public dynamic Eval (ValDictScope ctx) {
+	public ValTuple EvalTuple (ValDictScope ctx) {
 		var it = new List<(string key, dynamic val)> { };
 		foreach(var(key, val) in items) {
-			if(val is ExprSpread es) {
-				if(es.value is ExprRealTuple vt) {
-					vt.Spread(ctx, it);
-				} else if(es.value is ValRealTuple vrt) {
+			var v = val.Eval(ctx);
+			if(v is ValSpread vs) {
+				if(vs.value is ValTuple vrt) {
 					vrt.Spread(it);
+				} else {
+					it.Add((key, vs.value));
 				}
+			} else {
+				it.Add((key, v));
 			}
 		}
-		return new ValRealTuple { items = it.ToArray() };
+		return new ValTuple { items = it.ToArray() };
 	}
+	public dynamic Eval (ValDictScope ctx) => EvalTuple(ctx);
 	public void Spread(ValDictScope ctx, List<(string key, dynamic val)> it) {
 		foreach(var(key,val) in items) {
 			it.Add((key, val.Eval(ctx)));
 		}
 	}
+	public ExprTuple ParTuple () =>
+		new ExprTuple {
+			items = items.Select(pair => {
+				if(pair.key == null) {
+					if(pair.value is ExprSymbol { up: -1, key: { } key }) {
+						return (key, new ExprVal { value = typeof(object) });
+					}
+					throw new Exception("Expected");
+				} else {
+					return pair;
+				}
+			}).ToArray()
+		};
 }
-public class ValRealTuple : INode {
+public class ValTuple : INode {
 	public (string key, dynamic val)[] items;
 	public dynamic Eval (ValDictScope ctx) => this;
 	public void Spread (List<(string key, dynamic val)> it) {
@@ -1609,13 +1570,17 @@ public class ValRealTuple : INode {
 			it.Add((key, val));
 		}
 	}
+
+	public ExprTuple expr => new ExprTuple {
+		items = items.Select(pair => (pair.key, (INode)new ExprVal { value = pair.val})).ToArray()
+	};
 }
 public class StmtDefFunc : INode {
 	public string key;
-    public List<StmtKeyVal> pars;
+    public ExprTuple pars;
 	public INode value;
-	public XElement ToXML () => new("DefineFunc", [new XAttribute("key", key), ..pars.Select(i => i.ToXML()), value.ToXML()]);
-    public string Source => $"{key}({string.Join(", ",pars.Select(p => p.Source))}): {value.Source}";
+	//public XElement ToXML () => new("DefineFunc", [new XAttribute("key", key), ..pars.Select(i => i.ToXML()), value.ToXML()]);
+    //public string Source => $"{key}({string.Join(", ",pars.Select(p => p.Source))}): {value.Source}";
 	public dynamic Eval(ValDictScope ctx) {
 		Define(ctx);
 		return ValEmpty.VALUE;
@@ -1623,7 +1588,7 @@ public class StmtDefFunc : INode {
 	public void Define(ValDictScope owner) {
 		owner.locals[key] = new ValFunc {
 			expr = value,
-			pars = pars,
+			pars = pars.EvalTuple(owner),
 			parent_ctx = owner
 		};
 	}

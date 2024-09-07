@@ -97,5 +97,5 @@ global.locals = new Dictionary<string, dynamic> {
 	["StringBuilder"] = typeof(StringBuilder)
 };
 var result = (ValDictScope)scope.Eval(global);
-var r = (result.locals["main"] as ValFunc).Call(result, [new ExprVal<string> { value = "program" }]);
+var r = (result.locals["main"] as ValFunc).Call(result, [new ExprVal { value = "program" }]);
 return;

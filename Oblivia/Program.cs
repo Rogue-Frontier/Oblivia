@@ -849,6 +849,13 @@ public class ExprSpread : INode {
 		if(val is ValTuple vt) {
 			return new ValSpread { value = vt };
 		}
+		if(val is ValEmpty) {
+			return ValEmpty.VALUE;
+		}
+		if(val is null) return null;
+
+		return val;
+		throw new Exception("Tuple or array or record expected");
 		return val;
 	}
 }

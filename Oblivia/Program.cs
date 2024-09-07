@@ -94,28 +94,21 @@ public record ValFunc {
 		var func_ctx = new ValDictScope(parent_ctx, false);
 		var argData = new Args { };
 		func_ctx.locals["_arg"] = argData;
-
 		foreach(var (k, v) in pars.items) {
-
 			StmtKeyVal.Init(func_ctx, k, v);
-			/*
-			if(v == null) {
-				StmtKeyVal.Init(func_ctx, k, null);
-			} else {
-
-				var val = v?.Eval(caller_ctx);
-				StmtKeyVal.Init(func_ctx, k, val);
-			}
-			*/
 		}
 		int ind = 0;
-		foreach(var(k, v) in args.items) {
+		foreach(var(k, v) in args.EvalTuple(caller_ctx).items) {
 			if(k != null) {
 				ind = -1;
-				var val = StmtAssign.Assign(func_ctx, k, 1, () => v.Eval(caller_ctx));
+				var val = StmtAssign.Assign(func_ctx, k, 1, () => v);
 			} else {
+				if(ind == -1) {
+					throw new Exception("Cannot have positional arguments after named arguments");
+				}
+
 				var p = pars.items[ind];
-				var val = StmtAssign.Assign(func_ctx, p.key, 1, () => v.Eval(caller_ctx));
+				var val = StmtAssign.Assign(func_ctx, p.key, 1, () => v);
 				ind += 1;
 			}
 		}
@@ -265,7 +258,11 @@ public record ValDictScope :IScope {
 		this.parent = parent;
 	}
 
-
+	public ValDictScope MakeTemp () => new ValDictScope {
+		locals = {},
+		parent = this,
+		temp = true
+	};
 	public ValDictScope MakeTemp (dynamic _) => new ValDictScope {
 		locals = {
 				["_"] = _
@@ -273,6 +270,9 @@ public record ValDictScope :IScope {
 		parent = this,
 		temp = true
 	};
+
+
+
 	public dynamic Get(string key, int up = -1) =>
 		up == -1 ? GetNearest(key) : GetAt(key, up);
 	public dynamic GetAt(string key, int up) {
@@ -345,7 +345,7 @@ public class Parser {
 				inc();
 				type = NextExpression();
 			}
-			return NextExpression(new ExprMap { from = lhs, cond = cond, type = type, map = NextExpression() });
+			return NextExpression(new ExprMapFunc { src = lhs, cond = cond, type = type, map = NextExpression() });
 		}
 		if(t == TokenType.L_PAREN) {
 			inc();
@@ -365,22 +365,18 @@ public class Parser {
 		if(t == TokenType.EQUAL) {
 			inc();
 			t = tokenType;
-			bool invert;
-
-			INode Make() => NextExpression(new ExprEqual {
+			var Make = (bool invert) => NextExpression(new ExprEqual {
 				lhs = lhs,
 				rhs = NextTerm(),
 				invert = invert
 			});
 			if(t == TokenType.PLUS) {
 				inc();
-				invert = false;
-				return Make();
+				return Make(false);
 			}
 			if(t == TokenType.DASH) {
 				inc();
-				invert = true;
-				return Make();
+				return Make(true);
 			}
 			throw new Exception();
 		}
@@ -391,6 +387,10 @@ public class Parser {
 				var name = currToken.str;
 				inc();
 				return NextExpression(new ExprGet { src = lhs, key = name });
+			}
+			if(t == TokenType.SLASH) {
+				inc();
+				return NextExpression(new ExprMapExpr { src = lhs, map = NextExpression() });
 			}
 			return NextExpression(new ExprApply { lhs = lhs, rhs = NextExpression() });
 		}
@@ -516,7 +516,6 @@ public class Parser {
 			}
 			dec();
 		}
-
 		/*
 		if(t == TokenType.PERCENT) {
 			inc();
@@ -548,7 +547,6 @@ public class Parser {
 			case TokenType.INTEGER:
 				return NextInteger();
 			case TokenType.L_CURLY:
-				//Object literal
 				return NextBlock();
 			case TokenType.L_PAREN:
 				return NextTupleOrExpression();
@@ -929,6 +927,8 @@ public class ExprCond : INode {
 	public dynamic Eval (ValDictScope ctx) {
 		var l = item.Eval(ctx);
 		var inner_ctx = ctx.MakeTemp(l);
+		inner_ctx.locals["_var"] = item;
+
 		var r = cond.Eval(inner_ctx);
 		if(r is not bool) {
 			throw new Exception();
@@ -1334,6 +1334,9 @@ public class ExprIndex : INode {
 		if(call is Delegate de) {
 			return de.DynamicInvoke([index.Select(a => a.Eval(ctx)).ToArray()]);
 		}
+		if(call is ValTuple vt) {
+			return (((string key, dynamic val)) vt.items.GetValue(index.Select(i => (int)i.Eval(ctx)).ToArray())).val;
+		}
 		/*
 		if(false){
 			var ind = index.Eval(ctx);
@@ -1396,6 +1399,7 @@ public class ExprPatternMatch : INode {
 		var subject = item.Eval(ctx);
 
 		var inner_ctx = ctx.MakeTemp(subject);
+		inner_ctx.locals["_default"] = subject;
 		foreach(var (cond, yes) in branches) {
 			var b = cond.Eval(inner_ctx);
 			if(Is(b)) {
@@ -1411,15 +1415,15 @@ public class ExprPatternMatch : INode {
 		throw new Exception("Fell out of match expression");
 	}
 }
-public class ExprMap : INode {
-	public INode from;
+public class ExprMapFunc : INode {
+	public INode src;
 	public INode map;
 	public INode cond;
 	public INode type;
-	public XElement ToXML () => new("Map", from.ToXML(), map.ToXML());
-	public string Source => $"{from.Source} | {map.Source}";
+	public XElement ToXML () => new("Map", src.ToXML(), map.ToXML());
+	public string Source => $"{src.Source} | {map.Source}";
 	public dynamic Eval (ValDictScope ctx) {
-		var _from = from.Eval(ctx);
+		var _from = src.Eval(ctx);
 		if(_from is ValEmpty) {
 			throw new Exception("Variable not found");
 		}
@@ -1435,7 +1439,13 @@ public class ExprMap : INode {
 		dynamic Map (dynamic seq) {
 			var result = new List<dynamic>();
 			var f = map.Eval(ctx);
+
+			int index = 0;
 			foreach(var item in seq) {
+				var inner_ctx = ctx.MakeTemp();
+				inner_ctx.locals["_item"] = item;
+				inner_ctx.locals["_index"] = index;
+				index++;
 				if(cond != null) {
 					var b = cond.Eval(ctx);
 					if(b == true) {
@@ -1446,11 +1456,7 @@ public class ExprMap : INode {
 					}
 					throw new Exception("Boolean expected");
 				}
-
 				Do:
-				var inner_ctx = ctx.MakeTemp(item);
-
-
 				var r = ExprInvoke.Invoke(inner_ctx, f,
 					item is ValTuple vt ? vt.expr :
 					new ExprTuple { items = [(null, new ExprVal { value = item })] });
@@ -1464,17 +1470,85 @@ public class ExprMap : INode {
 		}
 		dynamic Convert(List<dynamic> items) {
 			var r = items.ToArray();
-
 			if(type != null) {
 				var arr = Array.CreateInstance(type.Eval(ctx), r.Length);
 				Array.Copy(r, arr, r.Length);
-
 				return arr;
 			}
 			return r;
 		}
 	}
 }
+
+
+
+
+
+
+public class ExprMapExpr : INode {
+	public INode src;
+	public INode map;
+
+	public INode cond;
+	public INode type;
+
+	public XElement ToXML () => new("Map", src.ToXML(), map.ToXML());
+	public string Source => $"{src.Source} | {map.Source}";
+	public dynamic Eval (ValDictScope ctx) {
+		var _from = src.Eval(ctx);
+		if(_from is ValEmpty) {
+			throw new Exception("Variable not found");
+		}
+		if(_from is ICollection c) {
+			return Map(c);
+		} else if(_from is IEnumerable e) {
+			return Map(e);
+		} else {
+			throw new Exception("Sequence expected");
+		}
+		dynamic Map (dynamic seq) {
+			var result = new List<dynamic>();
+			int index = 0;
+			foreach(var item in seq) {
+				var inner_ctx = ctx.MakeTemp();
+				inner_ctx.locals["_item"] = item;
+				inner_ctx.locals["_index"] = index;
+				index++;
+				if(cond != null) {
+					var b = cond.Eval(ctx);
+					if(b == true) {
+						goto Do;
+					}
+					if(b == false) {
+						break;
+					}
+					throw new Exception("Boolean expected");
+				}
+				Do:
+				var r = map.Eval(inner_ctx);
+				if(r is ValEmpty) {
+					continue;
+				}
+				result.Add(r);
+				continue;
+			}
+			return Convert(result);
+		}
+		dynamic Convert (List<dynamic> items) {
+			var r = items.ToArray();
+			if(type != null) {
+				var arr = Array.CreateInstance(type.Eval(ctx), r.Length);
+				Array.Copy(r, arr, r.Length);
+				return arr;
+			}
+			return r;
+		}
+	}
+}
+
+
+
+
 public class StmtKeyVal : INode {
     public string key;
     public INode value;
@@ -1540,9 +1614,13 @@ public class ExprTuple : INode {
 			if(v is ValSpread vs) {
 				if(vs.value is ValTuple vrt) {
 					vrt.Spread(it);
+				} else if(vs.value is ValEmpty) {
+					continue;
 				} else {
 					it.Add((key, vs.value));
 				}
+			} else if(v is ValEmpty) {
+				continue;
 			} else {
 				it.Add((key, v));
 			}
@@ -1574,6 +1652,7 @@ public class ValTuple : INode {
 	public dynamic Eval (ValDictScope ctx) => this;
 	public void Spread (List<(string key, dynamic val)> it) {
 		foreach(var (key, val) in items) {
+
 			it.Add((key, val));
 		}
 	}
@@ -1606,7 +1685,9 @@ public class StmtAssign : INode {
     XElement ToXML () => new("Reassign", symbol.ToXML(), value.ToXML());
     public string Source => $"{symbol.Source} := {value.Source}";
 	public dynamic Eval(ValDictScope ctx) {
-		var inner_ctx = ctx.MakeTemp(ctx.Get(symbol.key, symbol.up));
+		var curr = ctx.Get(symbol.key, symbol.up);
+		var inner_ctx = ctx.MakeTemp(curr);
+		inner_ctx.locals["_curr"] = curr;
 		var r = Assign(ctx, symbol.key, symbol.up, () => value.Eval(inner_ctx));
 		return r;
 	}

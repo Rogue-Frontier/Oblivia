@@ -92,8 +92,10 @@
 		back: ABGR/Black
 		arr(str:string): str | ?(c:char) Tile { glyph := c front := ABGR/White back := ABGR/Black }
 		print(sf:Sf pos:XY): {
-			charg: (%pos/(x:xi y:yi) %^^/(glyph front back))
+			charg: (%pos/(xi yi) %^^/(glyph front back))
 			sf/PrintChar * charg
+
+
 		}
 	}
 	Entity: interface {
@@ -277,6 +279,8 @@
 	sf_ui: Sf
 	menu: object * null
 	init!: {
+		print * [1 2 3] // _item =+ 1 ?+ _item
+
 		world := World/new!
 		add: world/addEntity
 		range(0 30) | ?(y:int)
@@ -301,13 +305,13 @@
 			menu/update*delta
 	}
 	render(delta:TimeSpan): {
-		sf/Clear!
-		sf_ui/Clear!
+		
+		[sf sf_ui] // _item/Clear!
 		grid: world/getGrid
 		center: XY/i(sf/GridWidth sf/GridHeight)/div*2
 		grid/Keys | ?(p:Pt)
 			grid@p | ?(e) {
-				e/tile/print(sf center/add * e/pos/sub* player/pos)
+				e/tile/print(sf center/add*e/pos/sub*player/pos)
 			}
 		sf_ui/PrintStr(1 1 cat["tick: " world/tick] ABGR/White ABGR/Black)
 		invMenu: {
@@ -341,7 +345,7 @@
 			}
 		}
 		menu =- null ?+ menu/render!
-		,[:Sf sf sf_ui] | scene/Draw/Invoke
+		,[sf sf_ui] | scene/Draw/Invoke
 	}
 	handle_key(kb:KB): {
 		player/busy ?+ { ^^ := empty }
@@ -447,7 +451,7 @@
 			items | ?(it) {
 				y := addi(_ 1),
 				[
-					(addi(x 2) y it/tile/glyph it/tile/front it/tile/back),
+					(addi(x 2) y %it/tile/(glyph front back)),
 					(addi(x 4) y it/name ABGR/White ABGR/Black),
 					(subi(addi(x w) 3) y ABC@ind ABGR/White ABGR/Black),
 				] | sf_ui/Print

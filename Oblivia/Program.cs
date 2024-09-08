@@ -440,6 +440,59 @@ public class Parser {
 	void dec() => index--;
     public Token currToken => tokens[index];
     public TokenType tokenType => currToken.type;
+	public INode NextStatement () {
+		var lhs = NextExpression();
+		switch(tokenType) {
+			case TokenType.COLON:
+				inc();
+				switch(lhs) {
+					case ExprSymbol { up: { } up } es:
+						switch(tokenType) {
+							case TokenType.EQUAL:
+								inc();
+								return new StmtAssign { symbol = es, value = NextExpression() };
+							default:
+								switch(up) {
+									case -1 or 1:
+										return new StmtKeyVal {
+											key = es.key,
+											value = NextExpression()
+										};
+									default:
+										throw new Exception("Can only define in current scope");
+								}
+						}
+					case ExprSelf { up: { } up }:
+						switch(up) {
+							case > 1:
+								switch(tokenType) {
+									case TokenType.EQUAL:
+										inc();
+										return new StmtReturn { val = NextExpression(), up = up };
+									default:
+										throw new Exception("Multi-level return must be assignment");
+								}
+							default:
+								return new StmtReturn { val = NextExpression(), up = up };
+						}
+					case ExprInvoke { expr: ExprSymbol { up: { } up, key: { } key }, args: { } args }:
+						switch(up) {
+							case -1 or 1:
+								return new StmtDefFunc {
+									key = key,
+									pars = args.ParTuple(),
+									value = NextExpression()
+								};
+							default:
+								throw new Exception("Cannot define non-local function");
+						}
+					default:
+						throw new Exception("Cannot define this");
+				}
+			default:
+				return NextExpression(lhs);
+		}
+	}
 	public INode NextExpression () {
 		var lhs = NextTerm();
 		return NextExpression(lhs);
@@ -499,7 +552,6 @@ public class Parser {
 						rhs = NextTerm(),
 						invert = invert
 					});
-
 					switch(tokenType) {
 						case TokenType.PLUS: {
 								inc();
@@ -514,10 +566,8 @@ public class Parser {
 				}
 			case TokenType.SLASH: {
 					inc();
-
 					switch(tokenType) {
 						case TokenType.NAME:
-
 							var name = currToken.str;
 							inc();
 							return NextExpression(new ExprGet { src = lhs, key = name });
@@ -538,14 +588,11 @@ public class Parser {
 					inc();
 					List<INode> index = new List<INode> { NextExpression() };
 					Check:
-
 					switch(tokenType) {
 						case TokenType.R_SQUARE: {
-
 								inc();
 								return NextExpression(new ExprIndex { src = lhs, index = index });
 							}
-
 					}
 					index.Add(NextExpression());
 					goto Check;
@@ -555,8 +602,7 @@ public class Parser {
 					switch(tokenType) {
 						case TokenType.PIPE: {
 								inc();
-								var cond = NextExpression();
-								return new ExprCond { item = lhs, cond = cond };
+								return new ExprCond { item = lhs, cond = NextExpression() };
 							}
 						case TokenType.L_CURLY: {
 								inc();
@@ -631,7 +677,6 @@ public class Parser {
 								inc();
 								var positive = NextExpression();
 								var negative = default(INode);
-
 								switch(tokenType) {
 									case TokenType.QUERY: {
 											inc();
@@ -691,7 +736,7 @@ public class Parser {
 			case TokenType.NAME:
 				return NextSymbolOrBlock();
 			case TokenType.CARET:
-				return NextSymbolOrReturn();
+				return NextCaretSymbol();
 			case TokenType.STRING:
 				return NextString();
 			case TokenType.INTEGER:
@@ -714,9 +759,7 @@ public class Parser {
 			default:
 				return NextTuple(expr);
 		}
-		
 	}
-
 	ExprTuple NextArgTuple () {
 		switch(tokenType) {
 			case TokenType.R_PAREN:
@@ -737,7 +780,6 @@ public class Parser {
 					items.Add((null, lhs));
 					break;
 			}
-
 			switch(tokenType) {
 				case TokenType.R_PAREN:
 					inc();
@@ -767,14 +809,11 @@ public class Parser {
 				break;
 		}
 		Check:
-		
 		switch(tokenType) {
 			case TokenType.COMMA:
 				inc();
 				goto Check;
 			case TokenType.R_SQUARE:
-
-
 				inc();
 				return new ExprSeq { items = items, type = type };
 			default:
@@ -811,52 +850,33 @@ public class Parser {
 				return new ExprSymbol { key = name };
 		}		
 	}
-	INode NextSymbolOrReturn () {
+	INode NextCaretSymbol () {
 		inc();
 		int up = 1;
 		Check:
-		var t = tokenType;
-		if(t == TokenType.COLON) {
-			inc();
-			if(up > 1) {
-				t = tokenType;
-				if(t == TokenType.EQUAL) {
+		switch(tokenType) {
+			case TokenType.CARET: {
+					up += 1;
 					inc();
-					return new StmtReturn { val = NextExpression(), up = up };
+					goto Check;
 				}
-				throw new Exception("Multi-level return must be assignment");
-			} else {
-				return new StmtReturn { val = NextExpression(), up = up };
-			}
+			case TokenType.NAME: {
+
+					var s = new ExprSymbol { up = up, key = currToken.str };
+					inc();
+					return s;
+				}
+			case TokenType.CASH: {
+					//Return This
+					var s = new ExprSelf { up = up };
+					inc();
+					return s;
+				}
+			default:
+				return new ExprSelf { up = up };
+				//throw new Exception($"Unexpected token in up-symbol {currToken.type}");
 		}
-		if(t == TokenType.CARET) {
-			up += 1;
-			inc();
-			goto Check;
-		}
-		if(t == TokenType.CASH) {
-			//Return This
-			var s = new ExprSelf { up = up };
-			inc();
-			return s;
-		}
-		if(t == TokenType.SLASH) {
-			inc();
-			t = tokenType;
-			if(t == TokenType.NAME) {
-				var r = new ExprGet { key = currToken.str, src = new ExprSelf { up = up } };
-				inc();
-				return r;
-			} else {
-				return NextExpression(new ExprApply { lhs = new ExprSelf { up = up }, rhs = NextExpression() });
-			}
-		}
-		if(t == TokenType.NAME) {
-			var s = new ExprSymbol { up = up, key = currToken.str };
-			inc();
-			return s;
-		}
-		throw new Exception($"Unexpected token in up-symbol {currToken.type}");
+
 	}
 	public ExprVal NextString () {
         var value = tokens[index].str;
@@ -879,79 +899,11 @@ public class Parser {
 			case TokenType.COMMA:
 				inc();
 				goto Check;
-			case TokenType.L_PAREN:
-				ele.Add(NextTupleOrExpression());
-				goto Check;
-			case TokenType.CARET:
-				ele.Add(NextReassignOrExpressionOrReturn());
-				goto Check;
-			case TokenType.NAME:
-				ele.Add(NextStatementOrExpression());
-				goto Check;
-			case TokenType.L_SQUARE:
-				ele.Add(NextExpression());
-				goto Check;
-			case TokenType.HASH:
-				inc();
-				NextTerm();
+			default:
+				ele.Add(NextStatement());
 				goto Check;
 		}
         throw new Exception($"Unexpected token in object expression: {currToken.type}");
-	}
-    INode NextReassignOrExpressionOrReturn () {
-		var symbol = NextSymbolOrReturn();
-		if(symbol is StmtReturn) return symbol;
-
-		switch(tokenType) {
-			case TokenType.COMMA:
-				return symbol;
-			case TokenType.COLON:
-				inc();
-				switch(tokenType) {
-					case TokenType.EQUAL:
-						inc();
-						return new StmtAssign { symbol = (ExprSymbol)symbol, value = NextExpression() };
-				}
-				break;
-			case TokenType.L_PAREN:
-				inc();
-				return NextExpression(new ExprInvoke { expr = symbol, args = NextArgTuple() });
-		}
-        throw new Exception($"Unexpected token in reassign or expression {tokenType}");
-	}
-	//A:B,
-	//A():B,
-	//A:B {},
-	//A():B {},
-	//A(a:int, b:int): B{}
-	public INode NextStatementOrExpression () {
-		var name = currToken.str;
-		inc();
-		switch(tokenType) {
-			case TokenType.L_PAREN or TokenType.SPARK or TokenType.SHOUT:
-				return NextFuncOrExpression(name);
-			case TokenType.COLON:
-				return NextDefineOrReassign(name);
-			default:
-				return NextExpression(new ExprSymbol { key = name });
-		}
-		throw new Exception($"Unexpected token: {tokenType}");
-	}
-	INode NextDefineOrReassign (string name) {
-		inc();
-		switch(currToken.type) {
-			case TokenType.EQUAL:
-				inc();
-				return new StmtAssign {
-					symbol = new ExprSymbol { key = name },
-					value = NextExpression()
-				};
-			default:
-				return new StmtKeyVal {
-					key = name,
-					value = NextExpression()
-				};
-		}
 	}
 	INode NextSpark(INode lhs) {
 		inc();
@@ -959,48 +911,6 @@ public class Parser {
 			expr = lhs,
 			args = new ExprTuple { items = [(null, new ExprSpread { value = NextExpression() })] },
 		});
-	}
-	INode NextFuncOrExpression (string name) {
-		var t = tokenType;
-		switch(tokenType) {
-			case TokenType.SPARK: {
-					return NextSpark(new ExprSymbol { key = name });
-				}
-			case TokenType.SHOUT: {
-					inc();
-					switch(tokenType) {
-						case TokenType.COLON: {
-								inc();
-								return new StmtDefFunc {
-									key = name,
-									pars = new ExprTuple { items = [] },
-									value = NextExpression()
-								};
-							}
-						default:
-							return NextExpression(new ExprInvoke {
-								expr = new ExprSymbol { key = name },
-								args = new ExprTuple { items = [] },
-							});
-					}
-				}
-			default: {
-
-					inc();
-					var args = NextArgTuple();
-					t = currToken.type;
-					switch(tokenType) {
-						case TokenType.COLON: {
-								inc();
-								var pars = args.ParTuple();
-								return new StmtDefFunc { key = name, pars = pars, value = NextExpression() };
-							}
-						default:
-							return NextExpression(new ExprInvoke { expr = new ExprSymbol { key = name }, args = args });
-					}
-				}
-
-		}
 	}
 }
 public class ExprSpread : INode {

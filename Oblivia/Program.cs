@@ -44,14 +44,14 @@ public record ValRef {
 	public dynamic Get () => src.GetValue(index);
 }
 public record ValConstructor (Type t) { }
-public record ValInstanceMember (object src, string key) {
+public record ValInstanceMethod (object src, string key) {
 	public dynamic Call (dynamic[] data) {
 		var tp = data.Select(d => (d as object).GetType()).ToArray();
 		var fl = BindingFlags.Instance | BindingFlags.Public;
 		return src.GetType().GetMethod(key, fl, tp).Invoke(src, data);
 	}
 };
-public record ValStaticMember (Type src, string key) {
+public record ValStaticMethod (Type src, string key) {
 	public dynamic Call (dynamic[] data) {
 		var tp = data.Select(d => (d as object).GetType()).ToArray();
 		var fl = BindingFlags.Static | BindingFlags.Public;
@@ -69,7 +69,7 @@ public class ValDeclared {
 }
 public record ValGetter {
 	public INode expr;
-	public ValDictScope ctx;
+	public IScope ctx;
 	public dynamic Eval () => expr.Eval(ctx);
 }
 public record ValMacro {
@@ -84,14 +84,14 @@ public record Args {
 public record ValFunc {
 	public INode expr;
 	public ValTuple pars;
-	public ValDictScope parent_ctx;
-	public dynamic CallPars(ValDictScope caller_ctx, ExprTuple pars) {
+	public IScope parent_ctx;
+	public dynamic CallPars(IScope caller_ctx, ExprTuple pars) {
 		return CallFunc(caller_ctx, () => pars.EvalTuple(caller_ctx));
 	}
-	public dynamic CallArgs(ValDictScope caller_ctx, ValTuple args) {
+	public dynamic CallArgs(IScope caller_ctx, ValTuple args) {
 		return CallFunc(caller_ctx, () => args);
 	}
-	public dynamic CallFunc (ValDictScope caller_ctx, Func<ValTuple> evalArgs) {
+	public dynamic CallFunc (IScope caller_ctx, Func<ValTuple> evalArgs) {
 		var func_ctx = new ValDictScope(parent_ctx, false);
 		var argData = new Args { };
 		func_ctx.locals["_arg"] = argData;
@@ -124,7 +124,7 @@ public record ValFunc {
 		var result = expr.Eval(func_ctx);
 		return result;
 	}
-	public dynamic CallData (ValDictScope caller_ctx, IEnumerable<object> args) {
+	public dynamic CallData (IScope caller_ctx, IEnumerable<object> args) {
 		var func_ctx = new ValDictScope(parent_ctx, false);
 		var argData = new Args { };
 		func_ctx.locals["_arg"] = argData;
@@ -149,7 +149,7 @@ public record ValFunc {
 		var result = expr.Eval(func_ctx);
 		return result;
 	}
-	public dynamic ApplyData (ValDictScope caller_ctx, ValDictScope target_ctx, IEnumerable<object> args) {
+	public dynamic ApplyData (IScope caller_ctx, ValDictScope target_ctx, IEnumerable<object> args) {
 		var func_ctx = new ValDictScope(parent_ctx, false);
 		var argData = new Args { };
 		func_ctx.locals["_arg"] = argData;
@@ -206,10 +206,9 @@ public record ValInterface {
 public class ValClass {
 	public string name;
 	public ValDictScope _static;
-
 	public INode source_expr;
-	public ValDictScope source_ctx;
-	public dynamic VarBlock(ValDictScope ctx, ExprBlock block) {
+	public IScope source_ctx;
+	public dynamic VarBlock(IScope ctx, ExprBlock block) {
 		var scope = (ValDictScope)source_expr.Eval(source_ctx);
 		scope.locals["class"] = this;
 		var r = block.Apply(new ValDictScope { locals = scope.locals, parent = ctx, temp = false});
@@ -217,46 +216,28 @@ public class ValClass {
 	}
 }
 public interface IScope {
+
+	public IScope parent { get; }
 	public dynamic Get (string key, int up = -1) =>
 		up == -1 ? GetNearest(key) : GetAt(key, up);
+	public dynamic GetLocal(string key) => GetAt(key, 1);
+
 	public dynamic GetAt (string key, int up);
 	public dynamic GetNearest (string key);
-	public dynamic GetHere(string key) => GetAt(key, 1);
-}
-public record ValObjectScope : IScope {
-	public IScope parent;
-	public object obj;
-	public dynamic GetAt (string key, int up) {
-		return null;
-	}
-	public dynamic GetNearest (string key) {
-		return null;
-	}
-}
-
-public record ValClassScope : IScope {
 
 
-	public ValClass fromClass;
-	public dynamic GetAt (string key, int up) {
-		return null;
-	}
-	public dynamic GetNearest (string key) {
-		return null;
-	}
+	public dynamic Set (string key, object val, int up = -1) =>
+		up == -1 ? SetNearest(key, val) : SetAt(key, val, up);
+	public dynamic SetLocal (string key, dynamic val) => SetAt(key, val, 1);
+	public dynamic SetAt (string key, object val, int up);
+	public dynamic SetNearest (string key, object val);
 
-}
-public record ValDictScope :IScope {
-	public bool temp = false;
-	public ValDictScope parent = null;
-	public Dictionary<string, dynamic> locals = [];
-	public ValDictScope (ValDictScope parent = null, bool temp = false) {
-		this.temp = temp;
-		this.parent = parent;
-	}
+
+	public IScope Copy (IScope parent);
+
 
 	public ValDictScope MakeTemp () => new ValDictScope {
-		locals = {},
+		locals = { },
 		parent = this,
 		temp = true
 	};
@@ -267,18 +248,158 @@ public record ValDictScope :IScope {
 		parent = this,
 		temp = true
 	};
+}
+public record ValTypeScope : IScope {
+	public IScope parent { get; set; } = null;
+	public Type t;
+	public IScope Copy (IScope parent) => new ValTypeScope { parent = parent, t = t };
+	public dynamic GetAt (string key, int up) {
+		if(up == 1) {
+			if(GetLocal(key, out var v))
+				return v;
+		} else {
+			if(parent != null)
+				return parent.GetAt(key, up - 1);
+		}
+		return ValError.VARIABLE_NOT_FOUND;
+	}
+	BindingFlags FLS = BindingFlags.Static | BindingFlags.Public;
+	public bool GetLocal (string key, out dynamic res) {
+		if(key == "new") {
+			res = new ValConstructor(t);
+			return true;
+		}
+		if(t.GetProperty(key, FLS) is { } pr) {
+			res = pr.GetValue(null);
+			return true;
+		}
+		if(t.GetField(key, FLS) is { } f) {
+			res = f.GetValue(null);
+			return true;
+		}
+		if(t.GetMethods().Any(m => m.Name == key)) {
+			res = new ValStaticMethod(t, key);
+			return true;
+		}
+		res = null;
+		return false;
+	}
+	public dynamic GetNearest (string key) =>
+			GetLocal(key, out var v) ? v :
+			parent != null ? parent.GetNearest(key) :
+			ValError.VARIABLE_NOT_FOUND;
+	public bool SetLocal (string key, dynamic val) {
+		if(t.GetProperty(key, FLS) is { } pr) {
+			pr.SetValue(null, val);
+			return true;
+		}
+		if(t.GetField(key, FLS) is { } f) {
+			f.SetValue(null, val);
+			return true;
+		}
+		return false;
+	}
+	public dynamic SetAt (string key, object val, int up) {
+		if(up == 1) {
+			if(SetLocal(key, val))
+				return val;
+		} else {
+			if(parent != null) {
+				return parent.SetAt(key, val, up - 1);
+			}
+		}
+		return ValError.VARIABLE_NOT_FOUND;
+	}
+	public dynamic SetNearest (string key, object val) =>
+		SetLocal(key, val) ? val :
+		parent != null ? parent.SetNearest(key, val) :
+		ValError.VARIABLE_NOT_FOUND;
+}
+public record ValObjectScope : IScope {
+	public IScope parent { get; set; } = null;
+	public object o;
+	BindingFlags FL = BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic;
+	public IScope Copy (IScope parent) => new ValObjectScope { parent = parent, o = o };
+	public dynamic GetAt (string key, int up) {
+		if(up == 1) {
+			if(GetLocal(key, out var v))
+				return v;
+		} else {
+			if(parent != null) 
+				return parent.GetAt(key, up - 1);
+		}
+		return ValError.VARIABLE_NOT_FOUND;
+	}
+	public bool GetLocal(string key, out dynamic res) {
+		var ot = o.GetType();
+		if(ot.GetProperty(key, FL) is { } p) {
+			res = p.GetValue(o);
+			return true;
+		}
+		if(ot.GetField(key, FL) is { } f) {
+			res = f.GetValue(o);
+			return true;
+		}
+		if(ot.GetMethods().Any(m => m.Name == key)) {
+			res = new ValInstanceMethod(o, key);
+			return true;
+		}
+		res = null;
+		return false;
+	}
+	public dynamic GetNearest (string key) =>
+			GetLocal(key, out var v) ? v :
+			parent != null ? parent.GetNearest(key) :
+			ValError.VARIABLE_NOT_FOUND;
+	public bool SetLocal(string key, object val) {
+		var ot = o.GetType();
+		if(ot.GetProperty(key, FL) is { } p) {
+			p.SetValue(o, val);
+			return true;
+		}
+		if(ot.GetField(key, FL) is { } f) {
+			f.SetValue(o, val);
+			return true;
+		}
+		return false;
+	}
+	public dynamic SetAt (string key, object val, int up) {
+		if(up == 1) {
+			if(SetLocal(key, val))
+				return val;
+		} else {
+			if(parent != null) {
+				return parent.SetAt(key, val, up - 1);
+			}
+		}
+		return ValError.VARIABLE_NOT_FOUND;
+	}
+	public dynamic SetNearest (string key, object val) =>
+		SetLocal(key, val) ? val :
+		parent != null ? parent.SetNearest(key, val) :
+		ValError.VARIABLE_NOT_FOUND;
+}
+public record ValDictScope :IScope {
+	public bool temp = false;
+	public IScope parent { get; set; } = null;
+	public Dictionary<string, dynamic> locals = [];
+	public ValDictScope (IScope parent = null, bool temp = false) {
+		this.temp = temp;
+		this.parent = parent;
+	}
 
+	public IScope Copy (IScope parent) => new ValDictScope { locals = locals, parent = parent, temp = false };
 
-
+	/*
 	public dynamic Get(string key, int up = -1) =>
 		up == -1 ? GetNearest(key) : GetAt(key, up);
+	*/
 	public dynamic GetAt(string key, int up) {
 		if(up == 1) {
 			if(locals.TryGetValue(key, out var v))
 				return v;
 			else if(!temp)
 				return ValError.VARIABLE_NOT_FOUND;
-
 		}
 		return
 			parent != null ? parent.GetAt(key, temp ? up : up - 1) :
@@ -288,18 +409,21 @@ public record ValDictScope :IScope {
 			locals.TryGetValue(key, out var v) ? v :
 			parent != null ? parent.GetNearest(key) :
 			ValError.VARIABLE_NOT_FOUND;
-	public dynamic Set (string key, object val, int up = -1) => up == -1 ? SetNearest(key, val) : SetAt(key, val, up);
+	/*
+	public dynamic Set (string key, object val, int up = -1) =>
+		up == -1 ? SetNearest(key, val) : SetAt(key, val, up);
+	*/
 	public dynamic SetAt(string key, object val, int up) {
 		if(temp) {
 			return parent.SetAt(key, val, up);
-		}
-		if(up == 1) {
+		} else if(up == 1) {
 			return locals[key] = val;
+		} else {
+			if(parent != null) {
+				parent.SetAt(key, val, up - 1);
+			}
+			return ValError.VARIABLE_NOT_FOUND;
 		} 
-		if(parent != null) {
-			parent.SetAt(key, val, up - 1);
-		}
-		return ValError.VARIABLE_NOT_FOUND;
 	}
 	public dynamic SetNearest (string key, object val) =>
 		locals.TryGetValue(key, out var v) ? locals[key] = val :
@@ -322,14 +446,12 @@ public class Parser {
 	}
 	public INode NextExpression(INode lhs) {
 		switch(tokenType) {
-
 			case TokenType.PIPE: {
 					inc();
 					var cond = default(INode);
 					var type = default(INode);
 					switch(tokenType) {
 						case TokenType.L_ANGLE: {
-
 								inc();
 								cond = NextExpression();
 								switch(tokenType) {
@@ -448,8 +570,6 @@ public class Parser {
 											branches = items
 										});
 								}
-
-
 								var cond_group = new List<INode> { };
 								ReadItem:
 								cond_group.Add(NextExpression());
@@ -460,12 +580,10 @@ public class Parser {
 									goto ReadBranch;
 								}
 								*/
-
 								switch(tokenType) {
 									case TokenType.COLON:
 										inc();
 										var yes = NextExpression();
-
 										foreach(var c in cond_group) {
 											items.Add((c, yes));
 										}
@@ -483,15 +601,14 @@ public class Parser {
 										type = NextExpression();
 										break;
 								}
-
 								var items = new List<(INode cond, INode yes, INode no)> { };
 								Read:
-								var ante = NextExpression();
+								var cond = NextExpression();
 								switch(tokenType) {
 									case TokenType.COLON: {
 											inc();
-											var cons = NextExpression();
-											items.Add((ante, cons, null));
+											var yes = NextExpression();
+											items.Add((cond, yes, null));
 											break;
 										}
 									default:
@@ -888,11 +1005,10 @@ public class Parser {
 }
 public class ExprSpread : INode {
 	public INode value;
-	public dynamic Eval(ValDictScope ctx) {
+	public dynamic Eval(IScope ctx) {
 		if(value is ExprSeq s) {
 			return new ValSpread { value = s.items.Select(i => i.Eval(ctx)).ToArray() };
 		}
-
 		var val = value.Eval(ctx);
 		switch(val) {
 			case ValTuple vt:
@@ -903,12 +1019,10 @@ public class ExprSpread : INode {
 			default: return val;
 		}
 		throw new Exception("Tuple or array or record expected");
-		return val;
 	}
 }
 public class ValSpread {
 	public dynamic value;
-
 	public void Spread(string key, List<(string key, dynamic val)> it) {
 		switch(value) {
 			case ValTuple vrt:
@@ -929,7 +1043,7 @@ public class ExprVarBlock : INode {
     public XElement ToXML () => new("VarBlock", new XAttribute("type", type), source_block.ToXML());
     public string Source => $"{type} {source_block.Source}";
 	public dynamic MakeScope (ValDictScope ctx) => source_block.MakeScope(ctx);
-	public dynamic Eval(ValDictScope ctx) {
+	public dynamic Eval(IScope ctx) {
 		var getResult = () => source_block.Eval(ctx);
 		if(type == "class") {
 			if(getResult() is ValDictScope s) {
@@ -974,7 +1088,7 @@ public class ExprEqual : INode {
 	public INode rhs;
 
 	public bool invert;
-	public dynamic Eval(ValDictScope scope) {
+	public dynamic Eval(IScope scope) {
 		var l = lhs.Eval(scope);
 		var r = rhs.Eval(scope);
 		var b = Equals(l, r);
@@ -987,7 +1101,7 @@ public class ExprEqual : INode {
 public class ExprCond : INode {
 	public INode item;
 	public INode cond;
-	public dynamic Eval (ValDictScope ctx) {
+	public dynamic Eval (IScope ctx) {
 		var l = item.Eval(ctx);
 		var inner_ctx = ctx.MakeTemp(l);
 		inner_ctx.locals["_var"] = item;
@@ -1005,7 +1119,7 @@ public class ExprBranch : INode {
 	public INode positive;
 	public INode negative;
 	public string Source => $"{condition.Source} ?+ {positive.Source}{(negative != null ? $" ?- {negative.Source}" : $"")}";
-	public dynamic Eval(ValDictScope ctx) {
+	public dynamic Eval(IScope ctx) {
 		var cond = condition.Eval(ctx);
 		switch(cond) {
 			case true:
@@ -1023,7 +1137,7 @@ public class ExprBranch : INode {
 public class ExprLoop: INode {
 	public INode condition;
 	public INode positive;
-	public dynamic Eval(ValDictScope ctx) {
+	public dynamic Eval(IScope ctx) {
 		dynamic r = ValEmpty.VALUE;
 		Step:
 		var cond = condition.Eval(ctx);
@@ -1041,7 +1155,7 @@ public class ExprInvoke : INode {
     public INode expr;
 	public ExprTuple args;
 	//public string Source => $"{expr.Source}{(args.Count > 1 ? $"({string.Join(", ", args.Select(a => a.Source))})" : args.Count == 1 ? $"*{args.Single().Source}" : $"!")}";
-	public dynamic Eval(ValDictScope ctx) {
+	public dynamic Eval(IScope ctx) {
 		if(expr is ExprSymbol { key: "decl", up: -1 }) {
 		}
 		if(expr is ExprSymbol { key:"get", up: -1 }) {
@@ -1052,11 +1166,11 @@ public class ExprInvoke : INode {
 	public static object GetReturnType(object f) {
 		throw new Exception("Implement");
 	}
-	public static dynamic InvokePars(ValDictScope ctx, object lhs, ExprTuple pars) =>
+	public static dynamic InvokePars(IScope ctx, object lhs, ExprTuple pars) =>
 		InvokeFunc(ctx, lhs, () => pars.EvalTuple(ctx));
-	public static dynamic InvokeArgs (ValDictScope ctx, object lhs, ValTuple args) =>
+	public static dynamic InvokeArgs (IScope ctx, object lhs, ValTuple args) =>
 		InvokeFunc(ctx, lhs, () => args);
-	public static dynamic InvokeFunc (ValDictScope ctx, object lhs, Func<ValTuple> evalArgs) {
+	public static dynamic InvokeFunc (IScope ctx, object lhs, Func<ValTuple> evalArgs) {
 		switch(lhs) {
 			case ValEmpty: {
 					throw new Exception("Function not found");
@@ -1072,11 +1186,11 @@ public class ExprInvoke : INode {
 					}
 					return c.Invoke(rhs);
 				}
-			case ValInstanceMember vim: {
+			case ValInstanceMethod vim: {
 					var vals = evalArgs().items.Select(pair => pair.val).ToArray();
 					return vim.Call(vals);
 				}
-			case ValStaticMember vsm: {
+			case ValStaticMethod vsm: {
 					var vals = evalArgs().items.Select(pair => pair.val).ToArray();
 					return vsm.Call(vals);
 				}
@@ -1113,7 +1227,8 @@ public class ExprInvoke : INode {
 					return vf.CallFunc(ctx, evalArgs);
 				}
 			case Delegate de: {
-					var r = de.DynamicInvoke(evalArgs().items.Select(pair => pair.val).ToArray());
+					var a = evalArgs().items.Select(pair => pair.val).ToArray();
+					var r = de.DynamicInvoke(a);
 					if(de.Method.ReturnType == typeof(void))
 						return ValEmpty.VALUE;
 					return r;
@@ -1132,14 +1247,35 @@ public class ExprInvoke : INode {
 public class ExprApply : INode {
 	public INode lhs;
 	public INode rhs;
-	public dynamic Eval(ValDictScope ctx) {
-		switch(lhs.Eval(ctx)) {
-			case ValDictScope vds:
-				switch(rhs) {
-					case ExprBlock eb:
-						return eb.Apply(new ValDictScope { locals = vds.locals, parent = ctx, temp = false });
-					default:
-						return rhs.Eval(new ValDictScope { locals = vds.locals, parent = ctx, temp = false });
+	public dynamic Eval(IScope ctx) {
+		var s = lhs.Eval(ctx);
+		switch(s) {
+			case IScope sc: {
+					var dest = sc.Copy(ctx);
+					switch(rhs) {
+						case ExprBlock eb:
+							return eb.Apply(dest);
+						default:
+							return rhs.Eval(dest);
+					}
+				}
+			case Type t: {
+					var dest = new ValTypeScope { t = t, parent = ctx };
+					switch(rhs) {
+						case ExprBlock eb:
+							return eb.Apply(dest);
+						default:
+							return rhs.Eval(dest);
+					}
+				}
+			case object o: {
+					var dest = new ValObjectScope { o = o, parent = ctx };
+					switch(rhs) {
+						case ExprBlock eb:
+							return eb.Apply(dest);
+						default:
+							return rhs.Eval(dest);
+					}
 				}
 		}
 		/*
@@ -1155,17 +1291,17 @@ public class ExprApply : INode {
 public class StmtReturn : INode {
 	public int up = 1;
 	public INode val;
-	public dynamic Eval(ValDictScope ctx) =>
+	public dynamic Eval(IScope ctx) =>
 		new ValReturn(val.Eval(ctx), up);
 }
 public class ExprBlock : INode {
     public List<INode> statements;
     public XElement ToXML () => new ("Block", statements.Select(i => i.ToXML()));
 	public string Source => $"{{{string.Join(", ", statements.Select(i => i.Source))}}}";
-	public dynamic Eval(ValDictScope ctx) {
+	public dynamic Eval(IScope ctx) {
 		return Apply(new ValDictScope(ctx, false));
 	}
-	public dynamic Apply(ValDictScope f) {
+	public dynamic Apply(IScope f) {
 		dynamic r = ValEmpty.VALUE;
 		foreach(var s in statements) {
 			r = s.Eval(f);
@@ -1181,8 +1317,8 @@ public class ExprBlock : INode {
 		}
 		return f;
 	}
-	public dynamic MakeScope (ValDictScope ctx) => new ValDictScope(ctx, false);
-	public dynamic StagedEval (ValDictScope ctx) => StagedApply(MakeScope(ctx));
+	public dynamic MakeScope (IScope ctx) => new ValDictScope(ctx, false);
+	public dynamic StagedEval (IScope ctx) => StagedApply(MakeScope(ctx));
 	public dynamic StagedApply (ValDictScope f) {
 		dynamic r = ValEmpty.VALUE;
 		var stageA = () => { };
@@ -1229,7 +1365,7 @@ public class ExprSymbol : INode {
     public string key;
     public XElement ToXML () => new("Symbol", new XAttribute("key", key), new XAttribute("level", $"{up}"));
 	public string Source => $"{new string('^', up)}{key}";
-	public dynamic Eval(ValDictScope ctx) {
+	public dynamic Eval(IScope ctx) {
 		var r = ctx.Get(key, up);
 		if(r is ValGetter vg) {
 			r = vg.Eval();
@@ -1239,7 +1375,7 @@ public class ExprSymbol : INode {
 }
 public class ExprSelf : INode {
 	public int up;
-	public dynamic Eval(ValDictScope ctx) {
+	public dynamic Eval(IScope ctx) {
 		for(int i = 1; i < up; i++) {
 			ctx = ctx.parent;
 		}
@@ -1249,8 +1385,7 @@ public class ExprSelf : INode {
 public class ExprGet : INode {
 	public INode src;
 	public string key;
-	public dynamic Eval(ValDictScope ctx) {
-		var FL = BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic;
+	public dynamic Eval(IScope ctx) {
 		var source = src.Eval(ctx);
 
 		switch(source) {
@@ -1269,29 +1404,13 @@ public class ExprGet : INode {
 					return vc._static.locals.TryGetValue(key, out var v) ? v : throw new Exception("Variable not found");
 				}
 			case Type t: {
-
-					var FLS = BindingFlags.Static | BindingFlags.Public;
-					if(key == "new") {
-						return new ValConstructor(t);
-					}
-					if(t.GetField(key, FLS) is { } f) {
-						return f.GetValue(null);
-					}
-					return new ValStaticMember(t, key);
+					return new ValTypeScope { t = t }.GetAt(key, 1);
 				}
 			case Args a: {
 					return a[key];
 				}
 			case object o: {
-
-					var ot = o.GetType();
-					if(ot.GetProperty(key, FL) is { } p) {
-						return p.GetValue(o);
-					}
-					if(ot.GetField(key, FL) is { } f) {
-						return f.GetValue(o);
-					}
-					return new ValInstanceMember(o, key);
+					return new ValObjectScope { o = o }.GetAt(key, 1);
 				}
 		}
 		throw new Exception("Object expected");
@@ -1300,10 +1419,8 @@ public class ExprGet : INode {
 public class ExprIndex : INode {
 	public INode src;
 	public List<INode> index;
-	public dynamic Eval(ValDictScope ctx) {
+	public dynamic Eval(IScope ctx) {
 		var call = src.Eval(ctx);
-
-
 		switch(call) {
 			case IDictionary d: {
 					var i = index.Single().Eval(ctx);
@@ -1348,14 +1465,14 @@ public class ExprVal : INode {
     public object value;
     public XElement ToXML () => new("Value", new XAttribute("value", value));
 	public string Source => $"{value}";
-	public dynamic Eval(ValDictScope ctx) => value;
+	public dynamic Eval(IScope ctx) => value;
 }
 public class ExprCondSeq : INode {
 	public INode type;
 	public INode filter;
 
 	public List<(INode cond, INode yes, INode no)> items;
-	public dynamic Eval(ValDictScope ctx) {
+	public dynamic Eval(IScope ctx) {
 		var f = filter.Eval(ctx);
 		var lis =(List<object>)(
 			type == null ?
@@ -1402,7 +1519,7 @@ public class ExprCondSeq : INode {
 public class ExprPatternMatch : INode {
 	public INode item;
 	public List<(INode cond, INode yes)> branches;
-	public dynamic Eval (ValDictScope ctx) {
+	public dynamic Eval (IScope ctx) {
 		var subject = item.Eval(ctx);
 
 		var inner_ctx = ctx.MakeTemp(subject);
@@ -1429,7 +1546,7 @@ public class ExprMapFunc : INode {
 	public INode type;
 	public XElement ToXML () => new("Map", src.ToXML(), map.ToXML());
 	public string Source => $"{src.Source} | {map.Source}";
-	public dynamic Eval (ValDictScope ctx) {
+	public dynamic Eval (IScope ctx) {
 		switch(src.Eval(ctx)) {
 			case ValEmpty:
 				throw new Exception("Variable not found");
@@ -1517,7 +1634,7 @@ public class ExprMapExpr : INode {
 
 	public XElement ToXML () => new("Map", src.ToXML(), map.ToXML());
 	public string Source => $"{src.Source} | {map.Source}";
-	public dynamic Eval (ValDictScope ctx) {
+	public dynamic Eval (IScope ctx) {
 		switch(src.Eval(ctx)) {
 			case ValEmpty:
 				throw new Exception("Variable not found");
@@ -1579,7 +1696,7 @@ public class StmtKeyVal : INode {
     public INode value;
     public XElement ToXML () => new("KeyVal", new XAttribute("key", key), value.ToXML());
 	public string Source => $"{key}:{value?.Source ?? "null"}";
-	public dynamic Eval(ValDictScope ctx) {
+	public dynamic Eval(IScope ctx) {
 		var val = value.Eval(ctx);
 		if(val is ValError ve) throw new Exception(ve.msg);
 		if(value is ExprVarBlock { type: "class" }) {
@@ -1588,7 +1705,7 @@ public class StmtKeyVal : INode {
 		}
 		return Init(ctx, key, val);
 	}
-	public static dynamic Init(ValDictScope ctx, string key, dynamic val) {
+	public static dynamic Init(IScope ctx, string key, dynamic val) {
 		switch(val) {
 			case Type t:
 				val = new ValDeclared { type = t };
@@ -1601,8 +1718,8 @@ public class StmtKeyVal : INode {
 		Set(ctx, key, val);
 		return ValEmpty.VALUE;
 	}
-	public static void Set(ValDictScope ctx, string key, dynamic val) {
-		ctx.locals[key] = val;
+	public static void Set(IScope ctx, string key, dynamic val) {
+		ctx.SetLocal(key, val);
 	}
 }
 
@@ -1611,7 +1728,7 @@ public class ExprFunc : INode {
 	public INode result;
 	//public XElement ToXML () => new("ExprFunc", [.. pars.Select(i => i.ToXML()), result.ToXML()]);
 	//public string Source => $"@({string.Join(", ", pars.Select(p => p.Source))}) {result.Source}";
-	public dynamic Eval (ValDictScope ctx) =>
+	public dynamic Eval (IScope ctx) =>
 		new ValFunc {
 			expr = result,
 			pars = pars.EvalTuple(ctx),
@@ -1621,7 +1738,7 @@ public class ExprFunc : INode {
 public class ExprSeq : INode {
 	public INode type;
 	public List<INode> items;
-	public dynamic Eval(ValDictScope ctx) {
+	public dynamic Eval(IScope ctx) {
 		var src = items.Select(i => i.Eval(ctx)).ToArray();
 		var _type = type?.Eval(ctx);
 		if(_type is Type t) {
@@ -1635,7 +1752,7 @@ public class ExprSeq : INode {
 
 public class ExprTuple : INode {
 	public (string key, INode value)[] items;
-	public ValTuple EvalTuple (ValDictScope ctx) {
+	public ValTuple EvalTuple (IScope ctx) {
 		var it = new List<(string key, dynamic val)> { };
 		foreach(var(key, val) in items) {
 			var v = val.Eval(ctx);
@@ -1652,8 +1769,8 @@ public class ExprTuple : INode {
 		}
 		return new ValTuple { items = it.ToArray() };
 	}
-	public dynamic Eval (ValDictScope ctx) => EvalTuple(ctx);
-	public void Spread(ValDictScope ctx, List<(string key, dynamic val)> it) {
+	public dynamic Eval (IScope ctx) => EvalTuple(ctx);
+	public void Spread(IScope ctx, List<(string key, dynamic val)> it) {
 		foreach(var(key,val) in items) {
 			it.Add((key, val.Eval(ctx)));
 		}
@@ -1662,8 +1779,11 @@ public class ExprTuple : INode {
 		new ExprTuple {
 			items = items.Select(pair => {
 				if(pair.key == null) {
-					if(pair.value is ExprSymbol { up: -1, key: { } key }) {
-						return (key, new ExprVal { value = typeof(object) });
+					switch(pair.value) {
+						case ExprSymbol { up: -1, key: { } key }:
+							return (key, new ExprVal { value = typeof(object) });
+						case ExprSymbol { up: not -1, key: { } key }:
+							return (key, pair.value);
 					}
 					throw new Exception("Expected");
 				} else {
@@ -1674,14 +1794,12 @@ public class ExprTuple : INode {
 }
 public class ValTuple : INode {
 	public (string key, dynamic val)[] items;
-	public dynamic Eval (ValDictScope ctx) => this;
+	public dynamic Eval (IScope ctx) => this;
 	public void Spread (List<(string key, dynamic val)> it) {
 		foreach(var (key, val) in items) {
-
 			it.Add((key, val));
 		}
 	}
-
 	public ExprTuple expr => new ExprTuple {
 		items = items.Select(pair => (pair.key, (INode)new ExprVal { value = pair.val})).ToArray()
 	};
@@ -1692,16 +1810,16 @@ public class StmtDefFunc : INode {
 	public INode value;
 	//public XElement ToXML () => new("DefineFunc", [new XAttribute("key", key), ..pars.Select(i => i.ToXML()), value.ToXML()]);
     //public string Source => $"{key}({string.Join(", ",pars.Select(p => p.Source))}): {value.Source}";
-	public dynamic Eval(ValDictScope ctx) {
+	public dynamic Eval(IScope ctx) {
 		Define(ctx);
 		return ValEmpty.VALUE;
 	}
-	public void Define(ValDictScope owner) {
-		owner.locals[key] = new ValFunc {
+	public void Define(IScope owner) {
+		owner.SetLocal(key, new ValFunc {
 			expr = value,
 			pars = pars.EvalTuple(owner),
 			parent_ctx = owner
-		};
+		});
 	}
 }
 public class StmtAssign : INode {
@@ -1709,14 +1827,14 @@ public class StmtAssign : INode {
     public INode value;
     XElement ToXML () => new("Reassign", symbol.ToXML(), value.ToXML());
     public string Source => $"{symbol.Source} := {value.Source}";
-	public dynamic Eval(ValDictScope ctx) {
+	public dynamic Eval(IScope ctx) {
 		var curr = ctx.Get(symbol.key, symbol.up);
 		var inner_ctx = ctx.MakeTemp(curr);
 		inner_ctx.locals["_curr"] = curr;
 		var r = Assign(ctx, symbol.key, symbol.up, () => value.Eval(inner_ctx));
 		return r;
 	}
-	public static dynamic Assign (ValDictScope ctx, string key, int up, Func<object> getNext) {
+	public static dynamic Assign (IScope ctx, string key, int up, Func<object> getNext) {
 		var curr = (object)ctx.Get(key, up);
 		switch(curr) {
 			case ValError ve: 
@@ -1743,9 +1861,6 @@ public class StmtAssign : INode {
 		}
 		dynamic MatchClass(ValClass cl) {
 			var next = getNext();
-			if(next is ValClassScope vcs && vcs.fromClass == cl) {
-				return ctx.Set(key, vcs, up);
-			}
 			if(next is ValDictScope vds) {
 				return ctx.Set(key, vds, up);
 			}
@@ -1777,7 +1892,7 @@ public interface INode {
 
     String Source => "";
 
-	dynamic Eval (ValDictScope ctx) => null;
+	dynamic Eval (IScope ctx);
 }
 public class Tokenizer {
     string src;

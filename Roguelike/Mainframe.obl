@@ -64,7 +64,7 @@
 			x := double_from-^^x
 			y := double_from-^^y
 		}
-		f(x:double y:double): XY {
+		f(^x ^y): XY {
 			x := ^^x
 			y := ^^y
 		}
@@ -109,7 +109,7 @@
 		}
 		update!: {
 		}
-		new(pos:XY): Floor {
+		new(^pos): Floor {
 			pos := ^^pos
 		}
 		#register(Entity)
@@ -132,7 +132,7 @@
 		tiles: Row-Tile
 		time: double/Parse-"0"
 		tick: int/Parse-"0"
-		new(tiles:Row-Tile time:double tick:int): Msg {
+		new(^tiles ^time ^tick): Msg {
 			tiles := _0
 			time := _1
 			tick := _2
@@ -153,7 +153,7 @@
 			glyph := "E"[0]
 			front := ABGR/Red
 		}
-		new(pos:XY world:World): Enemy {
+		new(^pos ^world): Enemy {
 			pos := _0
 			world := _1
 		}
@@ -161,7 +161,7 @@
 			not-active ?+
 				world/removeEntity*this	
 		}
-		damage(hp: int): {
+		damage(^hp): {
 			^^^hp := subi(_ hp)
 			active := gt(^^^hp 0)
 			#print * ^^^hp
@@ -189,7 +189,7 @@
 		world: World
 		log: List-Msg/new!
 		cargo: List-Item/new!
-		new(pos:XY world:World): Player {
+		new(^pos ^world): Player {
 			pos := _0
 			world := _1
 		}
@@ -225,7 +225,7 @@
 		pos: XY
 		active: b1
 		tile: Tile { glyph := "r"@0  front := ABGR/White }
-		new(type:ItemType pos:XY): Item {
+		new(^type ^pos): Item {
 			type := _0
 			pos := _1
 			print * pos/x
@@ -249,7 +249,6 @@
 		menu: object
 		update!: {
 			entities / {
-
 				items | ?(e)
 					not(e/active) ?+ Remove-e ?- e/update!
 			}
@@ -297,7 +296,6 @@
 	menu: object * null
 	init!: {
 		print * [1 2 3] // _item =+ 1 ?+ _item
-
 		world := World/new!
 		add: world/addEntity
 		range(0 30) | ?(y:int)
@@ -311,7 +309,7 @@
 			Item/new(ItemType { name := "gun" } XY/i(5 5))
 		] | add
 		world/update!
-		sf := Sf/new(Runner/WIDTH Runner/HEIGHT scene/FONT_8x8)
+		sf := Sf/new(Runner/(WIDTH HEIGHT)% scene/FONT_8x8)
 		sf_ui := Sf/new(divi(muli(4 Runner/WIDTH) 3) Runner/HEIGHT scene/FONT_6x8)
 	}
 	update(delta:TimeSpan): {
@@ -322,33 +320,32 @@
 			menu/update*delta
 	}
 	render(delta:TimeSpan): {
-		
 		[sf sf_ui] // _item/Clear!
 		grid: world/getGrid
-		center: XY/i(sf/GridWidth sf/GridHeight)/div*2
+		center: XY/i(sf/(GridWidth GridHeight)%)/div*2
 		grid/Keys | ?(p:Pt)
 			grid@p | ?(e) {
 				e/tile/print(sf center/add*e/pos/sub*player/pos)
 			}
-		sf_ui/PrintStr(1 1 cat["tick: " world/tick] ABGR/White ABGR/Black)
+		sf_ui/PrintStr(1 1 cat["tick: " world/tick] ABGR/(White Black)%)
 		invMenu: {
 			y: subi(sf/GridHeight 64)
 			Sf/DrawRect(sf_ui 0 y 32 32 border)
 			y := addi(_ 1)
-			sf_ui/Print(2 y "Inventory" ABGR/White ABGR/Black)
+			sf_ui/Print(2 y "Inventory" ABGR/(White Black)%)
 			y := addi(_ 1)
 			Sf/DrawRect(sf_ui 0 y 32 1 border)
 			player/cargo | ?(it:Item) {
 				y := addi(_ 1)
 				it/tile/print(sf_ui XY/i(2 y))
-				sf_ui/Print(4 y it/name ABGR/White ABGR/Black)
+				sf_ui/Print(4 y it/name ABGR/(White Black)%)
 			}
 		}
 		log: {
 			y: subi(sf/GridHeight 32)
 			Sf/DrawRect(sf_ui 0 y 64 32 border)
 			y := addi(_ 1)
-			sf_ui/Print(2 y "Log" ABGR/White ABGR/Black)
+			sf_ui/Print(2 y "Log" ABGR/(White Black)%)
 			y := addi(_ 1)
 			Sf/DrawRect(sf_ui 0 y 64 1 border)
 			y := addi(_ 1)
@@ -414,12 +411,12 @@
 			menu/handle_mouse*state
 	}
 	RO: RectOptions/new
-	border: RO(ABGR/DeepPink ABGR/Black)
-	borderMenu: RO(ABGR/DeepPink ABGR/Black b1 b0)
+	border: RO(ABGR/(DeepPink Black)%)
+	borderMenu: RO(ABGR/(DeepPink Black)% b1 b0)
 	SelectMenu: class {
 		title:string
 		items: Row-Item
-		setItems(items:Row-Item): {
+		setItems(^items): {
 			^^^items := items
 		}
 		invoke: ValFunc * null
@@ -427,7 +424,7 @@
 
 		time: double/Parse-"0"
 		pos: XY/i(32 26)
-		new(title:string items:Row-Item invoke:ValFunc * null escape:ValFunc*null pos:null): SelectMenu {
+		new(^title ^items ^invoke ^escape ^pos): SelectMenu {
 			title := _0
 			items := _1
 			invoke := _2
@@ -460,7 +457,7 @@
 			w:32
 			Sf/DrawRect(sf_ui x y int_from*Common/Lerp(time 0 divf(1 10) 1 w 1) 32 border)
 			y := addi(_ 1)
-			sf_ui/PrintStr(addi(x 2) y title ABGR/White ABGR/Black)
+			sf_ui/PrintStr(addi(x 2) y title ABGR/(White Black)%)
 			y := addi(_ 1)
 			Sf/DrawRect(sf_ui x y w 1 borderMenu)
 			ind: 0
@@ -468,8 +465,8 @@
 				y := addi(_ 1),
 				[
 					(addi(x 2) y it/tile/(glyph front back)%),
-					(addi(x 4) y it/name ABGR/White ABGR/Black),
-					(subi(addi(x w) 3) y ABC@ind ABGR/White ABGR/Black),
+					(addi(x 4) y it/name ABGR/(White Black)%),
+					(subi(addi(x w) 3) y ABC@ind ABGR/(White Black)%),
 				] | sf_ui/Print
 				ind := addi(_ 1)
 			}

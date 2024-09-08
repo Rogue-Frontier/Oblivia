@@ -41,8 +41,8 @@
 		}
 	}
 	XY: class {
-		x: double_from-0
-		y: double_from-0
+		x: double/Parse-"0"
+		y: double/Parse-"0"
 		xi:	get* int_from-x
 		yi:	get* int_from-y
 		xf: get* x
@@ -92,10 +92,7 @@
 		back: ABGR/Black
 		arr(str:string): str | ?(c:char) Tile { glyph := c front := ABGR/White back := ABGR/Black }
 		print(sf:Sf pos:XY): {
-			charg: (%pos/(xi yi) %^^/(glyph front back))
-			sf/PrintChar * charg
-
-
+			sf/PrintChar(pos/(xi yi)% ^^/(glyph front back)%)
 		}
 	}
 	Entity: interface {
@@ -119,20 +116,18 @@
 		#register(Entity)
 	}
 	Msg: class {
-		new(str:Row-Tile time:double tick:int): Msg {
-			str := _0
+		tiles: Row-Tile
+		time: double/Parse-"0"
+		tick: int/Parse-"0"
+		new(tiles:Row-Tile time:double tick:int): Msg {
+			tiles := _0
 			time := _1
 			tick := _2
 		}
-
-		str: Row-Tile
-		time: double
-		tick: int
-
 		repeats: 1
+		fadeTime: double/Parse-"0"
 		once: get* repeats =+ 1
-		fadeTime: double_from-0
-		text: get* str | ?(t:Tile) t/glyph
+		text: get* tiles | ?(t:Tile) t/glyph
 	}
 	Enemy: class {
 		hp: 100
@@ -271,7 +266,7 @@
 			^: b
 		}
 	}
-	time: double_from-0
+	time: double/Parse-"0"
 	move: b0
 	player: Player
 	world: World
@@ -337,7 +332,7 @@
 			y := addi(_ 1)
 			player/log | ?(msg:Msg) {
 				x:2
-				msg/str | ?(t:Tile) {
+				msg/tiles | ?(t:Tile) {
 					t/print(sf_ui XY/i(x y))
 					x := addi(_ 1)
 				}
@@ -408,8 +403,7 @@
 		invoke: ValFunc * null
 		escape: ValFunc * null
 
-		time: double_from-0
-
+		time: double/Parse-"0"
 		pos: XY/i(32 26)
 		new(title:string items:Row-Item invoke:ValFunc * null escape:ValFunc*null pos:null): SelectMenu {
 			title := _0
@@ -451,7 +445,7 @@
 			items | ?(it) {
 				y := addi(_ 1),
 				[
-					(addi(x 2) y %it/tile/(glyph front back)),
+					(addi(x 2) y it/tile/(glyph front back)%),
 					(addi(x 4) y it/name ABGR/White ABGR/Black),
 					(subi(addi(x w) 3) y ABC@ind ABGR/White ABGR/Black),
 				] | sf_ui/Print

@@ -12,9 +12,9 @@
 	func(int void)
 	~
 	BufferedList: class {
-		items: HashSet-object/new!
-		toAdd: HashSet-object/new!
-		toRemove: HashSet-object/new!
+		items: HashSet-object/ctor!
+		toAdd: HashSet-object/ctor!
+		toRemove: HashSet-object/ctor!
 
 		new!: BufferedList{}
 		Add(e:object): {
@@ -61,24 +61,24 @@
 		~
 
 		i(x:int y:int): XY {
-			x := double_from-^^x
-			y := double_from-^^y
+			x := double_from-_0
+			y := double_from-_1
 		}
 		f(^x ^y): XY {
-			x := ^^x
-			y := ^^y
+			x := _0
+			y := _1
 		}
 		add(rhs: XY): XY {
-			x := addf(^^^x rhs/x)
-			y := addf(^^^y rhs/y)
+			x := addf(^^^x _0/x)
+			y := addf(^^^y _0/y)
 		}
 		sub(rhs: XY): XY {
-			x := subf(^^^x rhs/x)
-			y := subf(^^^y rhs/y)
+			x := subf(^^^x _0/x)
+			y := subf(^^^y _0/y)
 		}
 		div(scale:int): XY {
-			x := divf(^^^x scale)
-			y := divf(^^^y scale)
+			x := divf(^^^x _0)
+			y := divf(^^^y _0)
 		}
 	}
 	Tile: class {
@@ -126,8 +126,6 @@
 			back := ABGR/Transparent
 		}
 	}
-
-
 	Msg: class {
 		tiles: Row-Tile
 		time: double/Parse-"0"
@@ -187,8 +185,8 @@
 		active: b1
 		busy: b0
 		world: World
-		log: List-Msg/new!
-		cargo: List-Item/new!
+		log: List-Msg/ctor!
+		cargo: List-Item/ctor!
 		new(^pos ^world): Player {
 			pos := _0
 			world := _1
@@ -242,7 +240,7 @@
 		tick: 0
 		entities: BufferedList/new!
 		updateGrid: b1
-		grid: ConcurrentDictionary(Pt HashSet-object)/new!
+		grid: ConcurrentDictionary(Pt HashSet-object)/ctor!
 		new!: World{}
 		addEntity: entities/Add
 		removeEntity: entities/Remove
@@ -264,7 +262,7 @@
 			not-updateGrid ?+ { ^^ := grid }
 			grid/Clear!
 			#print* grid/Count
-			entities/items | ?(e) grid/GetOrAdd(e/pos/xyi HashSet-object/new!)/Add-e
+			entities/items | ?(e) grid/GetOrAdd(e/pos/xyi HashSet-object/ctor!)/Add-e
 			updateGrid := b0
 			^: grid
 		}
@@ -295,6 +293,8 @@
 	sf_ui: Sf
 	menu: object * null
 	init!: {
+		print * cat*[1 2, [:int 3 4]%]
+		
 		print * [1 2 3] // _item =+ 1 ?+ _item
 		world := World/new!
 		add: world/addEntity
@@ -309,8 +309,8 @@
 			Item/new(ItemType { name := "gun" } XY/i(5 5))
 		] | add
 		world/update!
-		sf := Sf/new(Runner/(WIDTH HEIGHT)% scene/FONT_8x8)
-		sf_ui := Sf/new(divi(muli(4 Runner/WIDTH) 3) Runner/HEIGHT scene/FONT_6x8)
+		sf := Sf/ctor(Runner/(WIDTH HEIGHT)% scene/FONT_8x8)
+		sf_ui := Sf/ctor(divi(muli(4 Runner/WIDTH) 3) Runner/HEIGHT scene/FONT_6x8)
 	}
 	update(delta:TimeSpan): {
 		time := addf(_ delta/TotalSeconds)
@@ -410,7 +410,7 @@
 		menu =- null ?+
 			menu/handle_mouse*state
 	}
-	RO: RectOptions/new
+	RO: RectOptions/ctor
 	border: RO(ABGR/(DeepPink Black)%)
 	borderMenu: RO(ABGR/(DeepPink Black)% b1 b0)
 	SelectMenu: class {
@@ -429,7 +429,7 @@
 			items := _1
 			invoke := _2
 			escape := _3
-			pos := _4 =- null ?+ _4 ?- _
+			pos := nullor(_ _4)
 		}
 		update(delta:TimeSpan): {
 			time := addf(_ delta/TotalSeconds)

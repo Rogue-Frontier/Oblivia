@@ -75,6 +75,8 @@ var global = new ValDictScope {
 		["and"] = Val((bool a, bool b) => a && b),
 		["or"] = Val((bool a, bool b) => a || b),
 
+		["nullor"] = Val((object a, object b) => a ?? b),
+
 		["count"] = Val((IEnumerable data, object value) => data.Cast<object>().Count(d => {
 			var result = d.Equals(value);
 			return result;
@@ -133,10 +135,21 @@ var global = new ValDictScope {
 		["ValFunc"] = typeof(ValFunc),
 
 		["Common"] = typeof(Main),
+
+
+		["class"] = ValKeyword.CLASS,
+		["interface"] = ValKeyword.INTERFACE,
+		["enum"] = ValKeyword.ENUM,
+		["get"] = ValKeyword.GET,
+
 	}
 };
 
-Type MakeGeneric (Type gen, object item) => item is Type t ? gen.MakeGenericType(t) : gen.MakeGenericType(typeof(object));
+Type MakeGeneric (Type gen, object item) => item switch {
+	Type t => gen.MakeGenericType(t),
+	_ => gen.MakeGenericType(typeof(object))
+
+};
 
 var result = (ValDictScope)block.StagedEval(global);
 /*

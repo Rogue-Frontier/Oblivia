@@ -32,6 +32,7 @@ var global = new ValDictScope {
 		["int_from"] = Val((double d) => (int)d),
 		["uint_from"] = Val((int i) => (uint)i),
 		["char_from"] = Val((int i) => (char)i),
+		["byte_from"] = Val((int i) => (byte)i),
 
 		["void"] = typeof(void),
 		["char"] = typeof(char),
@@ -118,6 +119,8 @@ var global = new ValDictScope {
 			return result;
 		}),
 		["rand_bool"] = Val(() => new Random().Next(2) == 1),
+		["randf"] = Val(new Random().NextDouble),
+		["rand_range"] = Val((int a, int b) => new Random().Next(a, b)),
 
 		["Row"] = Val((object type) => (type as Type ?? typeof(object)).MakeArrayType(1)),
 		["Grid"] = Val((Type type) => type.MakeArrayType(2)),

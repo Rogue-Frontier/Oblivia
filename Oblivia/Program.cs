@@ -85,7 +85,13 @@ public record ValFunc {
 	public INode expr;
 	public ValTuple pars;
 	public ValDictScope parent_ctx;
-	public dynamic Call(ValDictScope caller_ctx, ExprTuple args) {
+	public dynamic CallPars(ValDictScope caller_ctx, ExprTuple pars) {
+		return CallFunc(caller_ctx, () => pars.EvalTuple(caller_ctx));
+	}
+	public dynamic CallArgs(ValDictScope caller_ctx, ValTuple args) {
+		return CallFunc(caller_ctx, () => args);
+	}
+	public dynamic CallFunc (ValDictScope caller_ctx, Func<ValTuple> evalArgs) {
 		var func_ctx = new ValDictScope(parent_ctx, false);
 		var argData = new Args { };
 		func_ctx.locals["_arg"] = argData;
@@ -93,7 +99,7 @@ public record ValFunc {
 			StmtKeyVal.Init(func_ctx, k, v);
 		}
 		int ind = 0;
-		foreach(var(k, v) in args.EvalTuple(caller_ctx).items) {
+		foreach(var (k, v) in evalArgs().items) {
 			if(k != null) {
 				ind = -1;
 				var val = StmtAssign.Assign(func_ctx, k, 1, () => v);
@@ -315,201 +321,235 @@ public class Parser {
 		return NextExpression(lhs);
 	}
 	public INode NextExpression(INode lhs) {
-		var t = tokenType;
-		if(t == TokenType.PIPE) {
-			inc();
-			var cond = default(INode);
-			var type = default(INode);
-			t = tokenType;
-			if(t == TokenType.L_ANGLE) {
-				inc();
-				cond = NextExpression();
+		switch(tokenType) {
 
-				t = tokenType;
-				if(t == TokenType.R_ANGLE) {
+			case TokenType.PIPE: {
 					inc();
-				} else {
-					throw new Exception("Closing expected");
-				}
-			}
-			if(t == TokenType.COLON) {
-				inc();
-				type = NextExpression();
-			}
-			return NextExpression(new ExprMapFunc { src = lhs, cond = cond, type = type, map = NextExpression() });
-		}
-		if(t == TokenType.L_PAREN) {
-			inc();
-			return NextExpression(new ExprInvoke { expr = lhs, args = NextArgTuple() });
-		}
-		if(t == TokenType.SPARK) {
-			return NextSpark(lhs);
-		}
-		if(t == TokenType.DASH) {
-			inc();
-			return NextExpression(new ExprInvoke { expr = lhs, args = new ExprTuple { items = [(null, NextTerm())] } });
-		}
-		if(t == TokenType.SHOUT) {
-			inc();
-			return NextExpression(new ExprInvoke { expr = lhs, args = new ExprTuple { items = [] } });
-		}
-		if(t == TokenType.PERCENT) {
-			inc();
-			return NextExpression(new ExprSpread { value = lhs });
-		}
-		if(t == TokenType.EQUAL) {
-			inc();
-			t = tokenType;
-			var Make = (bool invert) => NextExpression(new ExprEqual {
-				lhs = lhs,
-				rhs = NextTerm(),
-				invert = invert
-			});
-			if(t == TokenType.PLUS) {
-				inc();
-				return Make(false);
-			}
-			if(t == TokenType.DASH) {
-				inc();
-				return Make(true);
-			}
-			throw new Exception();
-		}
-		if(t == TokenType.SLASH) {
-			inc();
-			t = tokenType;
-			if(t == TokenType.NAME) {
-				var name = currToken.str;
-				inc();
-				return NextExpression(new ExprGet { src = lhs, key = name });
-			}
-			if(t == TokenType.SLASH) {
-				inc();
-				return NextExpression(new ExprMapExpr { src = lhs, map = NextExpression() });
-			}
-			return NextExpression(new ExprApply { lhs = lhs, rhs = NextExpression() });
-		}
-		if(t == TokenType.SWIRL) {
-			inc();
-			var index = NextTerm();
-			return NextExpression(new ExprIndex { src = lhs, index = [index] });
-		}
-		//Index
-		if(t == TokenType.L_SQUARE) {
-			inc();
-			List<INode> index = new List<INode> { NextExpression() };
-			Check:
-			t = tokenType;
-			if(t == TokenType.R_SQUARE) {
-				inc();
-				return NextExpression(new ExprIndex { src = lhs, index = index });
-			}
-			index.Add(NextExpression());
-			goto Check;
-		}
-		if(t == TokenType.QUERY) {
-			inc();
-			t = tokenType;
-			if(t == TokenType.PIPE) {
-				inc();
-				var cond = NextExpression();
-				return new ExprCond { item = lhs, cond = cond };
-			}
-			if(t == TokenType.L_CURLY) {
-				inc();
-				var items = new List<(INode cond, INode yes)> { };
-				ReadBranch:
-				t = tokenType;
-				if(t == TokenType.R_CURLY) {
-					inc();
-					return NextExpression(new ExprPatternMatch {
-						item = lhs,
-						branches = items
-					});
-				}
+					var cond = default(INode);
+					var type = default(INode);
+					switch(tokenType) {
+						case TokenType.L_ANGLE: {
 
-
-
-				var cond_group = new List<INode> { };
-				ReadItem:
-				cond_group.Add(NextExpression());
-				/*
-				if(cond is ExprFunc ef) {
-					//Handle lambda
-					//If this lambda accepts this object as argument, then treat it as a branch.
-					goto ReadBranch;
-				}
-				*/
-
-				t = tokenType;
-				if(t == TokenType.COLON) {
-					inc();
-					var yes = NextExpression();
-
-					foreach(var c in cond_group) {
-						items.Add((c, yes));
+								inc();
+								cond = NextExpression();
+								switch(tokenType) {
+									case TokenType.R_ANGLE:
+										inc();
+										break;
+									default:
+										throw new Exception("Closing expected");
+								}
+								break;
+							}
 					}
-					goto ReadBranch;
-				} else {
-					goto ReadItem;
+					switch(tokenType) {
+						case TokenType.COLON: {
+								inc();
+								type = NextExpression();
+								break;
+							}
+					}
+					return NextExpression(new ExprMapFunc { src = lhs, cond = cond, type = type, map = NextExpression() });
 				}
-				throw new Exception();
-			}
-			if(t == TokenType.L_SQUARE) {
-				inc();
-				INode type = null;
-				t = tokenType;
-				if(t == TokenType.COLON) {
+			case TokenType.L_PAREN: {
 					inc();
-					type = NextExpression();
+					return NextExpression(new ExprInvoke { expr = lhs, args = NextArgTuple() });
 				}
-				var items = new List<(INode cond, INode yes, INode no)> { };
-				Read:
-				var ante = NextExpression();
-				t = tokenType;
-				if(t == TokenType.COLON) {
+			case TokenType.SPARK: {
+					return NextSpark(lhs);
+				}
+			case TokenType.DASH: {
 					inc();
-					var cons = NextExpression();
-					items.Add((ante, cons, null));
-				} else {
+					return NextExpression(new ExprInvoke { expr = lhs, args = new ExprTuple { items = [(null, NextTerm())] } });
+				}
+			case TokenType.SHOUT: {
+					inc();
+					return NextExpression(new ExprInvoke { expr = lhs, args = new ExprTuple { items = [] } });
+				}
+			case TokenType.PERCENT: {
+					inc();
+					return NextExpression(new ExprSpread { value = lhs });
+				}
+			case TokenType.EQUAL: {
+					inc();
+					var Make = (bool invert) => NextExpression(new ExprEqual {
+						lhs = lhs,
+						rhs = NextTerm(),
+						invert = invert
+					});
+
+					switch(tokenType) {
+						case TokenType.PLUS: {
+								inc();
+								return Make(false);
+							}
+						case TokenType.DASH: {
+								inc();
+								return Make(true);
+							}
+					}
 					throw new Exception();
 				}
-				t = tokenType;
-				if(t == TokenType.R_SQUARE) {
+			case TokenType.SLASH: {
 					inc();
-					return NextExpression( new ExprCondSeq {
-						type = type,
-						filter = lhs,
-						items = items
-					});
-				} else {
-					goto Read;
-				}
-			}
-			if(t == TokenType.PLUS) {
-				inc();
-				var positive = NextExpression();
-				var negative = default(INode);
-				t = tokenType;
-				if(t == TokenType.QUERY) {
-					inc();
-					t = tokenType;
-					if(t == TokenType.DASH) {
-						inc();
-						negative = NextExpression();
+
+					switch(tokenType) {
+						case TokenType.NAME:
+
+							var name = currToken.str;
+							inc();
+							return NextExpression(new ExprGet { src = lhs, key = name });
+						case TokenType.SLASH:
+							inc();
+							return NextExpression(new ExprMapExpr { src = lhs, map = NextExpression() });
+						default: {
+								return NextExpression(new ExprApply { lhs = lhs, rhs = NextExpression() });
+							}
 					}
 				}
-				return NextExpression(new ExprBranch {
-					condition = lhs,
-					positive = positive,
-					negative = negative
-				});
-			}
-			if(t == TokenType.SPARK) {
-				inc();
-				return NextExpression(new ExprLoop { condition = lhs, positive = NextExpression() });
-			}
-			dec();
+			case TokenType.SWIRL: {
+					inc();
+					var index = NextTerm();
+					return NextExpression(new ExprIndex { src = lhs, index = [index] });
+				}
+			case TokenType.L_SQUARE: {
+					inc();
+					List<INode> index = new List<INode> { NextExpression() };
+					Check:
+
+					switch(tokenType) {
+						case TokenType.R_SQUARE: {
+
+								inc();
+								return NextExpression(new ExprIndex { src = lhs, index = index });
+							}
+
+					}
+					index.Add(NextExpression());
+					goto Check;
+				}
+			case TokenType.QUERY: {
+					inc();
+					switch(tokenType) {
+						case TokenType.PIPE: {
+								inc();
+								var cond = NextExpression();
+								return new ExprCond { item = lhs, cond = cond };
+							}
+						case TokenType.L_CURLY: {
+								inc();
+								var items = new List<(INode cond, INode yes)> { };
+								ReadBranch:
+								switch(tokenType) {
+									case TokenType.R_CURLY:
+										inc();
+										return NextExpression(new ExprPatternMatch {
+											item = lhs,
+											branches = items
+										});
+								}
+
+
+								var cond_group = new List<INode> { };
+								ReadItem:
+								cond_group.Add(NextExpression());
+								/*
+								if(cond is ExprFunc ef) {
+									//Handle lambda
+									//If this lambda accepts this object as argument, then treat it as a branch.
+									goto ReadBranch;
+								}
+								*/
+
+								switch(tokenType) {
+									case TokenType.COLON:
+										inc();
+										var yes = NextExpression();
+
+										foreach(var c in cond_group) {
+											items.Add((c, yes));
+										}
+										goto ReadBranch;
+									default:
+										goto ReadItem;
+								}
+							}
+						case (TokenType.L_SQUARE): {
+								inc();
+								INode type = null;
+								switch(tokenType) {
+									case TokenType.COLON:
+										inc();
+										type = NextExpression();
+										break;
+								}
+
+								var items = new List<(INode cond, INode yes, INode no)> { };
+								Read:
+								var ante = NextExpression();
+								switch(tokenType) {
+									case TokenType.COLON: {
+											inc();
+											var cons = NextExpression();
+											items.Add((ante, cons, null));
+											break;
+										}
+									default:
+										throw new Exception();
+								}
+								switch(tokenType) {
+									case TokenType.R_SQUARE: {
+											inc();
+											return NextExpression(new ExprCondSeq {
+												type = type,
+												filter = lhs,
+												items = items
+											});
+										}
+									default:
+										goto Read;
+								}
+							}
+						case (TokenType.PLUS): {
+								inc();
+								var positive = NextExpression();
+								var negative = default(INode);
+
+								switch(tokenType) {
+									case TokenType.QUERY: {
+											inc();
+											switch(tokenType) {
+												case TokenType.DASH: {
+
+														inc();
+														negative = NextExpression();
+														break;
+													}
+												default: {
+														dec(); break;
+													}
+											}
+										}
+										break;
+								}
+								return NextExpression(new ExprBranch {
+									condition = lhs,
+									positive = positive,
+									negative = negative
+								});
+							}
+						case (TokenType.SPARK): {
+								inc();
+								return NextExpression(new ExprLoop { condition = lhs, positive = NextExpression() });
+							}
+						default:
+							dec();
+
+							break;
+					}
+
+					break;
+				}
 		}
 		/*
 		if(t == TokenType.PERCENT) {
@@ -901,8 +941,6 @@ public class ExprVarBlock : INode {
 			}
 		}
 		var t = ctx.Get(type);
-
-
 		switch(t) {
 			case ValEmpty: throw new Exception("Type not found");
 			case Type tt: {
@@ -1001,9 +1039,7 @@ public class ExprLoop: INode {
 }
 public class ExprInvoke : INode {
     public INode expr;
-
 	public ExprTuple args;
-
 	//public string Source => $"{expr.Source}{(args.Count > 1 ? $"({string.Join(", ", args.Select(a => a.Source))})" : args.Count == 1 ? $"*{args.Single().Source}" : $"!")}";
 	public dynamic Eval(ValDictScope ctx) {
 		if(expr is ExprSymbol { key: "decl", up: -1 }) {
@@ -1011,56 +1047,46 @@ public class ExprInvoke : INode {
 		if(expr is ExprSymbol { key:"get", up: -1 }) {
 			return new ValGetter { ctx = ctx, expr = args.items.Single().value };
 		}
-		var lhs = expr.Eval(ctx);
-		return Invoke(ctx, lhs, args);
+		return InvokePars(ctx, expr.Eval(ctx), args);
 	}
 	public static object GetReturnType(object f) {
 		throw new Exception("Implement");
 	}
-	public static dynamic Invoke(ValDictScope ctx, object lhs, ExprTuple pars) {
-		var args = () => pars.EvalTuple(ctx);
+	public static dynamic InvokePars(ValDictScope ctx, object lhs, ExprTuple pars) =>
+		InvokeFunc(ctx, lhs, () => pars.EvalTuple(ctx));
+	public static dynamic InvokeArgs (ValDictScope ctx, object lhs, ValTuple args) =>
+		InvokeFunc(ctx, lhs, () => args);
+	public static dynamic InvokeFunc (ValDictScope ctx, object lhs, Func<ValTuple> evalArgs) {
 		switch(lhs) {
-			case ValEmpty:{
+			case ValEmpty: {
 					throw new Exception("Function not found");
 				}
-			case ValError ve:{
+			case ValError ve: {
 					throw new Exception(ve.msg);
 				}
 			case ValConstructor vc: {
-
-					var rhs = args().items.Select(pair => pair.val).ToArray();
+					var rhs = evalArgs().items.Select(pair => pair.val).ToArray();
 					var c = vc.t.GetConstructor(rhs.Select(arg => (arg as object).GetType()).ToArray());
 					if(c == null) {
 						throw new Exception("Constructor not found");
-						//return ValError.CONSTRUCTOR_NOT_FOUND;
 					}
 					return c.Invoke(rhs);
 				}
 			case ValInstanceMember vim: {
-					var vals = args().items.Select(pair => pair.val).ToArray();
+					var vals = evalArgs().items.Select(pair => pair.val).ToArray();
 					return vim.Call(vals);
 				}
 			case ValStaticMember vsm: {
-					var vals = args().items.Select(pair => pair.val).ToArray();
+					var vals = evalArgs().items.Select(pair => pair.val).ToArray();
 					return vsm.Call(vals);
 				}
 			case Type tl: {
-
-					var d = args().items.Single().val;
+					var d = evalArgs().items.Single().val;
 					return new ValType(tl).Cast(d, d?.GetType());
-					if(tl.IsPrimitive) {
-						//return new ValType(t).Cast(d);
-					} else {
-						var o = tl.GetConstructor([]).Invoke([]);
-						var sc = new ValObjectScope { obj = o, parent = ctx };
-						//args.Single().Eval(sc);
-						return o;
-					}
 				}
 			case ValTuple vt: {
-
 					//var parTypes = vt.items.OfType<Type>().ToArray();
-					var argArr = args();
+					var argArr = evalArgs();
 					var argTypes = argArr.items.Select(a => (Type)a.GetType()).ToArray();
 					var tt = argTypes.Length switch {
 						2 => typeof(ValueTuple<,>),
@@ -1083,119 +1109,37 @@ public class ExprInvoke : INode {
 					var at = tt.MakeGenericType(argTypes);
 					return new ValType(tt.MakeGenericType(argTypes)).Cast(aa, at);
 				}
-			case ValFunc vf:{
-					return vf.Call(ctx, pars);
+			case ValFunc vf: {
+					return vf.CallFunc(ctx, evalArgs);
 				}
 			case Delegate de: {
-					var r = de.DynamicInvoke(args().items.Select(pair => pair.val).ToArray());
+					var r = de.DynamicInvoke(evalArgs().items.Select(pair => pair.val).ToArray());
 					if(de.Method.ReturnType == typeof(void))
 						return ValEmpty.VALUE;
 					return r;
 				}
-			case ValClass vcl:{
+			case ValClass vcl: {
 					//Cast
 					break;
 				}
 			case ValDictScope s: {
-
-					throw new Exception("Illegal");
-					var result = new List<dynamic> { };
-					foreach(var a in pars.items) {
-						var r = a.value.Eval(s);
-						if(r is ValEmpty)
-							continue;
-						result.Add(r);
-					}
-					if(result.Count > 0)
-						return result;
-					else return ValEmpty.VALUE;
-				}
+				throw new Exception("Illegal");
+			}
 		}
 		throw new Exception($"Unknown function {lhs}");
-	}
-	public static dynamic InvokeData (ValDictScope ctx, object lhs, IEnumerable<dynamic> evalArgs) {
-
-		switch(lhs) {
-			case ValEmpty:{
-					throw new Exception("Function not found");
-				}
-				case ValError ve:{
-					throw new Exception(ve.msg);
-				}
-			case ValConstructor vc: {
-
-					var rhs = evalArgs.ToArray();
-					var c = vc.t.GetConstructor(rhs.Select(arg => (arg as object).GetType()).ToArray());
-					if(c == null) {
-						throw new Exception("Constructor not found");
-						//return ValError.CONSTRUCTOR_NOT_FOUND;
-					}
-					return c.Invoke(rhs);
-				}
-			case ValInstanceMember vim: {
-
-					var vals = evalArgs.ToArray();
-					return vim.Call(vals);
-				}
-			case ValStaticMember vsm: {
-
-					var vals = evalArgs.ToArray();
-					return vsm.Call(vals);
-				}
-			case Type t: {
-
-					var d = evalArgs.Single();
-					return new ValType(t).Cast(d, d?.GetType());
-					if(t.IsPrimitive) {
-						//return new ValType(t).Cast(d);
-					} else {
-						var o = t.GetConstructor([]).Invoke([]);
-						var sc = new ValObjectScope { obj = o, parent = ctx };
-						//args.Single().Eval(sc);
-						return o;
-					}
-				}
-			case ValFunc vf: { return vf.CallData(ctx, evalArgs.ToList()); }
-			case Delegate f: {
-
-					var argValues = evalArgs.ToArray();
-					var r = f.DynamicInvoke(argValues);
-					if(f.Method.ReturnType == typeof(void))
-						return ValEmpty.VALUE;
-					return r;
-				}
-			case ValClass vcl: { break; }
-			case ValDictScope s: {
-
-					throw new Exception("Illegal");
-					var result = new List<dynamic> { };
-					foreach(var a in evalArgs) {
-						var r = a.Eval(s);
-						if(r is ValEmpty)
-							continue;
-						result.Add(r);
-					}
-					if(result.Count > 0)
-						return result;
-					else return ValEmpty.VALUE;
-				}
-		}
-		throw new Exception();
 	}
 }
 public class ExprApply : INode {
 	public INode lhs;
 	public INode rhs;
 	public dynamic Eval(ValDictScope ctx) {
-		var lhs = this.lhs.Eval(ctx);
-		switch(lhs) {
+		switch(lhs.Eval(ctx)) {
 			case ValDictScope vds:
 				switch(rhs) {
 					case ExprBlock eb:
 						return eb.Apply(new ValDictScope { locals = vds.locals, parent = ctx, temp = false });
 					default:
 						return rhs.Eval(new ValDictScope { locals = vds.locals, parent = ctx, temp = false });
-
 				}
 		}
 		/*
@@ -1276,7 +1220,6 @@ public class ExprBlock : INode {
 		}
 		return f;
 	}
-
 	public dynamic EvalDefer(ValDictScope ctx) {
 		return null;
 	}
@@ -1421,7 +1364,10 @@ public class ExprCondSeq : INode {
 				);
 		foreach(var (cond, yes, no) in items) {
 			var c = cond.Eval(ctx);
-			var b = ExprInvoke.Invoke(ctx, f, c is ValTuple vrt ? vrt.expr : new ExprTuple { items = [(null, new ExprVal { value= c } )] });
+			var b = ExprInvoke.InvokeArgs(ctx, f, c switch {
+				ValTuple vrt => vrt,
+				_ => new ValTuple { items = [(null, c)] }
+			});
 			switch(b) {
 				case true: {
 
@@ -1491,6 +1437,12 @@ public class ExprMapFunc : INode {
 				return Map(c);
 			case IEnumerable e:
 				return Map(e);
+			case ValTuple vt:
+				var keys = vt.items.Select(i => i.key);
+				var vals = vt.items.Select(i => i.val);
+				var m = (IEnumerable<dynamic>)Map(vals);
+				var r = new ValTuple { items = keys.Zip(m).ToArray() }; ;
+				return r;
 			default:
 				throw new Exception("Sequence expected");
 		}
@@ -1515,11 +1467,18 @@ public class ExprMapFunc : INode {
 					}
 				}
 				Do:
-				var r = ExprInvoke.Invoke(inner_ctx, f,
-					item is ValTuple vt ? vt.expr :
-					new ExprTuple { items = [(null, new ExprVal { value = item })] });
+				var r = ExprInvoke.InvokeArgs(inner_ctx, f, item switch {
+					ValTuple vt => vt,
+					_ => new ValTuple{ items = [(null, item)] }
+				});
 				switch(r) {
-					case ValEmpty:continue;
+					case ValEmpty:
+						continue;
+					case ValReturn vr:
+						if(vr.up > 1) {
+							vr = vr with { up = vr.up - 1 };
+						}
+						return vr;
 					default:
 						result.Add(r);
 						continue;
@@ -1528,7 +1487,7 @@ public class ExprMapFunc : INode {
 			Done:
 			return Convert(result);
 		}
-		dynamic Convert(List<dynamic> items) {
+		IEnumerable<dynamic> Convert(List<dynamic> items) {
 			var r = items.ToArray();
 
 			switch(type) {

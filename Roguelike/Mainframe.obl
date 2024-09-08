@@ -31,11 +31,6 @@
 			items/UnionWith-toAdd
 			items/ExceptWith-toRemove
 
-			~
-				pr: ?(e:object) print* e/name
-				(items | pr)
-				(toRemove | pr)
-			~
 			toAdd/Clear!
 			toRemove/Clear!
 		}
@@ -101,12 +96,16 @@
 	Floor: class {
 		name: "Floor"
 		pos:XY
-		env: b1
-		active: b1
+		env: true
+		active: true
 		tile: Tile {
-			glyph := char_from-249
-			front := ABGR/Gray
+			glyph := char_from-254
+			#front := ABGR/Gray
+			by: byte_from
+			front := ABGR/RGBA * (51 51 75 addi(204 rand_range(0 25))) | by
 			back := ABGR/Transparent
+
+			# tile = new Tile(ABGR.RGBA(25, 25, 36, (byte)(204 + (r.NextFloat() * 51))), ABGR.Black, (char)254);
 		}
 		update!: {
 		}
@@ -115,6 +114,20 @@
 		}
 		#register(Entity)
 	}
+
+	Wall: class {
+		name: "Wall"
+		pos: XY
+		env: true
+		active: true
+		tile: get* Tile {
+			glyph := char_from-249
+			front := ABGR/Gray
+			back := ABGR/Transparent
+		}
+	}
+
+
 	Msg: class {
 		tiles: Row-Tile
 		time: double/Parse-"0"
@@ -236,6 +249,7 @@
 		menu: object
 		update!: {
 			entities / {
+
 				items | ?(e)
 					not(e/active) ?+ Remove-e ?- e/update!
 			}
@@ -257,13 +271,21 @@
 		}
 		hasFloor(p:XY): {
 			loc: getGrid[p/xyi]
-			b: b0
 			loc =- null ?+ 
 				loc | ?(e)
 					e/class =+ Floor ?+ {
-						b := b1
+						^^ := true
 					}
-			^: b
+			^: false
+		}
+		hasWall(p:XY): {
+			loc: getGrid[p/xyi]
+			loc =- null ?+ 
+				loc | ?(e)
+					e/class =+ Wall ?+ {
+						^^ := true
+					}
+			^: false
 		}
 	}
 	time: double/Parse-"0"

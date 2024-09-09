@@ -449,6 +449,11 @@ public class Parser {
 			case TokenType.COLON:
 				inc();
 				switch(lhs) {
+
+					case ExprTuple et:
+						throw new Exception();
+
+
 					case ExprSymbol { up: { } up } es:
 						switch(tokenType) {
 							case TokenType.EQUAL:
@@ -580,9 +585,10 @@ public class Parser {
 						case TokenType.SLASH:
 							inc();
 							return NextExpression(new ExprMapExpr { src = lhs, map = NextExpression() });
-						default: {
-								return NextExpression(new ExprApply { lhs = lhs, rhs = NextExpression() });
-							}
+						case TokenType.L_CURLY:
+							return NextExpression(new ExprApply { lhs = lhs, rhs = NextExpression(), local = false });
+						default:
+							return NextExpression(new ExprApply { lhs = lhs, rhs = NextExpression(), local = true });
 					}
 				}
 			case TokenType.SWIRL: {
@@ -871,7 +877,6 @@ public class Parser {
 					goto Check;
 				}
 			case TokenType.NAME: {
-
 					var s = new ExprSymbol { up = up, key = currToken.str };
 					inc();
 					return s;
@@ -882,6 +887,8 @@ public class Parser {
 					inc();
 					return s;
 				}
+			case TokenType.L_PAREN:
+				return new ExprApply { lhs = new ExprSelf { up = up }, rhs = NextExpression(), local = true };
 			default:
 				return new ExprSelf { up = up };
 				//throw new Exception($"Unexpected token in up-symbol {currToken.type}");
@@ -1187,11 +1194,14 @@ public class ExprInvoke : INode {
 public class ExprApply : INode {
 	public INode lhs;
 	public INode rhs;
+
+
+	public bool local = false;
 	public dynamic Eval(IScope ctx) {
 		var s = lhs.Eval(ctx);
 		switch(s) {
 			case IScope sc: {
-					var dest = sc.Copy(ctx);
+					var dest = sc.Copy(local ? null : ctx);
 					switch(rhs) {
 						case ExprBlock eb:
 							return eb.Apply(dest);
@@ -1200,7 +1210,7 @@ public class ExprApply : INode {
 					}
 				}
 			case Type t: {
-					var dest = new ValTypeScope { t = t, parent = ctx };
+					var dest = new ValTypeScope { t = t, parent = local ? null : ctx };
 					switch(rhs) {
 						case ExprBlock eb:
 							return eb.Apply(dest);
@@ -1209,7 +1219,7 @@ public class ExprApply : INode {
 					}
 				}
 			case object o: {
-					var dest = new ValObjectScope { o = o, parent = ctx };
+					var dest = new ValObjectScope { o = o, parent = local ? null : ctx };
 					switch(rhs) {
 						case ExprBlock eb:
 							return eb.Apply(dest);
@@ -1483,7 +1493,6 @@ public class ExprPatternMatch : INode {
 	public List<(INode cond, INode yes)> branches;
 	public dynamic Eval (IScope ctx) {
 		var subject = item.Eval(ctx);
-
 		var inner_ctx = ctx.MakeTemp(subject);
 		inner_ctx.locals["_default"] = subject;
 		foreach(var (cond, yes) in branches) {
@@ -1528,7 +1537,6 @@ public class ExprMapFunc : INode {
 		dynamic Map (dynamic seq) {
 			var result = new List<dynamic>();
 			var f = map.Eval(ctx);
-
 			int index = 0;
 			foreach(var item in seq) {
 				var inner_ctx = ctx.MakeTemp();
@@ -1568,7 +1576,6 @@ public class ExprMapFunc : INode {
 		}
 		IEnumerable<dynamic> Convert(List<dynamic> items) {
 			var r = items.ToArray();
-
 			switch(type) {
 				case null:
 					return r;
@@ -1581,19 +1588,11 @@ public class ExprMapFunc : INode {
 		}
 	}
 }
-
-
-
-
-
-
 public class ExprMapExpr : INode {
 	public INode src;
 	public INode map;
-
 	public INode cond;
 	public INode type;
-
 	public XElement ToXML () => new("Map", src.ToXML(), map.ToXML());
 	public string Source => $"{src.Source} | {map.Source}";
 	public dynamic Eval (IScope ctx) {
@@ -1611,21 +1610,24 @@ public class ExprMapExpr : INode {
 			var result = new List<dynamic>();
 			int index = 0;
 			foreach(var item in seq) {
-				var inner_ctx = ctx.MakeTemp();
-				inner_ctx.locals["_item"] = item;
-				inner_ctx.locals["_index"] = index;
+				var inner_ctx = (IScope) ctx.MakeTemp();
+				inner_ctx.SetLocal("_item", item);
+				inner_ctx.SetLocal("_index", index);
 				index++;
 				if(cond != null) {
-					var b = cond.Eval(ctx);
-					if(b == true) {
-						goto Do;
-					} else if(b == false) {
-						break;
-					} else { 
-						throw new Exception("Boolean expected"); 
+					switch(cond.Eval(ctx)) {
+						case true: goto Do;
+						case false: goto Done;
+						default:
+							throw new Exception();
 					}
 				}
 				Do:
+				inner_ctx = item switch {
+					ValDictScope vds => new ValDictScope { locals = vds.locals, parent = inner_ctx, temp = false },
+					Type t => new ValTypeScope { parent = inner_ctx, t = t },
+					object o => new ValObjectScope { parent = inner_ctx, o = o },
+				};
 				var r = map.Eval(inner_ctx);
 				switch(r) {
 					case ValEmpty:
@@ -1635,12 +1637,14 @@ public class ExprMapExpr : INode {
 						break;
 				}
 			}
+			Done:
 			return Convert(result);
 		}
 		dynamic Convert (List<dynamic> items) {
 			var r = items.ToArray();
 			if(type != null) {
-				var arr = Array.CreateInstance(type.Eval(ctx), r.Length);
+				var t = (Type)type.Eval(ctx);
+				var arr = Array.CreateInstance(t, r.Length);
 				Array.Copy(r, arr, r.Length);
 				return arr;
 			}
@@ -1655,8 +1659,12 @@ public class StmtKeyVal : INode {
 	public string Source => $"{key}:{value?.Source ?? "null"}";
 	public dynamic Eval(IScope ctx) {
 		var val = value.Eval(ctx);
-		if(val is ValError ve) throw new Exception(ve.msg);
-		return Init(ctx, key, val);
+		switch(val) {
+			case ValError ve:
+				throw new Exception(ve.msg);
+			default:
+				return Init(ctx, key, val);
+		}
 	}
 	public static dynamic Init(IScope ctx, string key, dynamic val) {
 		switch(val) {
@@ -1703,7 +1711,6 @@ public class ExprSeq : INode {
 			}
 		}
 		var res = l.ToArray();
-
 		switch(type?.Eval(ctx)) {
 			case Type t:
 				var arr = Array.CreateInstance(t, res.Length);
@@ -1850,20 +1857,16 @@ public class StmtAssign : INode {
 }
 public interface INode {
     XElement ToXML () => new(GetType().Name);
-
     String Source => "";
-
 	dynamic Eval (IScope ctx);
 }
 public class Tokenizer {
-    string src;
-    int index;
-    public Tokenizer(string src) {
-        this.src = src;
-    }
-
+	string src;
+	int index;
+	public Tokenizer (string src) {
+		this.src = src;
+	}
 	public List<Token> GetAllTokens () {
-
 		var tokens = new List<Token> { };
 		while(Next() is { type: not TokenType.EOF } t) {
 			tokens.Add(t);
@@ -1871,33 +1874,62 @@ public class Tokenizer {
 		return tokens;
 	}
 
-    public Token Next() {
-        if(index >= src.Length) {
-            return new Token { type = TokenType.EOF };
-        }
-        var str = (params char[] c) => string.Join("", c);
+	public Token Next () {
+		if(index >= src.Length) {
+			return new Token { type = TokenType.EOF };
+		}
+		var str = (params char[] c) => string.Join("", c);
 		void inc () => index += 1;
 		Check:
 		var c = src[index];
-
-
-		if(c is '#') {
-			inc();
-			while(index < src.Length && src[index] != '\n') {
-				inc();
-			}
-			goto Check;
+		switch(c) {
+			case ('#'): {
+					inc();
+					while(index < src.Length && src[index] != '\n') {
+						inc();
+					}
+					goto Check;
+				}
+			case ('~'): {
+					inc();
+					while(index < src.Length && src[index] != '~') {
+						inc();
+					}
+					inc();
+					goto Check;
+				}
+			case ('"'): {
+					int dest = index + 1;
+					while(dest < src.Length && src[dest] != '"') {
+						dest += 1;
+					}
+					dest += 1;
+					var v = src[(index + 1)..(dest - 1)];
+					index = dest;
+					return new Token { type = TokenType.STRING, str = v };
+				}
+			case (' ' or '\r' or '\t' or '\n'): {
+					inc();
+					goto Check;
+				}
+			case (>= '0' and <= '9'): {
+					int dest;
+					for(dest = index + 1; dest < src.Length && src[dest] is >= '0' and <= '9'; dest++) {
+					}
+					var v = src[index..dest];
+					index = dest;
+					return new Token { type = TokenType.INTEGER, str = v };
+				}
+			case ((>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or '_' or (>= '0' and <= '9')): {
+					int dest = index + 1;
+					while(dest < src.Length && src[dest] is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or '_' or (>= '0' and <= '9')) {
+						dest += 1;
+					}
+					var v = src[index..dest];
+					index = dest;
+					return new Token { type = TokenType.NAME, str = v };
+				}
 		}
-		if(c is '~') {
-			inc();
-			while(index < src.Length && src[index] != '~') {
-				inc();
-			}
-			inc();
-			goto Check;
-		}
-
-
 		if(c switch {
 			':' => TokenType.COLON,
 			'(' => TokenType.L_PAREN,
@@ -1924,50 +1956,12 @@ public class Tokenizer {
 			'%' => TokenType.PERCENT,
 			'#' => TokenType.HASH,
 			_ => default(TokenType?)
-		} is { }tt) {
+		} is { } tt) {
 			index += 1;
 			return new Token { type = tt, str = str(c) };
 		}
-		if(c is ' ' or '\r' or '\t' or '\n') {
-					inc();
-				goto Check;
-				}
-
-
-		if(c is >= '0' and <= '9') {
-					int dest;
-					for(dest = index + 1; dest < src.Length && src[dest] is >= '0' and <= '9'; dest++) {
-					}
-					var v = src[index..dest];
-					index = dest;
-					return new Token { type = TokenType.INTEGER, str = v };
-				}
-
-		bool isAlphanum (char c) => c is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or '_' or (>= '0' and <= '9');
-
-		if(isAlphanum(c)) {
-					int dest = index + 1;
-			while(dest < src.Length && isAlphanum(src[dest])) {
-						dest += 1;
-					}
-			var v = src[index..dest];
-					index = dest;
-			return new Token { type = TokenType.NAME, str = v };
-				}
-		if(c == '"') {
-
-					int dest = index + 1;
-			while(dest < src.Length && src[dest] != '"') {
-						dest += 1;
-					}
-
-			dest += 1;
-			var v = src[(index+1)..(dest-1)];
-					index = dest;
-			return new Token { type = TokenType.STRING, str = v };
-		}
-        throw new Exception();
-    }
+		throw new Exception();
+	}
 }
 
 public enum TokenType {

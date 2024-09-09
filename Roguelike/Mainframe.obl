@@ -87,7 +87,7 @@
 		back: ABGR/Black
 		arr(str:string): str | ?(c:char) Tile { glyph := c front := ABGR/White back := ABGR/Black }
 		print(sf:Sf pos:XY): {
-			sf/PrintChar(pos/(xi yi)% ^^/(glyph front back)%)
+			sf/PrintChar(pos/(xi yi)% ^^^(glyph front back)%)
 		}
 	}
 	Entity: interface {
@@ -110,7 +110,7 @@
 		update!: {
 		}
 		new(^pos): Floor {
-			pos := ^^pos
+			pos := _0
 		}
 		#register(Entity)
 	}
@@ -256,7 +256,7 @@
 		}
 		forceUpdate!: {
 			entities/Update!
-			updateGrid := b1
+			updateGrid := true
 		}
 		getGrid: get* {
 			not-updateGrid ?+ { ^^ := grid }
@@ -320,7 +320,7 @@
 			menu/update*delta
 	}
 	render(delta:TimeSpan): {
-		[sf sf_ui] // _item/Clear!
+		[sf sf_ui] // Clear!
 		grid: world/getGrid
 		center: XY/i(sf/(GridWidth GridHeight)%)/div*2
 		grid/Keys | ?(p:Pt)
@@ -412,7 +412,7 @@
 	}
 	RO: RectOptions/ctor
 	border: RO(ABGR/(DeepPink Black)%)
-	borderMenu: RO(ABGR/(DeepPink Black)% b1 b0)
+	borderMenu: RO(ABGR/(DeepPink Black)% true false)
 	SelectMenu: class {
 		title:string
 		items: Row-Item
@@ -429,7 +429,7 @@
 			items := _1
 			invoke := _2
 			escape := _3
-			pos := nullor(_ _4)
+			pos := nullor(_4 _)
 		}
 		update(delta:TimeSpan): {
 			time := addf(_ delta/TotalSeconds)
@@ -455,11 +455,13 @@
 			x:pos/xi
 			y:pos/yi
 			w:32
-			Sf/DrawRect(sf_ui x y int_from*Common/Lerp(time 0 divf(1 10) 1 w 1) 32 border)
+			h:1
+
+			Sf/DrawRect(sf_ui x y int_from*Common/Lerp(time 0 divf(1 10) 1 w h) 32 border)
 			y := addi(_ 1)
 			sf_ui/PrintStr(addi(x 2) y title ABGR/(White Black)%)
 			y := addi(_ 1)
-			Sf/DrawRect(sf_ui x y w 1 borderMenu)
+			Sf/DrawRect(sf_ui x y w h borderMenu)
 			ind: 0
 			items | ?(it) {
 				y := addi(_ 1),

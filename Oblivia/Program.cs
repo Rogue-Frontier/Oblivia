@@ -67,7 +67,7 @@ public enum ValKeyword {
 	INTERFACE,
 	ENUM,
 	GET,
-	Register
+	IMPLEMENT
 }
 public class ValEmpty {
 	public static readonly ValEmpty VALUE = new();
@@ -1208,8 +1208,7 @@ public class ExprInvoke : INode {
 		switch(f) {
 			case ValKeyword.GET:
 				return new ValGetter { ctx = ctx, expr = args.items.Single().value };
-			case ValKeyword.Register:
-
+			case ValKeyword.IMPLEMENT:
 				var vds = ctx as ValDictScope;
 				var arg = args.EvalTuple(ctx);
 				foreach(var(k,v) in arg.items) {
@@ -1221,7 +1220,6 @@ public class ExprInvoke : INode {
 			default:
 				return InvokePars(ctx, f, args);
 		}
-		
 	}
 	public static object GetReturnType(object f) {
 		throw new Exception("Implement");
@@ -1417,12 +1415,10 @@ public class ExprBlock : INode {
 		var stageD = new List<INode> { };
 		foreach(var s in statements) {
 			switch(s) {
-				/*
-				case StmtDefFunc df: {
-						df.Eval(f);
+				case StmtDefFunc df when df.value is ExprVarBlock { type: ExprSymbol { key: "class" } }: {
+						df.Define(f);
 						break;
 					}
-				*/
 				case StmtDefKey { value: ExprVarBlock { type: ExprSymbol { key: "class", up: -1 }, source_block: { } block } } kv: {
 						var _static = StmtDefKey.InitClassA(f, block, kv.key);
 						stageA += () => {
@@ -1430,7 +1426,6 @@ public class ExprBlock : INode {
 						};
 						break;
 					}
-
 				case StmtDefKey { value: ExprVarBlock { type: ExprSymbol { key: "interface", up: -1 }, source_block: { } block } } kv: {
 						var _static = StmtDefKey.InitInterfaceA(f, block, kv.key);
 						stageA += () => {
@@ -1994,6 +1989,19 @@ public class StmtDefFunc : INode {
 			parent_ctx = owner
 		});
 	}
+
+	public ValFunc DefineA(IScope owner) {
+		var vf = new ValFunc {
+			expr = value,
+			pars = new ValTuple { items = [] },
+			parent_ctx = owner
+		};
+		owner.SetLocal(key, vf);
+		return vf;
+	}
+	public void DefineB(ValFunc vf) {
+		vf.pars = pars.EvalTuple(vf.parent_ctx);
+	}
 }
 public class StmtDefTuple : INode {
 	public string[] symbols;
@@ -2084,8 +2092,21 @@ public class StmtAssignSymbol : INode {
 		dynamic MatchType(Type t) {
 			var next = getNext();
 			if(t == null) {
-				goto TODO;
+				goto Do;
 			}
+
+			switch(curr) {
+				case ValInterface vi:
+
+					if(next is ValDictScope vds) {
+						if(vds.HasInterface(vi)) {
+							goto Do;
+						}
+						throw new Exception("Does not implement interface");
+					}
+					throw new Exception("Value must be a scope");
+			}
+
 			var nt = next.GetType();
 			if(!t.IsAssignableFrom(nt)) {
 				throw new Exception("Type mismatch");
@@ -2093,7 +2114,7 @@ public class StmtAssignSymbol : INode {
 			if(next is ValError ve) {
 				throw new Exception(ve.msg);
 			}
-			TODO:
+			Do:
 			return ctx.Set(key, next, up);
 		}
 	}

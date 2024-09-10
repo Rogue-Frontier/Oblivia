@@ -141,7 +141,7 @@ var global = new ValDictScope {
 		["interface"] = ValKeyword.INTERFACE,
 		["enum"] = ValKeyword.ENUM,
 		["get"] = ValKeyword.GET,
-		["register"] = ValKeyword.Register,
+		["implement"] = ValKeyword.IMPLEMENT,
 
 	}
 };

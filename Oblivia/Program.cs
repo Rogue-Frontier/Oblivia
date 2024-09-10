@@ -67,6 +67,7 @@ public enum ValKeyword {
 	INTERFACE,
 	ENUM,
 	GET,
+	Register
 }
 public class ValEmpty {
 	public static readonly ValEmpty VALUE = new();
@@ -100,19 +101,19 @@ public record ValFunc {
 		var argData = new Args { };
 		func_ctx.locals["_arg"] = argData;
 		foreach(var (k, v) in pars.items) {
-			StmtKeyVal.Init(func_ctx, k, v);
+			StmtDefKey.Init(func_ctx, k, v);
 		}
 		int ind = 0;
 		foreach(var (k, v) in evalArgs().items) {
 			if(k != null) {
 				ind = -1;
-				var val = StmtAssign.Assign(func_ctx, k, 1, () => v);
+				var val = StmtAssignSymbol.AssignLocal(func_ctx, k, () => v);
 			} else {
 				if(ind == -1) {
 					throw new Exception("Cannot have positional arguments after named arguments");
 				}
 				var p = pars.items[ind];
-				var val = StmtAssign.Assign(func_ctx, p.key, 1, () => v);
+				var val = StmtAssignSymbol.AssignLocal(func_ctx, p.key, () => v);
 				ind += 1;
 			}
 		}
@@ -122,7 +123,7 @@ public record ValFunc {
 			argData.list.Add(val);
 			argData.dict[p.key] = val;
 
-			StmtKeyVal.Init(func_ctx, $"_{ind}", val);
+			StmtDefKey.Init(func_ctx, $"_{ind}", val);
 			ind += 1;
 		}
 		var result = expr.Eval(func_ctx);
@@ -134,12 +135,12 @@ public record ValFunc {
 		func_ctx.locals["_arg"] = argData;
 		foreach(var (k,v) in pars.items) {
 			//var val = v.Eval(caller_ctx);
-			StmtKeyVal.Init(func_ctx, k, v);
+			StmtDefKey.Init(func_ctx, k, v);
 		}
 		int ind = 0;
 		foreach(var arg in args) {
 			var p = pars.items[ind];
-			var val = StmtAssign.Assign(func_ctx, p.key, 1, () => arg);
+			var val = StmtAssignSymbol.AssignLocal(func_ctx, p.key, () => arg);
 			ind += 1;
 		}
 		ind = 0;
@@ -147,7 +148,7 @@ public record ValFunc {
 			var val = func_ctx.locals[p.key];
 			argData.list.Add(val);
 			argData.dict[p.key] = val;
-			StmtKeyVal.Init(func_ctx, $"_{ind}", val);
+			StmtDefKey.Init(func_ctx, $"_{ind}", val);
 			ind += 1;
 		}
 		var result = expr.Eval(func_ctx);
@@ -159,12 +160,12 @@ public record ValFunc {
 		func_ctx.locals["_arg"] = argData;
 		foreach(var p in pars.items) {
 			var val = p.val.Eval(caller_ctx);
-			StmtKeyVal.Init(func_ctx, p.key, val);
+			StmtDefKey.Init(func_ctx, p.key, val);
 		}
 		int ind = 0;
 		foreach(var arg in args) {
 			var p = pars.items[ind];
-			var val = StmtAssign.Assign(func_ctx, p.key, 1, () => arg);
+			var val = StmtAssignSymbol.AssignLocal(func_ctx, p.key, () => arg);
 			ind += 1;
 		}
 		ind = 0;
@@ -173,7 +174,7 @@ public record ValFunc {
 			argData.list.Add(val);
 			argData.dict[p.key] = val;
 
-			StmtKeyVal.Init(func_ctx, $"_{ind}", val);
+			StmtDefKey.Init(func_ctx, $"_{ind}", val);
 			ind += 1;
 		}
 		var inner_ctx = new ValDictScope {
@@ -204,41 +205,48 @@ public record ValType(Type type) {
 	}
 }
 public record ValInterface {
+	public INode source;
+	public ValDictScope _static;
+	public void Register(ValDictScope target) {
 
+		foreach(var(k,v) in _static.locals) {
+			if(!target.locals.ContainsKey(k)) {
+				throw new Exception("Does not implement");
+			}
+		}
+		target.AddInterface(this);
+	}
 }
 public class ValClass {
 	public string name;
 	public ValDictScope _static;
 	public INode source_expr;
 	public IScope source_ctx;
+	public ValDictScope MakeInstance () => Apply(source_ctx);
+	public ValDictScope Apply(IScope scope) {
+		var r = (ValDictScope) source_expr.Eval(scope);
+		r.AddClass(this);
+		return r;
+	}
 	public dynamic VarBlock(IScope ctx, ExprBlock block) {
-		var scope = (ValDictScope)source_expr.Eval(source_ctx);
-		scope.locals["class"] = this;
+		var scope = MakeInstance();
 		var r = block.Apply(new ValDictScope { locals = scope.locals, parent = ctx, temp = false});
 		return r;
 	}
 }
 public interface IScope {
-
 	public IScope parent { get; }
 	public dynamic Get (string key, int up = -1) =>
 		up == -1 ? GetNearest(key) : GetAt(key, up);
 	public dynamic GetLocal(string key) => GetAt(key, 1);
-
 	public dynamic GetAt (string key, int up);
 	public dynamic GetNearest (string key);
-
-
 	public dynamic Set (string key, object val, int up = -1) =>
 		up == -1 ? SetNearest(key, val) : SetAt(key, val, up);
 	public dynamic SetLocal (string key, dynamic val) => SetAt(key, val, 1);
 	public dynamic SetAt (string key, object val, int up);
 	public dynamic SetNearest (string key, object val);
-
-
 	public IScope Copy (IScope parent);
-
-
 	public ValDictScope MakeTemp () => new ValDictScope {
 		locals = { },
 		parent = this,
@@ -251,6 +259,58 @@ public interface IScope {
 		parent = this,
 		temp = true
 	};
+}
+public class ValTupleScope : IScope {
+	public IScope parent { get; set; } = null;
+	public ValTuple t;
+	public IScope Copy (IScope parent) => new ValTupleScope { parent = parent, t = t };
+	public dynamic GetAt (string key, int up) {
+		if(up == 1) {
+			if(GetLocal(key, out var v))
+				return v;
+		} else {
+			if(parent != null)
+				return parent.GetAt(key, up - 1);
+		}
+		return ValError.VARIABLE_NOT_FOUND;
+	}
+	public bool GetLocal (string key, out dynamic res) {
+		foreach(var (k,v) in t.items) {
+			if(k == key) {
+				res = v;
+				return true;
+			}
+		}
+		res = null;
+		return false;
+	}
+	public dynamic GetNearest (string key) =>
+			GetLocal(key, out var v) ? v :
+			parent != null ? parent.GetNearest(key) :
+			ValError.VARIABLE_NOT_FOUND;
+	public bool SetLocal (string key, dynamic val) {
+		for(int i = 0; i < t.items.Length; i++) {
+			if(t.items[i].key == key) {
+				t.items[i].val = val;
+			}
+		}
+		return false;
+	}
+	public dynamic SetAt (string key, object val, int up) {
+		if(up == 1) {
+			if(SetLocal(key, val))
+				return val;
+		} else {
+			if(parent != null) {
+				return parent.SetAt(key, val, up - 1);
+			}
+		}
+		return ValError.VARIABLE_NOT_FOUND;
+	}
+	public dynamic SetNearest (string key, object val) =>
+		SetLocal(key, val) ? val :
+		parent != null ? parent.SetNearest(key, val) :
+		ValError.VARIABLE_NOT_FOUND;
 }
 public record ValTypeScope : IScope {
 	public IScope parent { get; set; } = null;
@@ -385,7 +445,20 @@ public record ValObjectScope : IScope {
 public record ValDictScope :IScope {
 	public bool temp = false;
 	public IScope parent { get; set; } = null;
-	public Dictionary<string, dynamic> locals = [];
+	public Dictionary<string, dynamic> locals = new() {
+		["_classSet"] = new HashSet<ValClass> { },
+		["_interfaceSet"] = new HashSet<ValInterface> { }
+	};
+	public void AddClass(ValClass vc) {
+		(locals["_classSet"] as HashSet<ValClass>).Add(vc);
+	}
+	public void AddInterface(ValInterface vi) {
+		(locals["_interfaceSet"] as HashSet<ValInterface>).Add(vi);
+	}
+	public bool HasInterface(ValInterface vi) {
+		return(locals["_interfaceSet"] as HashSet<ValInterface>).Contains(vi);
+	}
+
 	public ValDictScope (IScope parent = null, bool temp = false) {
 		this.temp = temp;
 		this.parent = parent;
@@ -451,18 +524,42 @@ public class Parser {
 				switch(lhs) {
 
 					case ExprTuple et:
-						throw new Exception();
+						switch(tokenType) {
+							case TokenType.EQUAL: {
+									inc();
+									List<ExprSymbol> symbols = [];
+									foreach(var item in et.items) {
+										if(item.value is ExprSymbol s) {
+											symbols.Add(s);
+										} else {
+											throw new Exception();
+										}
+									}
+									return new StmtAssignTuple { symbols = symbols.ToArray(), value = NextExpression() };
+								}
+							default:{
+								List<string> symbols = [];
+								foreach(var item in et.items) {
+									if(item.value is ExprSymbol { key: { } key, up: -1 or 1 }) {
+										symbols.Add(key);
+									} else {
+										throw new Exception();
+									}
+								}
+									return new StmtDefTuple { symbols = symbols.ToArray(), value = NextExpression() };
+								}
+						}
 
 
 					case ExprSymbol { up: { } up } es:
 						switch(tokenType) {
 							case TokenType.EQUAL:
 								inc();
-								return new StmtAssign { symbol = es, value = NextExpression() };
+								return new StmtAssignSymbol { symbol = es, value = NextExpression() };
 							default:
 								switch(up) {
 									case -1 or 1:
-										return new StmtKeyVal {
+										return new StmtDefKey {
 											key = es.key,
 											value = NextExpression()
 										};
@@ -806,7 +903,6 @@ public class Parser {
 			}
 		}
 		void NextPair (INode lhs) {
-
 			switch(lhs) {
 				case ExprSymbol { up: -1, key: { } key }: {
 						inc();
@@ -980,7 +1076,6 @@ public class ValSpread {
 		}
 	}
 }
-
 public class ExprVarBlock : INode {
 	public INode type;
     public ExprBlock source_block;
@@ -1002,7 +1097,12 @@ public class ExprVarBlock : INode {
 			case ValInterface vi: {
 					break;
 				}
+			case ValKeyword.GET: {
+				return new ValGetter { ctx = ctx, expr = source_block };
+			}
 			case ValKeyword.CLASS: {
+
+					throw new Exception("not supported");
 					switch(getResult()) {
 						case ValDictScope s:
 							var c = new ValClass { _static = s, source_expr = source_block, source_ctx = ctx };
@@ -1013,10 +1113,10 @@ public class ExprVarBlock : INode {
 					}
 				}
 			case ValKeyword.INTERFACE: {
-
-					return null;
 					if(getResult() is ValDictScope s) {
+						return new ValInterface { _static = s, source = source_block };
 					}
+					throw new Exception("Object expected");
 				}
 			case ValKeyword.ENUM: {
 					var locals = new Dictionary<string, dynamic> { };
@@ -1090,10 +1190,11 @@ public class ExprLoop: INode {
 			case true:
 				r = positive.Eval(ctx);
 				goto Step;
+			case false:
+				return r;
 			default:
 				throw new Exception("Boolean expected");
 		}
-		return r;
 	}
 }
 public class ExprInvoke : INode {
@@ -1105,6 +1206,16 @@ public class ExprInvoke : INode {
 		switch(f) {
 			case ValKeyword.GET:
 				return new ValGetter { ctx = ctx, expr = args.items.Single().value };
+			case ValKeyword.Register:
+
+				var vds = ctx as ValDictScope;
+				var arg = args.EvalTuple(ctx);
+				foreach(var(k,v) in arg.items) {
+					if(v is ValInterface vi) {
+						vi.Register(vds);
+					}
+				}
+				return ValEmpty.VALUE;
 			default:
 				return InvokePars(ctx, f, args);
 		}
@@ -1181,9 +1292,37 @@ public class ExprInvoke : INode {
 					return r;
 				}
 			case ValClass vcl: {
-					//Cast
 					break;
+
+					var args = evalArgs();
+					var scope = vcl.MakeInstance();
+					foreach(var(k,v) in args.items) {
+						if(k == null) {
+							throw new Exception();
+						}
+						StmtAssignSymbol.AssignLocal(scope, k, () => v);
+					}
+					return scope;
 				}
+			case ValInterface vi: {
+
+					var args = evalArgs();
+					var arg = args.items.Single().val;
+
+					switch(arg) {
+						case ValDictScope vds:
+							if(vds.HasInterface(vi)) {
+								return arg;
+							} else {
+								throw new Exception("Does not implement interface");
+							}
+							//TODO: Remove this
+						case null:
+							return null;
+					}
+					throw new Exception();
+				}
+				
 			case ValDictScope s: {
 				throw new Exception("Illegal");
 			}
@@ -1276,22 +1415,22 @@ public class ExprBlock : INode {
 		var stageD = new List<INode> { };
 		foreach(var s in statements) {
 			switch(s) {
-				case StmtKeyVal { value: ExprVarBlock { type: ExprSymbol { key: "class", up: -1 }, source_block: { } block } } kv: {
-
-						var _static = (ValDictScope)block.MakeScope(f);
-						var c = new ValClass {
-							name = kv.key,
-							source_ctx = f,
-							source_expr = block,
-							_static = _static
-						};
-						f.locals[kv.key] = c;
-						_static.locals["class"] = c;
+				case StmtDefKey { value: ExprVarBlock { type: ExprSymbol { key: "class", up: -1 }, source_block: { } block } } kv: {
+						var _static = StmtDefKey.InitClassA(f, block, kv.key);
 						stageA += () => {
 							block.StagedApply(_static);
 						};
 						break;
 					}
+
+				case StmtDefKey { value: ExprVarBlock { type: ExprSymbol { key: "interface", up: -1 }, source_block: { } block } } kv: {
+						var _static = StmtDefKey.InitInterfaceA(f, block, kv.key);
+						stageA += () => {
+							block.StagedApply(_static);
+						};
+						break;
+					}
+
 				default:
 					stageD.Add(s);
 					break;
@@ -1300,7 +1439,7 @@ public class ExprBlock : INode {
 		stageA();
 		foreach(var s in stageD) {
 			switch(s) {
-				case StmtKeyVal { value: ExprVarBlock { type: ExprSymbol { key: "defer", up: -1 }, source_block: { } _block } }:
+				case StmtDefKey { value: ExprVarBlock { type: ExprSymbol { key: "defer", up: -1 }, source_block: { } _block } }:
 					r = _block.EvalDefer(f);
 					break;
 				default:
@@ -1352,8 +1491,6 @@ public class ExprGet : INode {
 			case ValDictScope s: {
 
 				if(s.locals.TryGetValue(key, out var v)) {
-
-
 					switch(v) {
 						case ValGetter vg:
 							return vg.Eval();
@@ -1526,6 +1663,7 @@ public class ExprMapFunc : INode {
 			case IEnumerable e:
 				return Map(e);
 			case ValTuple vt:
+				//TO DO: rewrite
 				var keys = vt.items.Select(i => i.key);
 				var vals = vt.items.Select(i => i.val);
 				var m = (IEnumerable<dynamic>)Map(vals);
@@ -1539,9 +1677,7 @@ public class ExprMapFunc : INode {
 			var f = map.Eval(ctx);
 			int index = 0;
 			foreach(var item in seq) {
-				var inner_ctx = ctx.MakeTemp();
-				inner_ctx.locals["_item"] = item;
-				inner_ctx.locals["_index"] = index;
+				var inner_ctx = ExprMapFunc.MakeCondCtx(ctx, item, index);
 				index++;
 				if(cond != null) {
 					switch(cond.Eval(ctx)) {
@@ -1587,6 +1723,21 @@ public class ExprMapFunc : INode {
 			}
 		}
 	}
+
+	public static IScope MakeCondCtx (IScope ctx, object item, int index) {
+		var inner_ctx = (IScope)ctx.MakeTemp();
+		inner_ctx.SetLocal("_item", item);
+		inner_ctx.SetLocal("_index", index);
+		return inner_ctx;
+	}
+	public static IScope MakeMapCtx (IScope inner_ctx, object item) {
+		return
+				item switch {
+					ValDictScope vds => new ValDictScope { locals = vds.locals, parent = inner_ctx, temp = false },
+					Type t => new ValTypeScope { parent = inner_ctx, t = t },
+					object o => new ValObjectScope { parent = inner_ctx, o = o },
+				};
+	}
 }
 public class ExprMapExpr : INode {
 	public INode src;
@@ -1596,13 +1747,30 @@ public class ExprMapExpr : INode {
 	public XElement ToXML () => new("Map", src.ToXML(), map.ToXML());
 	public string Source => $"{src.Source} | {map.Source}";
 	public dynamic Eval (IScope ctx) {
-		switch(src.Eval(ctx)) {
+		var lhs = src.Eval(ctx);
+		switch(lhs) {
 			case ValEmpty:
 				throw new Exception("Variable not found");
 			case ICollection c:
 				return Map(c);
 			case IEnumerable e:
 				return Map(e);
+			case ValTuple vt:
+
+				int index = 0;
+				List<(string key, dynamic val)> items = [];
+				foreach(var(key, val) in vt.items) {
+					var inner_ctx = ExprMapFunc.MakeCondCtx(ctx, val, index);
+					var r = map.Eval(ExprMapFunc.MakeMapCtx(inner_ctx, val));
+					index += 1;
+					if(r is ValEmpty) {
+						continue;
+					}
+					items.Add((key, r));
+				}
+				return new ValTuple {
+					items = items.ToArray()
+				};
 			default:
 				throw new Exception("Sequence expected");
 		}
@@ -1610,9 +1778,7 @@ public class ExprMapExpr : INode {
 			var result = new List<dynamic>();
 			int index = 0;
 			foreach(var item in seq) {
-				var inner_ctx = (IScope) ctx.MakeTemp();
-				inner_ctx.SetLocal("_item", item);
-				inner_ctx.SetLocal("_index", index);
+				var inner_ctx = ExprMapFunc.MakeCondCtx(ctx, item, index);
 				index++;
 				if(cond != null) {
 					switch(cond.Eval(ctx)) {
@@ -1623,11 +1789,7 @@ public class ExprMapExpr : INode {
 					}
 				}
 				Do:
-				inner_ctx = item switch {
-					ValDictScope vds => new ValDictScope { locals = vds.locals, parent = inner_ctx, temp = false },
-					Type t => new ValTypeScope { parent = inner_ctx, t = t },
-					object o => new ValObjectScope { parent = inner_ctx, o = o },
-				};
+				inner_ctx = ExprMapFunc.MakeMapCtx(inner_ctx, item);
 				var r = map.Eval(inner_ctx);
 				switch(r) {
 					case ValEmpty:
@@ -1652,7 +1814,7 @@ public class ExprMapExpr : INode {
 		}
 	}
 }
-public class StmtKeyVal : INode {
+public class StmtDefKey : INode {
     public string key;
     public INode value;
     public XElement ToXML () => new("KeyVal", new XAttribute("key", key), value.ToXML());
@@ -1667,6 +1829,10 @@ public class StmtKeyVal : INode {
 		}
 	}
 	public static dynamic Init(IScope ctx, string key, dynamic val) {
+		var curr = ctx.GetLocal(key);
+		if(!ReferenceEquals(curr, ValError.VARIABLE_NOT_FOUND)) {
+			throw new Exception();
+		}
 		switch(val) {
 			case Type t:
 				val = new ValDeclared { type = t };
@@ -1680,6 +1846,27 @@ public class StmtKeyVal : INode {
 	}
 	public static void Set(IScope ctx, string key, dynamic val) {
 		ctx.SetLocal(key, val);
+	}
+	public static ValDictScope InitClassA(IScope f, ExprBlock block, string key) {
+		var _static = (ValDictScope)block.MakeScope(f);
+		var c = new ValClass {
+			name = key,
+			source_ctx = f,
+			source_expr = block,
+			_static = _static
+		};
+		f.SetLocal(key, c);
+		_static.AddClass(c);
+		return _static;
+	}
+	public static ValDictScope InitInterfaceA(IScope f, ExprBlock block, string key) {
+		var _static = (ValDictScope)block.MakeScope(f);
+		var vi = new ValInterface {
+			_static = _static
+		};
+		f.SetLocal(key, vi);
+		_static.AddInterface(vi);
+		return _static;
 	}
 }
 public class ExprFunc : INode {
@@ -1792,7 +1979,45 @@ public class StmtDefFunc : INode {
 		});
 	}
 }
-public class StmtAssign : INode {
+public class StmtDefTuple : INode {
+	public string[] symbols;
+	public INode value;
+	public dynamic Eval(IScope ctx) {
+		var val = value.Eval(ctx);
+		switch(val) {
+			case ValTuple vt:
+				if(symbols.Length == vt.items.Length) {
+					foreach(var i in Enumerable.Range(0, symbols.Length)) {
+						StmtDefKey.Init(ctx, symbols[i], vt.items[i].val);
+					}
+					return ValEmpty.VALUE;
+				} else {
+					throw new Exception();
+				}
+		}
+		throw new Exception();
+	}
+}
+public class StmtAssignTuple : INode {
+	public ExprSymbol[] symbols;
+	public INode value;
+	public dynamic Eval (IScope ctx) {
+		var val = value.Eval(ctx);
+		switch(val) {
+			case ValTuple vt:
+				if(symbols.Length == vt.items.Length) {
+					foreach(var i in Enumerable.Range(0, symbols.Length)) {
+						StmtAssignSymbol.AssignSymbol(ctx, symbols[i], () => vt.items[i].val);
+					}
+					return ValEmpty.VALUE;
+				} else {
+					throw new Exception();
+				}
+		}
+		throw new Exception();
+	}
+}
+public class StmtAssignSymbol : INode {
     public ExprSymbol symbol;
     public INode value;
     XElement ToXML () => new("Reassign", symbol.ToXML(), value.ToXML());
@@ -1801,9 +2026,11 @@ public class StmtAssign : INode {
 		var curr = ctx.Get(symbol.key, symbol.up);
 		var inner_ctx = ctx.MakeTemp(curr);
 		inner_ctx.locals["_curr"] = curr;
-		var r = Assign(ctx, symbol.key, symbol.up, () => value.Eval(inner_ctx));
+		var r = AssignSymbol(ctx, symbol, () => value.Eval(inner_ctx));
 		return r;
 	}
+	public static dynamic AssignLocal (IScope ctx, string key, Func<object> getNext) => Assign(ctx, key, 1, getNext);
+	public static dynamic AssignSymbol (IScope ctx, ExprSymbol sym, Func<object> getNext) => Assign(ctx, sym.key, sym.up, getNext);
 	public static dynamic Assign (IScope ctx, string key, int up, Func<object> getNext) {
 		var curr = (object)ctx.Get(key, up);
 		switch(curr) {

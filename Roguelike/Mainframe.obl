@@ -12,9 +12,10 @@
 	func(int void)
 	~
 	BufferedList: class {
-		items: HashSet-object/ctor!
-		toAdd: HashSet-object/ctor!
-		toRemove: HashSet-object/ctor!
+		makeSet: HashSet-object/ctor
+		items: makeSet!
+		toAdd: makeSet!
+		toRemove: makeSet!
 
 		new!: BufferedList{}
 		Add(e:object): {
@@ -30,25 +31,22 @@
 		Update!: {
 			items/UnionWith-toAdd
 			items/ExceptWith-toRemove
-
-			toAdd/Clear!
-			toRemove/Clear!
+			,
+			[toAdd toRemove]//Clear!
 		}
 	}
 	XY: class {
-		x: double/Parse-"0"
-		y: double/Parse-"0"
+		(x y): (0 0) | double_from
+
 		xi:	get* int_from-x
 		yi:	get* int_from-y
 		xf: get* x
 		yf: get* y
 		xyi:get* pairi(xi yi)
-
 		left:	get* XY/i(subi(0 1) 0)
 		right:	get* XY/i(addi(0 1) 0)
 		up:		get* XY/i(0 subi(0 1))
 		down:	get* XY/i(0 addi(0 1))
-
 		~
 		l: prop(
 			get:null	
@@ -59,14 +57,11 @@
 		d: var-double
 		e: val-double
 		~
-
 		i(x:int y:int): XY {
-			x := double_from-_0
-			y := double_from-_1
+			(x y) := (_0 _1) | double_from
 		}
 		f(^x ^y): XY {
-			x := _0
-			y := _1
+			(x y) := (_0 _1)
 		}
 		add(rhs: XY): XY {
 			x := addf(^^^x _0/x)
@@ -82,9 +77,9 @@
 		}
 	}
 	Tile: class {
-		glyph: "@"@0
-		front: ABGR/Magenta
-		back: ABGR/Black
+		glyph: "@"@0,
+		(front back): ABGR/(Magenta Black),
+
 		arr(str:string): str | ?(c:char) Tile { glyph := c front := ABGR/White back := ABGR/Black }
 		print(sf:Sf pos:XY): {
 			sf/PrintChar(pos/(xi yi)% ^^^(glyph front back)%)
@@ -93,16 +88,20 @@
 	Entity: interface {
 		active: bool
 	}
+	Actor: interface {
+		update!: {}
+	}
 	Floor: class {
 		name: "Floor"
 		pos:XY
 		env: true
 		active: true
+
+		register(Entity)
+
 		tile: Tile {
 			glyph := char_from-254
-			#front := ABGR/Gray
-			by: byte_from
-			front := ABGR/RGBA * (51 51 75 addi(204 rand_range(0 25))) | by
+			front := ABGR/RGBA * (51 51 75 addi(204 rand_range(0 25))) | byte_from
 			back := ABGR/Transparent
 
 			# tile = new Tile(ABGR.RGBA(25, 25, 36, (byte)(204 + (r.NextFloat() * 51))), ABGR.Black, (char)254);
@@ -120,6 +119,9 @@
 		pos: XY
 		env: true
 		active: true
+		
+		register(Entity)
+
 		tile: get* Tile {
 			glyph := char_from-249
 			front := ABGR/Gray
@@ -131,9 +133,7 @@
 		time: double/Parse-"0"
 		tick: int/Parse-"0"
 		new(^tiles ^time ^tick): Msg {
-			tiles := _0
-			time := _1
-			tick := _2
+			(tiles time tick) := (_0 _1 _2)
 		}
 		repeats: 1
 		fadeTime: double/Parse-"0"
@@ -162,8 +162,9 @@
 		damage(^hp): {
 			^^^hp := subi(_ hp)
 			active := gt(^^^hp 0)
-			#print * ^^^hp
 		}
+		
+		register(Entity Actor)
 	}
 	Player: class {
 		~
@@ -182,8 +183,8 @@
 			glyph := "@"[0]
 			front := ABGR/Magenta
 		}
-		active: b1
-		busy: b0
+		active: true
+		busy: false
 		world: World
 		log: List-Msg/ctor!
 		cargo: List-Item/ctor!
@@ -192,7 +193,7 @@
 			world := _1
 		}
 		update!: {
-			busy := b0
+			busy := false
 		}
 		move(disp:XY): {
 			dest: pos/add*disp
@@ -201,10 +202,8 @@
 			attack: b0
 			others =- null ?+ {
 				others |<not*attack> ?(e) {
-					e/class =+ Enemy ?+ {
-						ta: Tile/arr(cat["Attack " e/name])
-						msg: Msg/new(ta time world/tick)
-						log/Add*msg
+					e/_classSet/Contains-Enemy ?+ {
+						log/Add*Msg/new(Tile/arr(cat["Attack " e/name]) time world/tick)
 						e/damage*10
 						attack := b1
 					}
@@ -215,18 +214,19 @@
 					pos := dest
 				}
 			}
-			busy := b1
+			busy := true
 		}
+		
+		register(Entity Actor)
 	}
 	Item: class {
 		type: ItemType
 		pos: XY
-		active: b1
+		active: true
 		tile: Tile { glyph := "r"@0  front := ABGR/White }
 		new(^type ^pos): Item {
 			type := _0
 			pos := _1
-			print * pos/x
 		}
 		update!: {
 			
@@ -244,7 +244,6 @@
 		new!: World{}
 		addEntity: entities/Add
 		removeEntity: entities/Remove
-		menu: object
 		update!: {
 			entities / {
 				items | ?(e)
@@ -262,15 +261,15 @@
 			not-updateGrid ?+ { ^^ := grid }
 			grid/Clear!
 			#print* grid/Count
-			entities/items | ?(e) grid/GetOrAdd(e/pos/xyi HashSet-object/ctor!)/Add-e
-			updateGrid := b0
+			entities/items | ?(e) grid/GetOrAdd(e/pos/xyi HashSet-Entity/ctor!)/Add*e
+			updateGrid := false
 			^: grid
 		}
 		hasFloor(p:XY): {
 			loc: getGrid[p/xyi]
 			loc =- null ?+ 
 				loc | ?(e)
-					e/class =+ Floor ?+ {
+					e/_classSet/Contains-Floor ?+ {
 						^^ := true
 					}
 			^: false
@@ -279,7 +278,7 @@
 			loc: getGrid[p/xyi]
 			loc =- null ?+ 
 				loc | ?(e)
-					e/class =+ Wall ?+ {
+					e/_classSet/Contains-Wall ?+ {
 						^^ := true
 					}
 			^: false
@@ -287,14 +286,14 @@
 	}
 	time: double/Parse-"0"
 	move: b0
+	camera: XY
 	player: Player
 	world: World
 	sf: Sf
 	sf_ui: Sf
-	menu: object * null
+	menu: Menu * null
 	init!: {
 		print * cat*[1 2, [:int 3 4]%]
-		
 		print * [1 2 3] // _item =+ 1 ?+ _item
 		world := World/new!
 		add: world/addEntity
@@ -302,7 +301,9 @@
 			range(0 30) | ?(x:int)
 				add* Floor/new* XY/i(x y)
 		player := Player/new(XY/i(0 0) world)
-		
+		camera := player/pos
+
+
 		,[
 			player
 			Enemy/new(XY/i(10 10) world)
@@ -319,15 +320,18 @@
 		menu =- null ?+
 			menu/update*delta
 	}
+	resetCamera!: {
+		camera := player/pos
+	}
 	render(delta:TimeSpan): {
 		[sf sf_ui] // Clear!
 		grid: world/getGrid
 		center: XY/i(sf/(GridWidth GridHeight)%)/div*2
 		grid/Keys | ?(p:Pt)
 			grid@p | ?(e) {
-				e/tile/print(sf center/add*e/pos/sub*player/pos)
+				e/tile/print(sf center/add*e/pos/sub*camera)
 			}
-		sf_ui/PrintStr(1 1 cat["tick: " world/tick] ABGR/(White Black)%)
+		sf_ui/Print(1 1 cat["tick: " world/tick] ABGR/(White Black)%)
 		invMenu: {
 			y: subi(sf/GridHeight 64)
 			Sf/DrawRect(sf_ui 0 y 32 32 border)
@@ -373,10 +377,11 @@
 			KC/Up:		XY/up
 			KC/Down:	XY/down
 		] | player/move
+
 		kb/IsPress ?[
 			KC/G: {
 				getItems: get* world/getGrid[player/pos/xyi] | ?(it)
-					it/class =+ Item ?+ 
+					it/_classSet/Contains-Item ?+ 
 						it ?-
 						empty
 				menu := SelectMenu/new(
@@ -413,6 +418,14 @@
 	RO: RectOptions/ctor
 	border: RO(ABGR/(DeepPink Black)%)
 	borderMenu: RO(ABGR/(DeepPink Black)% true false)
+
+	
+	Menu: interface {
+		update(delta:TimeSpan): {}
+		handle_key(kb:KB): {}
+		handle_mouse(state:HandState): {}
+		render!: {}
+	}
 	SelectMenu: class {
 		title:string
 		items: Row-Item
@@ -421,7 +434,6 @@
 		}
 		invoke: ValFunc * null
 		escape: ValFunc * null
-
 		time: double/Parse-"0"
 		pos: XY/i(32 26)
 		new(^title ^items ^invoke ^escape ^pos): SelectMenu {
@@ -449,17 +461,12 @@
 			}
 		}
 		handle_mouse(state:HandState): {
-			
 		}
 		render!: {
-			x:pos/xi
-			y:pos/yi
-			w:32
-			h:1
-
+			x:pos/xi y:pos/yi w:32 h:1
 			Sf/DrawRect(sf_ui x y int_from*Common/Lerp(time 0 divf(1 10) 1 w h) 32 border)
 			y := addi(_ 1)
-			sf_ui/PrintStr(addi(x 2) y title ABGR/(White Black)%)
+			sf_ui/Print(addi(x 2) y title ABGR/(White Black)%)
 			y := addi(_ 1)
 			Sf/DrawRect(sf_ui x y w h borderMenu)
 			ind: 0
@@ -473,14 +480,17 @@
 				ind := addi(_ 1)
 			}
 		}
-	}
-	LookMenu: class {
-		allowSpace: false
 
+		register(Menu)
+	}
+
+	LookMenu: class {
+
+
+		allowSpace: false
 		title:string
 		invoke: ValFunc * null
 		escape: ValFunc * null
-		
 		update(delta:TimeSpan): {
 		
 		}
@@ -490,6 +500,18 @@
 					escape =+ null ?+ {
 						menu := null
 					}
+				}
+				KC/Up: {
+					camera := camera/add(XY/up)
+				}
+				KC/Right: {
+					camera := camera/add(XY/right)
+				}
+				KC/Down: {
+					camera := camera/add(XY/down)
+				}
+				KC/Left: {
+					camera := camera/add(XY/left)
 				}
 			]
 			kb/Press | ?(k) beq(k 65 90) ?+ {
@@ -505,6 +527,8 @@
 		render!: {
 			
 		}
+		
+		register(Menu)
 	}
 	ABC: "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 }

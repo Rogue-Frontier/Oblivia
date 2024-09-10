@@ -272,7 +272,7 @@ public class ValTupleScope : IScope {
 			if(parent != null)
 				return parent.GetAt(key, up - 1);
 		}
-		return ValError.VARIABLE_NOT_FOUND;
+		return new ValError($"Unknown variable {key}");
 	}
 	public bool GetLocal (string key, out dynamic res) {
 		foreach(var (k,v) in t.items) {
@@ -287,7 +287,7 @@ public class ValTupleScope : IScope {
 	public dynamic GetNearest (string key) =>
 			GetLocal(key, out var v) ? v :
 			parent != null ? parent.GetNearest(key) :
-			ValError.VARIABLE_NOT_FOUND;
+			new ValError($"Unknown variable {key}");
 	public bool SetLocal (string key, dynamic val) {
 		for(int i = 0; i < t.items.Length; i++) {
 			if(t.items[i].key == key) {
@@ -305,12 +305,12 @@ public class ValTupleScope : IScope {
 				return parent.SetAt(key, val, up - 1);
 			}
 		}
-		return ValError.VARIABLE_NOT_FOUND;
+		return new ValError($"Unknown variable {key}");
 	}
 	public dynamic SetNearest (string key, object val) =>
 		SetLocal(key, val) ? val :
 		parent != null ? parent.SetNearest(key, val) :
-		ValError.VARIABLE_NOT_FOUND;
+		new ValError($"Unknown variable {key}");
 }
 public record ValTypeScope : IScope {
 	public IScope parent { get; set; } = null;
@@ -324,7 +324,7 @@ public record ValTypeScope : IScope {
 			if(parent != null)
 				return parent.GetAt(key, up - 1);
 		}
-		return ValError.VARIABLE_NOT_FOUND;
+		return new ValError($"Unknown variable {key}");
 	}
 	BindingFlags FLS = BindingFlags.Static | BindingFlags.Public;
 	public bool GetLocal (string key, out dynamic res) {
@@ -350,7 +350,7 @@ public record ValTypeScope : IScope {
 	public dynamic GetNearest (string key) =>
 			GetLocal(key, out var v) ? v :
 			parent != null ? parent.GetNearest(key) :
-			ValError.VARIABLE_NOT_FOUND;
+			new ValError($"Unknown variable {key}");
 	public bool SetLocal (string key, dynamic val) {
 		if(t.GetProperty(key, FLS) is { } pr) {
 			pr.SetValue(null, val);
@@ -371,12 +371,12 @@ public record ValTypeScope : IScope {
 				return parent.SetAt(key, val, up - 1);
 			}
 		}
-		return ValError.VARIABLE_NOT_FOUND;
+		return new ValError($"Unknown variable {key}");
 	}
 	public dynamic SetNearest (string key, object val) =>
 		SetLocal(key, val) ? val :
 		parent != null ? parent.SetNearest(key, val) :
-		ValError.VARIABLE_NOT_FOUND;
+		new ValError($"Unknown variable {key}");
 }
 public record ValObjectScope : IScope {
 	public IScope parent { get; set; } = null;
@@ -391,7 +391,7 @@ public record ValObjectScope : IScope {
 			if(parent != null) 
 				return parent.GetAt(key, up - 1);
 		}
-		return ValError.VARIABLE_NOT_FOUND;
+		return new ValError($"Unknown variable {key}");
 	}
 	public bool GetLocal(string key, out dynamic res) {
 		var ot = o.GetType();
@@ -413,7 +413,7 @@ public record ValObjectScope : IScope {
 	public dynamic GetNearest (string key) =>
 			GetLocal(key, out var v) ? v :
 			parent != null ? parent.GetNearest(key) :
-			ValError.VARIABLE_NOT_FOUND;
+			new ValError($"Unknown variable {key}");
 	public bool SetLocal(string key, object val) {
 		var ot = o.GetType();
 		if(ot.GetProperty(key, FL) is { } p) {
@@ -435,12 +435,12 @@ public record ValObjectScope : IScope {
 				return parent.SetAt(key, val, up - 1);
 			}
 		}
-		return ValError.VARIABLE_NOT_FOUND;
+		return new ValError($"Unknown variable {key}");
 	}
 	public dynamic SetNearest (string key, object val) =>
 		SetLocal(key, val) ? val :
 		parent != null ? parent.SetNearest(key, val) :
-		ValError.VARIABLE_NOT_FOUND;
+		new ValError($"Unknown variable {key}");
 }
 public record ValDictScope :IScope {
 	public bool temp = false;
@@ -475,16 +475,16 @@ public record ValDictScope :IScope {
 			if(locals.TryGetValue(key, out var v))
 				return v;
 			else if(!temp)
-				return ValError.VARIABLE_NOT_FOUND;
+				return new ValError($"Unknown variable {key}");
 		}
 		return
 			parent != null ? parent.GetAt(key, temp ? up : up - 1) :
-			ValError.VARIABLE_NOT_FOUND;
+			new ValError($"Unknown variable {key}");
 	}
 	public dynamic GetNearest (string key) =>
 			locals.TryGetValue(key, out var v) ? v :
 			parent != null ? parent.GetNearest(key) :
-			ValError.VARIABLE_NOT_FOUND;
+			new ValError($"Unknown variable {key}");
 	/*
 	public dynamic Set (string key, object val, int up = -1) =>
 		up == -1 ? SetNearest(key, val) : SetAt(key, val, up);
@@ -498,13 +498,13 @@ public record ValDictScope :IScope {
 			if(parent != null) {
 				parent.SetAt(key, val, up - 1);
 			}
-			return ValError.VARIABLE_NOT_FOUND;
+			return new ValError($"Unknown variable {key}");
 		} 
 	}
 	public dynamic SetNearest (string key, object val) =>
 		locals.TryGetValue(key, out var v) ? locals[key] = val :
 		parent != null ? parent.SetNearest(key, val) :
-		ValError.VARIABLE_NOT_FOUND;
+		new ValError($"Unknown variable {key}");
 }
 public class Parser {
     int index;
@@ -1102,6 +1102,8 @@ public class ExprVarBlock : INode {
 			}
 			case ValKeyword.CLASS: {
 
+
+					return StmtDefKey.MakeClass(ctx, source_block);
 					throw new Exception("not supported");
 					switch(getResult()) {
 						case ValDictScope s:
@@ -1415,6 +1417,12 @@ public class ExprBlock : INode {
 		var stageD = new List<INode> { };
 		foreach(var s in statements) {
 			switch(s) {
+				/*
+				case StmtDefFunc df: {
+						df.Eval(f);
+						break;
+					}
+				*/
 				case StmtDefKey { value: ExprVarBlock { type: ExprSymbol { key: "class", up: -1 }, source_block: { } block } } kv: {
 						var _static = StmtDefKey.InitClassA(f, block, kv.key);
 						stageA += () => {
@@ -1830,7 +1838,7 @@ public class StmtDefKey : INode {
 	}
 	public static dynamic Init(IScope ctx, string key, dynamic val) {
 		var curr = ctx.GetLocal(key);
-		if(!ReferenceEquals(curr, ValError.VARIABLE_NOT_FOUND)) {
+		if(curr is not ValError) {
 			throw new Exception();
 		}
 		switch(val) {
@@ -1846,6 +1854,14 @@ public class StmtDefKey : INode {
 	}
 	public static void Set(IScope ctx, string key, dynamic val) {
 		ctx.SetLocal(key, val);
+	}
+
+	public static ValClass MakeClass(IScope f, ExprBlock block) {
+		var _static = (ValDictScope)block.MakeScope(f);
+		block.StagedApply(_static);
+		var c = new ValClass { name = "unknown", source_ctx = f, source_expr = block, _static = _static };
+		_static.AddClass(c);
+		return c;
 	}
 	public static ValDictScope InitClassA(IScope f, ExprBlock block, string key) {
 		var _static = (ValDictScope)block.MakeScope(f);

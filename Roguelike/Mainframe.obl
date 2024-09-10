@@ -12,12 +12,12 @@
  func(int void)
  ~
 
-
+ ~
  test: multifunc {
   2: print * "two"
   (x:int): print * x
  }
-
+ ~
 
  BufferedList(T): class {
   makeSet: HashSet-T/ctor

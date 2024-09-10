@@ -1726,7 +1726,6 @@ public class ExprMapFunc : INode {
 			}
 		}
 	}
-
 	public static IScope MakeCondCtx (IScope ctx, object item, int index) {
 		var inner_ctx = (IScope)ctx.MakeTemp();
 		inner_ctx.SetLocal("_item", item);
@@ -2172,7 +2171,9 @@ public class Tokenizer {
 					index = dest;
 					return new Token { type = TokenType.STRING, str = v };
 				}
-			case (' ' or '\r' or '\t' or '\n'): {
+			case '\t':
+				throw new Exception("Tabs are not allowed");
+			case (' ' or '\r' or '\n'): {
 					inc();
 					goto Check;
 				}

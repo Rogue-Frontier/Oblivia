@@ -66,6 +66,7 @@ var global = new ValDictScope {
 		["subf"] = Val((double a, double b) => a - b),
 		["mulf"] = Val((double a, double b) => a * b),
 		["divf"] = Val((double a, double b) => a / b),
+		["modf"] = Val((double a, double b) => Math.IEEERemainder(a, b) + b/2),
 		["minf"] = Val((double a, double b) => Math.Min(a, b)),
 		["maxf"] = Val((double a, double b) => Math.Max(a, b)),
 
@@ -142,6 +143,8 @@ var global = new ValDictScope {
 		["enum"] = ValKeyword.ENUM,
 		["get"] = ValKeyword.GET,
 		["implement"] = ValKeyword.IMPLEMENT,
+		["inherit"] = ValKeyword.INHERIT,
+		["break"] = ValKeyword.BREAK
 
 	}
 };

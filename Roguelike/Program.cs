@@ -14,7 +14,7 @@ var block = parser.NextBlock();
 
 T Val<T> (T t) => t;
 var global = new ValDictScope {
-	locals = new Dictionary<string, dynamic> {
+	locals = new () {
 		["Sf"] = typeof(Sf),
 		["ABGR"] = typeof(ABGR),
 		["TimeSpan"] = typeof(TimeSpan),
@@ -41,7 +41,9 @@ var global = new ValDictScope {
 		["uint"] = typeof(uint),
 		["double"] = typeof(double),
 		["string"] = typeof(string),
+		["str"] = typeof(string),
 		["object"] = typeof(object),
+		["obj"] = typeof(object),
 
 		["bit"] = typeof(bool),
 		["b1"] = true,
@@ -73,8 +75,8 @@ var global = new ValDictScope {
 		["sumi"] = Val((int[] a) => a.Sum()),
 
 		["not"] = Val((bool b) => !b),
-		["and"] = Val((bool a, bool b) => a && b),
-		["or"] = Val((bool a, bool b) => a || b),
+		["and"] = Val((bool[] a) => a.All(a => a)),
+		["or"] = Val((bool[] a) => a.Any(a => a)),
 
 		["nullor"] = Val((object a, object b) => a ?? b),
 

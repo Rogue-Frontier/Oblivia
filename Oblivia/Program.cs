@@ -72,7 +72,9 @@ namespace Oblivia {
         GET,
         IMPLEMENT,
         INHERIT,
-        BREAK
+        BREAK,
+        CANCEL,
+        REPEAT
     }
     public class ValEmpty {
         public static readonly ValEmpty VALUE = new();
@@ -106,7 +108,6 @@ namespace Oblivia {
         public INode expr;
         public ValTuple pars;
         public IScope parent_ctx;
-
         private void InitPars(IScope ctx) {
 			foreach(var (k, v) in pars.items) {
 				StmtDefKey.Init(ctx, k, v);
@@ -123,7 +124,7 @@ namespace Oblivia {
             var argData = new Args { };
             func_ctx.locals["_arg"] = argData;
             func_ctx.locals["_func"] = this;
-            
+
             InitPars(func_ctx);
             int ind = 0;
             foreach(var (k, v) in evalArgs().items) {
@@ -139,77 +140,25 @@ namespace Oblivia {
                     ind += 1;
                 }
             }
-            ind = 0;
-            foreach(var p in pars.items) {
-                var val = func_ctx.locals[p.key];
-                argData.list.Add(val);
-                argData.dict[p.key] = val;
+            ReadPars(func_ctx, argData);
 
-                StmtDefKey.Init(func_ctx, $"_{ind}", val);
-                ind += 1;
-            }
             var result = expr.Eval(func_ctx);
             return result;
         }
-        public dynamic CallData (IScope caller_ctx, IEnumerable<object> args) {
-            var func_ctx = new ValDictScope(parent_ctx, false);
-            var argData = new Args { };
-            func_ctx.locals["_arg"] = argData;
-			func_ctx.locals["_func"] = this;
-            InitPars(func_ctx);
-            int ind = 0;
-            foreach(var arg in args) {
-                var p = pars.items[ind];
-                var val = StmtAssignSymbol.AssignLocal(func_ctx, p.key, () => arg);
-            }
-            ind = 0;
-            foreach(var p in pars.items) {
-                var val = func_ctx.locals[p.key];
-                argData.list.Add(val);
-                argData.dict[p.key] = val;
-                StmtDefKey.Init(func_ctx, $"_{ind}", val);
-                ind += 1;
-            }
-            var result = expr.Eval(func_ctx);
-            return result;
-        }
-        public dynamic ApplyData (IScope caller_ctx, ValDictScope target_ctx, IEnumerable<object> args) {
-            var func_ctx = new ValDictScope(parent_ctx, false);
-            var argData = new Args { };
-            func_ctx.locals["_arg"] = argData;
-			func_ctx.locals["_func"] = this;
+        public dynamic CallData (IScope caller_ctx, IEnumerable<object> args) => CallFunc(caller_ctx, () => new ValTuple {
+            items = args.Select(a => ((string) null, (dynamic) a)).ToArray()
+        });
+		private void ReadPars (IScope func_ctx, Args argData) {
+			var ind = 0;
 			foreach(var p in pars.items) {
-                var val = p.val.Eval(caller_ctx);
-                StmtDefKey.Init(func_ctx, p.key, val);
-            }
-            int ind = 0;
-            foreach(var arg in args) {
-                var p = pars.items[ind];
-                var val = StmtAssignSymbol.AssignLocal(func_ctx, p.key, () => arg);
-                ind += 1;
-            }
-            ind = 0;
-            foreach(var p in pars.items) {
-                var val = func_ctx.locals[p.key];
-                argData.list.Add(val);
-                argData.dict[p.key] = val;
-                StmtDefKey.Init(func_ctx, $"_{ind}", val);
-                ind += 1;
-            }
-            var inner_ctx = new ValDictScope {
-                locals = target_ctx.locals,
-                parent = func_ctx,
-                temp = false
-            };
-            switch(expr) {
-                case ExprBlock b:
-                    return b.Apply(inner_ctx);
-                case ExprVarBlock vb:
-                default:
-                    return expr.Eval(func_ctx);
-            }
-        }
-    }
+				var val = func_ctx.GetLocal(p.key);
+				argData.list.Add(val);
+				argData.dict[p.key] = val;
+				StmtDefKey.Init(func_ctx, $"_{ind}", val);
+				ind += 1;
+			}
+		}
+	}
     public record ValType (Type type) {
         public dynamic Cast (object next, Type nextType) {
             if(type == typeof(void)) {

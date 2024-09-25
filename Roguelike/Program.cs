@@ -144,9 +144,10 @@ var global = new ValDictScope {
 		["interface"] = ValKeyword.INTERFACE,
 		["enum"] = ValKeyword.ENUM,
 		["get"] = ValKeyword.GET,
-		["implement"] = ValKeyword.IMPLEMENT,
+		["impl"] = ValKeyword.IMPLEMENT,
 		["inherit"] = ValKeyword.INHERIT,
-		["break"] = ValKeyword.BREAK
+		["break"] = ValKeyword.BREAK,
+		["cancel"] = ValKeyword.CANCEL
 
 	}
 };

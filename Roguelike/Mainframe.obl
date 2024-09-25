@@ -1,56 +1,31 @@
 {
     WB: ABGR/(White Black)%
-    ~
-    test: ?{
-        (string{}): print * args
-        (2): print * args
-        (): print * "test"
-    }
-    init: match {
-    }
-    func(a:int void)
-    func(int void)
-    ~
-
-    ~
-    test: multifunc {
-        2: print * "two"
-        (x:int): print * x
-    }
-    ~
-    BufferList(T): class {
-        makeSet: HashSet.T/ctor
-        items: makeSet!
-        toAdd: makeSet!
-        toRemove: makeSet!
-
+    p:print
+    Buf(T): class {
+        mk: get*HashSet.T/ctor!
+        v:mk i:mk o:mk items:v,
+        (_add _rem):(i o)|/Add
+        has: v/Contains
+        new(): _class {}
+        add(e:T): has.e ?+ p*"already added" ?-_add.e
+        sub(e:T): has.e ?+ _rem.e ?- p*"already removed"
+        mut(): {
+            v/UnionWith.i,
+            v/ExceptWith.o,
+            [i o]|/Clear!
+        }
+        ~
         ^(a:int): {}
         ^@(a:int): {}
-
-        new(): _class {}
-        Add(e:T): {
-            items/Contains.e ?+
-                print*"already added" ?-
-                toAdd/Add.e
-        }
-        Remove(e:T): {
-            items/Contains.e ?+
-                toRemove/Add.e ?-
-                print*"already removed"
-        }
-        Update!: {
-            items/UnionWith.toAdd,
-            items/ExceptWith.toRemove,
-            [toAdd toRemove] |/Clear!
-        }
+        ~
     }
     XY: class {
         (x y): double_from *| (0 0)
-        xi: get* int_from.x
-        yi: get* int_from.y
-        xf: get* x
-        yf: get* y
-        xyi:get* pairi(xi yi)
+        xi: get*int_from.x
+        yi: get*int_from.y
+        xf: get*x
+        yf: get*y
+        xyi:get*pairi(xi yi)
         left:   get* XY/i(subi(0 1) 0)
         right:  get* XY/i(addi(0 1) 0)
         up:     get* XY/i(0 subi(0 1))
@@ -65,24 +40,11 @@
         d: var.double
         e: val.double
         ~
-        i(x:int y:int): XY {
-            (x y):=double_from *| (_0 _1)
-        }
-        f(^x ^y): XY {
-            (x y):=_arg
-        }
-        add(rhs:XY): XY {
-            x := addf(^^^x _0/x)
-            y := addf(^^^y _0/y)
-        }
-        sub(rhs:XY): XY {
-            x := subf(^^^x _0/x)
-            y := subf(^^^y _0/y)
-        }
-        div(scale:int): XY {
-            x := divf(^^^x _0)
-            y := divf(^^^y _0)
-        }
+        i(x:int y:int):XY{(x y):=double_from*|(_0 _1)}
+        f(^x ^y):XY{(x y):=_arg}
+        add(rhs:XY):XY{x:=addf(^^^x _0/x) y:=addf(^^^y _0/y)}
+        sub(rhs:XY):XY{x:=subf(^^^x _0/x) y:=subf(^^^y _0/y)}
+        div(scale:int):XY{x := divf(^^^x _0) y := divf(^^^y _0)}
     }
     Tile: class {
         glyph: "@"@0,
@@ -106,7 +68,7 @@
         new(^pos): Chasm {
             pos := _0
         }
-        implement(Entity Env)
+        impl(Entity Env)
     }
     Floor: class {
         name: "Floor"
@@ -121,7 +83,7 @@
             pos := _0
         }
         update!: {}
-        implement(Entity Env)
+        impl(Entity Env)
     }
     Wall: class {
         name: "Wall"
@@ -130,7 +92,7 @@
         tile: get* Tile {
             (glyph front back) := (char_from.249 ABGR/(Gray Transparent)%)
         }
-        implement(Entity Env)
+        impl(Entity Env)
     }
     Msg: class {
         tiles: Row.Tile
@@ -166,42 +128,8 @@
             active := gt(^^^hp 0)
             #active := gt(_temp@0 0) #_temp@0 substitutes to ^^^hp
         }
-        implement(Entity Actor)
+        impl(Entity Actor)
     }
-    ~
-    Player: class
-        name: "Player"
-        pos: XY
-        tile: Tile
-            glyph := "@"[0]
-            front := ABGR/Magenta
-            back := ABGR/Transparent
-        active: true
-        busy: false
-        world: World
-        log: List.Msg/ctor!
-        cargo: List.Item/ctor!
-        new(^pos ^world): Player
-            pos := _0
-            world := _1
-        update!:
-            busy := false
-        move(disp:XY):
-            dest: pos/add*disp
-            attack: false
-            world/getGrid[dest/xyi] = object:o ?+ 
-                o | ?(e)
-                    not.attack ?+ break ?-
-                    e = Enemy:e ?+ 
-                        log/Add*Msg/new(Tile/arr(cat["Attack " e/name]) time world/tick)
-                        e/damage*10
-                        attack := true
-            not.attack ?+ 
-                world/hasFloor.dest ?+
-                    pos := dest
-            busy := true
-        implement(Entity Actor)
-    ~
     Player: class {
         ^(a:int): {}
         ^@(a:int): {}
@@ -227,11 +155,12 @@
             attack: false
             world/getGrid[dest/xyi] = object:o ?+
                 o | ?(e) {
-                    attack ?+ { ^^:= break }
                     e = Enemy:e ?+ {
-                        log/Add*Msg/new(Tile/arr*cat["Attack " e/name] time world/tick)
+                        log/add*Msg/new(Tile/arr*cat["Attack " e/name] time world/tick)
                         e/damage*10
                         attack := true
+
+                        ^^ := break
                     }
                 }
             not.attack ?+ {
@@ -241,7 +170,7 @@
             }
             busy := true
         }
-        implement(Entity Actor)
+        impl(Entity Actor)
     }
     Item: class {
         type: ItemType
@@ -253,57 +182,55 @@
         }
         update!: {}
         name: get* type/name
-        implement(Entity)
+        impl(Entity)
     }
     ItemType: class {
         name: string
     }
     World: class {
         tick: 0
-        entities: BufferList.Entity/new!
-        actors: BufferList.Actor/new!
+        ent: Buf.Entity/new!
+        act: Buf.Actor/new!
         updateGrid: true
         grid: ConcurrentDictionary(Pt HashSet.Entity)/ctor!
         new!: World {}
         addEntity(e:Entity): {
-            entities/Add* e
-            isActor.e ?+ actors/Add* e
+            ent/add* e
+            isActor.e ?+ act/add* e
         }
         removeEntity(e:Entity): {
-            entities/Remove(e)
-            isActor(e) ?+ actors/Remove*e
+            ent/sub*e
+            isActor(e) ?+ act/sub*e
         }
         isActor(e:Entity): e = Actor
         update!: {
-            actors/items | ?(a)
+            act/items | ?(a)
                 not(a/active) ?+
                     removeEntity.a ?-
                     a/update!
-            entities/Update!
-            actors/Update!
-            updateGrid := b1
+            forceUpdate!
             tick := addi(_ 1)
         }
         forceUpdate!: {
-            entities/Update!
-            actors/Update!
+            ent/mut!
+            act/mut!
             updateGrid := true
         }
         getGrid: get* {
             not.updateGrid ?+ { ^^ := grid }
             grid/Clear!
             #print* grid/Count
-            entities/items | ?(e) grid/GetOrAdd(e/pos/xyi HashSet.Entity/ctor!)/Add*e
+            ent/items | ?(e) grid/GetOrAdd(e/pos/xyi HashSet.Entity/ctor!)/Add*e
             updateGrid := false
             ^: grid
         }
-        hasType(type p:XY): {
+        hasTile(type p:XY): {
             getGrid[p/xyi] = object:loc ?+ 
                 loc | ?(e) (e = type) ?+ { ^^^ := true }
             ^: false
         }
-        hasFloor(p:XY): hasType(Floor p)
-        hasWall(p:XY): hasType(Wall p)
+        hasFloor(p:XY): hasTile(Floor p)
+        hasWall(p:XY): hasTile(Wall p)
     }
     time: double/Parse."0"
     move: false
@@ -504,7 +431,6 @@
             ind: 0
             items | ?(it) {
                 y := addi(_ 1)
-                
                 sf_ui/Print *| [
                     (addi(x 2) y it/tile/(glyph front back)%),
                     (addi(x 4) y it/name WB),
@@ -513,7 +439,7 @@
                 ind := addi(_ 1)
             }
         }
-        implement(Menu)
+        impl(Menu)
     }
     TargetMenu: class {
         allowSpace: false
@@ -578,7 +504,7 @@
                     ind := addi(ind 1)
                 }
         }
-        implement(Menu)
+        impl(Menu)
     }
     ABC: "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 }

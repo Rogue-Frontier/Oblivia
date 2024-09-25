@@ -46,14 +46,14 @@ namespace Oblivia {
     }
     public record ValConstructor (Type t) { }
     public record ValInstanceMethod (object src, string key) {
-        public object Call (dynamic[] data) {
+        public object Call (object[] data) {
             var tp = data.Select(d => (d as object).GetType()).ToArray();
             var fl = BindingFlags.Instance | BindingFlags.Public;
             return src.GetType().GetMethod(key, fl, tp).Invoke(src, data);
         }
     };
     public record ValStaticMethod (Type src, string key) {
-        public object Call (dynamic[] data) {
+        public object Call (object[] data) {
             var tp = data.Select(d => (d as object).GetType()).ToArray();
             var fl = BindingFlags.Static | BindingFlags.Public;
             return src.GetMethod(key, fl, tp).Invoke(src, data);
@@ -75,7 +75,7 @@ namespace Oblivia {
         INHERIT,
         BREAK,
         CANCEL,
-        RET,
+        RETURN,
         REPEAT
     }
     public class ValEmpty {
@@ -87,12 +87,12 @@ namespace Oblivia {
 
     public record ExprGetter : INode {
         public INode expr;
-        public dynamic Eval (IScope ctx) => new ValGetter { ctx = ctx, expr = expr };
+        public object Eval (IScope ctx) => new ValGetter { ctx = ctx, expr = expr };
     }
     public record ValGetter {
         public INode expr;
         public IScope ctx;
-        public dynamic Eval () => expr.Eval(ctx);
+        public object Eval () => expr.Eval(ctx);
     }
 
 	public record ValLazy {
@@ -100,16 +100,16 @@ namespace Oblivia {
 		public IScope ctx;
 
         public bool done = false;
-        public dynamic value;
-		public dynamic Eval () => expr.Eval(ctx);
+        public object value;
+		public object Eval () => expr.Eval(ctx);
 	}
 
 	public record Args {
-        public dynamic this[string s] => dict[s];
-        public dynamic this[int s] => list[s];
+        public object this[string s] => dict[s];
+        public object this[int s] => list[s];
         public int Length => list.Count;
-        public Dictionary<string, dynamic> dict = new();
-        public List<dynamic> list = new();
+        public Dictionary<string, object> dict = new();
+        public List<object> list = new();
     }
     public record ValFunc {
         public INode expr;
@@ -120,13 +120,13 @@ namespace Oblivia {
 				StmtDefKey.Init(ctx, k, v);
 			}
 		}
-        public dynamic CallPars (IScope caller_ctx, ExprTuple pars) {
+        public object CallPars (IScope caller_ctx, ExprTuple pars) {
             return CallFunc(caller_ctx, () => pars.EvalTuple(caller_ctx));
         }
-        public dynamic CallArgs (IScope caller_ctx, ValTuple args) {
+        public object CallArgs (IScope caller_ctx, ValTuple args) {
             return CallFunc(caller_ctx, () => args);
         }
-        public dynamic CallFunc (IScope caller_ctx, Func<ValTuple> evalArgs) {
+        public object CallFunc (IScope caller_ctx, Func<ValTuple> evalArgs) {
             var func_ctx = new ValDictScope(parent_ctx, false);
             var argData = new Args { };
             func_ctx.locals["_arg"] = argData;
@@ -152,8 +152,8 @@ namespace Oblivia {
             var result = expr.Eval(func_ctx);
             return result;
         }
-        public dynamic CallData (IScope caller_ctx, IEnumerable<object> args) => CallFunc(caller_ctx, () => new ValTuple {
-            items = args.Select(a => ((string) null, (dynamic) a)).ToArray()
+        public object CallData (IScope caller_ctx, IEnumerable<object> args) => CallFunc(caller_ctx, () => new ValTuple {
+            items = args.Select(a => ((string) null, (object) a)).ToArray()
         });
 		private void ReadPars (IScope func_ctx, Args argData) {
 			var ind = 0;
@@ -167,7 +167,7 @@ namespace Oblivia {
 		}
 	}
     public record ValType (Type type) {
-        public dynamic Cast (object next, Type nextType) {
+        public object Cast (object next, Type nextType) {
             if(type == typeof(void)) {
                 return ValEmpty.VALUE;
             }
@@ -207,7 +207,7 @@ namespace Oblivia {
             r.AddClass(this);
             return r;
         }
-        public dynamic VarBlock (IScope ctx, ExprBlock block) {
+        public object VarBlock (IScope ctx, ExprBlock block) {
             var scope = MakeInstance();
             var r = block.Apply(new ValDictScope { locals = scope.locals, parent = ctx, temp = false });
             return r;
@@ -215,23 +215,23 @@ namespace Oblivia {
     }
     public interface IScope {
         public IScope parent { get; }
-        public dynamic Get (string key, int up = -1) =>
+        public object Get (string key, int up = -1) =>
          up == -1 ? GetNearest(key) : GetAt(key, up);
-        public dynamic GetLocal (string key) => GetAt(key, 1);
-        public dynamic GetAt (string key, int up);
-        public dynamic GetNearest (string key);
-        public dynamic Set (string key, object val, int up = -1) =>
+        public object GetLocal (string key) => GetAt(key, 1);
+        public object GetAt (string key, int up);
+        public object GetNearest (string key);
+        public object Set (string key, object val, int up = -1) =>
          up == -1 ? SetNearest(key, val) : SetAt(key, val, up);
-        public dynamic SetLocal (string key, dynamic val) => SetAt(key, val, 1);
-        public dynamic SetAt (string key, object val, int up);
-        public dynamic SetNearest (string key, object val);
+        public object SetLocal (string key, object val) => SetAt(key, val, 1);
+        public object SetAt (string key, object val, int up);
+        public object SetNearest (string key, object val);
         public IScope Copy (IScope parent);
         public ValDictScope MakeTemp () => new ValDictScope {
             locals = { },
             parent = this,
             temp = true
         };
-        public ValDictScope MakeTemp (dynamic _) => new ValDictScope {
+        public ValDictScope MakeTemp (object _) => new ValDictScope {
             locals = { ["_"] = _ },
             parent = this,
             temp = true
@@ -241,7 +241,7 @@ namespace Oblivia {
         public IScope parent { get; set; } = null;
         public ValTuple t;
         public IScope Copy (IScope parent) => new ValTupleScope { parent = parent, t = t };
-        public dynamic GetAt (string key, int up) {
+        public object GetAt (string key, int up) {
             if(up == 1) {
                 if(GetLocal(key, out var v))
                     return v;
@@ -251,7 +251,7 @@ namespace Oblivia {
             }
             return new ValError($"Unknown variable {key}");
         }
-        public bool GetLocal (string key, out dynamic res) {
+        public bool GetLocal (string key, out object res) {
             foreach(var (k, v) in t.items) {
                 if(k == key) {
                     res = v;
@@ -261,11 +261,11 @@ namespace Oblivia {
             res = null;
             return false;
         }
-        public dynamic GetNearest (string key) =>
+        public object GetNearest (string key) =>
           GetLocal(key, out var v) ? v :
           parent != null ? parent.GetNearest(key) :
           new ValError($"Unknown variable {key}");
-        public bool SetLocal (string key, dynamic val) {
+        public bool SetLocal (string key, object val) {
             for(int i = 0; i < t.items.Length; i++) {
                 var it = t.items[i];
                 if(it.key == key) {
@@ -274,7 +274,7 @@ namespace Oblivia {
             }
             return false;
         }
-        public dynamic SetAt (string key, object val, int up) {
+        public object SetAt (string key, object val, int up) {
             if(up == 1) {
                 if(SetLocal(key, val))
                     return val;
@@ -285,7 +285,7 @@ namespace Oblivia {
             }
             return new ValError($"Unknown variable {key}");
         }
-        public dynamic SetNearest (string key, object val) =>
+        public object SetNearest (string key, object val) =>
          SetLocal(key, val) ? val :
          parent != null ? parent.SetNearest(key, val) :
          new ValError($"Unknown variable {key}");
@@ -294,7 +294,7 @@ namespace Oblivia {
         public IScope parent { get; set; } = null;
         public Type t;
         public IScope Copy (IScope parent) => new ValTypeScope { parent = parent, t = t };
-        public dynamic GetAt (string key, int up) {
+        public object GetAt (string key, int up) {
             if(up == 1) {
                 if(GetLocal(key, out var v))
                     return v;
@@ -305,7 +305,7 @@ namespace Oblivia {
             return new ValError($"Unknown variable {key}");
         }
         BindingFlags FLS = BindingFlags.Static | BindingFlags.Public;
-        public bool GetLocal (string key, out dynamic res) {
+        public bool GetLocal (string key, out object res) {
             if(key == "ctor") {
                 res = new ValConstructor(t);
                 return true;
@@ -325,11 +325,11 @@ namespace Oblivia {
             res = null;
             return false;
         }
-        public dynamic GetNearest (string key) =>
+        public object GetNearest (string key) =>
           GetLocal(key, out var v) ? v :
           parent != null ? parent.GetNearest(key) :
           new ValError($"Unknown variable {key}");
-        public bool SetLocal (string key, dynamic val) {
+        public bool SetLocal (string key, object val) {
             if(t.GetProperty(key, FLS) is { } pr) {
                 pr.SetValue(null, val);
                 return true;
@@ -340,7 +340,7 @@ namespace Oblivia {
             }
             return false;
         }
-        public dynamic SetAt (string key, object val, int up) {
+        public object SetAt (string key, object val, int up) {
             if(up == 1) {
                 if(SetLocal(key, val))
                     return val;
@@ -351,7 +351,7 @@ namespace Oblivia {
             }
             return new ValError($"Unknown variable {key}");
         }
-        public dynamic SetNearest (string key, object val) =>
+        public object SetNearest (string key, object val) =>
          SetLocal(key, val) ? val :
          parent != null ? parent.SetNearest(key, val) :
          new ValError($"Unknown variable {key}");
@@ -361,7 +361,7 @@ namespace Oblivia {
         public object o;
         BindingFlags FL = BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic;
         public IScope Copy (IScope parent) => new ValObjectScope { parent = parent, o = o };
-        public dynamic GetAt (string key, int up) {
+        public object GetAt (string key, int up) {
             if(up == 1) {
                 if(GetLocal(key, out var v))
                     return v;
@@ -371,7 +371,7 @@ namespace Oblivia {
             }
             return new ValError($"Unknown variable {key}");
         }
-        public bool GetLocal (string key, out dynamic res) {
+        public bool GetLocal (string key, out object res) {
             var ot = o.GetType();
             if(ot.GetProperty(key, FL) is { } p) {
                 res = p.GetValue(o);
@@ -388,7 +388,7 @@ namespace Oblivia {
             res = null;
             return false;
         }
-        public dynamic GetNearest (string key) =>
+        public object GetNearest (string key) =>
           GetLocal(key, out var v) ? v :
           parent != null ? parent.GetNearest(key) :
           new ValError($"Unknown variable {key}");
@@ -404,7 +404,7 @@ namespace Oblivia {
             }
             return false;
         }
-        public dynamic SetAt (string key, object val, int up) {
+        public object SetAt (string key, object val, int up) {
             if(up == 1) {
                 if(SetLocal(key, val))
                     return val;
@@ -415,7 +415,7 @@ namespace Oblivia {
             }
             return new ValError($"Unknown variable {key}");
         }
-        public dynamic SetNearest (string key, object val) =>
+        public object SetNearest (string key, object val) =>
          SetLocal(key, val) ? val :
          parent != null ? parent.SetNearest(key, val) :
          new ValError($"Unknown variable {key}");
@@ -455,10 +455,10 @@ namespace Oblivia {
         */
         public IScope Copy (IScope parent) => new ValDictScope { locals = locals, parent = parent, temp = false };
         /*
-        public dynamic Get(string key, int up = -1) =>
+        public object Get(string key, int up = -1) =>
          up == -1 ? GetNearest(key) : GetAt(key, up);
         */
-        public dynamic GetAt (string key, int up) {
+        public object GetAt (string key, int up) {
             if(up == 1) {
                 if(locals.TryGetValue(key, out var v))
                     return v;
@@ -469,15 +469,15 @@ namespace Oblivia {
              parent != null ? parent.GetAt(key, temp ? up : up - 1) :
              new ValError($"Unknown variable {key}");
         }
-        public dynamic GetNearest (string key) =>
+        public object GetNearest (string key) =>
           locals.TryGetValue(key, out var v) ? v :
           parent != null ? parent.GetNearest(key) :
           new ValError($"Unknown variable {key}");
         /*
-        public dynamic Set (string key, object val, int up = -1) =>
+        public object Set (string key, object val, int up = -1) =>
          up == -1 ? SetNearest(key, val) : SetAt(key, val, up);
         */
-        public dynamic SetAt (string key, object val, int up) {
+        public object SetAt (string key, object val, int up) {
             if(temp) {
                 return parent.SetAt(key, val, up);
             } else if(up == 1) {
@@ -489,7 +489,7 @@ namespace Oblivia {
                 return new ValError($"Unknown variable {key}");
             }
         }
-        public dynamic SetNearest (string key, object val) =>
+        public object SetNearest (string key, object val) =>
          locals.TryGetValue(key, out var v) ? locals[key] = val :
          parent != null ? parent.SetNearest(key, val) :
          new ValError($"Unknown variable {key}");
@@ -913,6 +913,9 @@ namespace Oblivia {
                 case TokenType.SHOUT:
                     inc();
                     return new ExprGetter { expr = NextExpression() };
+                case TokenType.SWIRL:
+                    inc();
+                    return null;
                 case TokenType.COMMA:
                     inc();
                     goto Read;
@@ -1077,7 +1080,7 @@ namespace Oblivia {
     }
     public class ExprSpread : INode {
         public INode value;
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var val = value.Eval(ctx);
             switch(val) {
                 case ValTuple vt:
@@ -1093,8 +1096,8 @@ namespace Oblivia {
         }
     }
     public class ValSpread {
-        public dynamic value;
-        public void SpreadTuple (string key, List<(string key, dynamic val)> it) {
+        public object value;
+        public void SpreadTuple (string key, List<(string key, object val)> it) {
             switch(value) {
                 case ValTuple vrt:
                     vrt.Spread(it);
@@ -1106,7 +1109,7 @@ namespace Oblivia {
                     break;
             }
         }
-        public void SpreadArray (List<dynamic> items) {
+        public void SpreadArray (List<object> items) {
             switch(value) {
                 case ValTuple vrt:
                     items.AddRange(vrt.items.Select(i => i.val));
@@ -1130,8 +1133,8 @@ namespace Oblivia {
         public ExprBlock source_block;
         public XElement ToXML () => new("VarBlock", new XAttribute("type", type), source_block.ToXML());
         public string Source => $"{type} {source_block.Source}";
-        public dynamic MakeScope (ValDictScope ctx) => source_block.MakeScope(ctx);
-        public dynamic Eval (IScope ctx) {
+        public object MakeScope (ValDictScope ctx) => source_block.MakeScope(ctx);
+        public object Eval (IScope ctx) {
             var getResult = () => (object)source_block.Eval(ctx);
             var t = type.Eval(ctx);
 
@@ -1160,6 +1163,9 @@ namespace Oblivia {
                 case ValKeyword.GET: {
                         return new ValGetter { ctx = ctx, expr = source_block };
                     }
+                case ValKeyword.RETURN: {
+                        return new ValReturn(getResult(), 1);
+                    }
                 case ValKeyword.CLASS: {
                         return StmtDefKey.MakeClass(ctx, source_block);
                         throw new Exception("not supported");
@@ -1179,7 +1185,7 @@ namespace Oblivia {
                         throw new Exception("Object expected");
                     }
                 case ValKeyword.ENUM: {
-                        var locals = new Dictionary<string, dynamic> { };
+                        var locals = new Dictionary<string, object> { };
                         var rhs = getResult();
                         return new ValDictScope { locals = [], parent = ctx, temp = false };
 					}
@@ -1196,7 +1202,7 @@ namespace Oblivia {
         public INode rhs;
 
         public bool invert;
-        public dynamic Eval (IScope scope) {
+        public object Eval (IScope scope) {
             var l = lhs.Eval(scope);
             var r = rhs.Eval(scope);
             var b = Equals(l, r);
@@ -1210,7 +1216,7 @@ namespace Oblivia {
         public INode lhs;
         public INode rhs;
         public string? key;
-        public dynamic Eval(IScope scope) {
+        public object Eval(IScope scope) {
             var l = lhs.Eval(scope);
             var r = rhs.Eval(scope);
 			scope.SetLocal("_lhs", l);
@@ -1225,7 +1231,7 @@ namespace Oblivia {
             }
         }
 
-        public bool Is(dynamic l, dynamic r) {
+        public bool Is(object l, object r) {
 			switch(l, r) {
 				case (var v, Type t): {
 						if(v is object o && t.IsAssignableFrom(o.GetType())) {
@@ -1262,7 +1268,7 @@ namespace Oblivia {
     public class ExprCond : INode {
         public INode item;
         public INode cond;
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var l = item.Eval(ctx);
             var inner_ctx = ctx.MakeTemp(l);
             inner_ctx.locals["_var"] = item;
@@ -1280,7 +1286,7 @@ namespace Oblivia {
         public INode positive;
         public INode negative;
         public string Source => $"{condition.Source} ?+ {positive.Source}{(negative != null ? $" ?- {negative.Source}" : $"")}";
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var cond = condition.Eval(ctx);
             switch(cond) {
                 case true:
@@ -1298,7 +1304,7 @@ namespace Oblivia {
     public class ExprLoop : INode {
         public INode condition;
         public INode positive;
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             object r = ValEmpty.VALUE;
             Step:
             var cond = condition.Eval(ctx);
@@ -1317,11 +1323,13 @@ namespace Oblivia {
         public INode expr;
         public ExprTuple args;
         //public string Source => $"{expr.Source}{(args.Count > 1 ? $"({string.Join(", ", args.Select(a => a.Source))})" : args.Count == 1 ? $"*{args.Single().Source}" : $"!")}";
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var f = expr.Eval(ctx);
             switch(f) {
                 case ValKeyword.GET:
                     return new ValGetter { ctx = ctx, expr = args.items.Single().value };
+                case ValKeyword.RETURN:
+					return new ValReturn(args.EvalExpression(ctx), 1);
                 case ValKeyword.IMPLEMENT: {
                         var vds = ctx as ValDictScope;
                         var arg = args.EvalTuple(ctx);
@@ -1463,10 +1471,8 @@ namespace Oblivia {
     public class ExprApply : INode {
         public INode lhs;
         public INode rhs;
-
-
         public bool local = false;
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var s = lhs.Eval(ctx);
             switch(s) {
                 case IScope sc: {
@@ -1510,7 +1516,7 @@ namespace Oblivia {
     public class StmtReturn : INode {
         public int up = 1;
         public INode val;
-        public dynamic Eval (IScope ctx) =>
+        public object Eval (IScope ctx) =>
          new ValReturn(val.Eval(ctx), up);
     }
     public class ExprBlock : INode {
@@ -1519,7 +1525,7 @@ namespace Oblivia {
         public string Source => $"{{{string.Join(", ", statements.Select(i => i.Source))}}}";
         public bool obj => _obj ??= statements.Any(s => s is StmtDefFunc or StmtDefKey or StmtDefTuple);
         public bool? _obj;
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             if(statements.Count == 0) {
                 return ValEmpty.VALUE;
             }
@@ -1619,7 +1625,7 @@ namespace Oblivia {
         public string key;
         public XElement ToXML () => new("Symbol", new XAttribute("key", key), new XAttribute("level", $"{up}"));
         public string Source => $"{new string('^', up)}{key}";
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var r = ctx.Get(key, up);
 			return r switch {
 				ValGetter vg => vg.Eval(),
@@ -1629,7 +1635,7 @@ namespace Oblivia {
     }
     public class ExprSelf : INode {
         public int up;
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             for(int i = 1; i < up; i++)
                 ctx = ctx.parent;
             return ctx;
@@ -1638,7 +1644,7 @@ namespace Oblivia {
     public class ExprGet : INode {
         public INode src;
         public string key;
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var source = src.Eval(ctx);
             switch(source) {
                 case ValDictScope s: {
@@ -1669,7 +1675,7 @@ namespace Oblivia {
     public class ExprIndex : INode {
         public INode src;
         public List<INode> index;
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var call = src.Eval(ctx);
             switch(call) {
                 case IDictionary d: {
@@ -1719,19 +1725,19 @@ namespace Oblivia {
         public object value;
         public XElement ToXML () => new("Value", new XAttribute("value", value));
         public string Source => $"{value}";
-        public dynamic Eval (IScope ctx) => value;
+        public object Eval (IScope ctx) => value;
     }
     public class ExprCondSeq : INode {
         public INode type;
         public INode filter;
 
         public List<(INode cond, INode yes, INode no)> items;
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var f = filter.Eval(ctx);
             var lis = (List<object>)(
              type == null ?
               new List<object> { } :
-              (typeof(List<>).MakeGenericType(type.Eval(ctx)) as Type).GetConstructor([]).Invoke([])
+              (typeof(List<>).MakeGenericType((Type)type.Eval(ctx)) as Type).GetConstructor([]).Invoke([])
               );
             foreach(var (cond, yes, no) in items) {
                 var c = cond.Eval(ctx);
@@ -1778,7 +1784,7 @@ namespace Oblivia {
     public class ExprPatternMatch : INode {
         public INode item;
         public List<(INode cond, INode yes)> branches;
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var subject = item.Eval(ctx);
             var inner_ctx = ctx.MakeTemp(subject);
             inner_ctx.locals["_default"] = subject;
@@ -1804,7 +1810,7 @@ namespace Oblivia {
         public INode type;
         public XElement ToXML () => new("Map", src.ToXML(), map.ToXML());
         public string Source => $"{src.Source} | {map.Source}";
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var seq = src.Eval(ctx);
 			switch(seq) {
                 case ValEmpty:
@@ -1824,7 +1830,7 @@ namespace Oblivia {
                     throw new Exception("Sequence expected");
             }
             object Map (dynamic seq) {
-                var result = new List<dynamic>();
+                var result = new List<object>();
                 var f = map.Eval(ctx);
                 int index = 0;
                 foreach(var item in seq) {
@@ -1863,15 +1869,15 @@ namespace Oblivia {
                 Done:
                 return Convert(result);
             }
-            IEnumerable<dynamic> Convert (List<dynamic> items) {
+            IEnumerable<dynamic> Convert (List<object> items) {
                 var r = items.ToArray();
                 switch(type) {
                     case null:
                         return r;
                     default: {
-                            var arr = Array.CreateInstance(type.Eval(ctx), r.Length);
+                            var arr = Array.CreateInstance((Type)type.Eval(ctx), r.Length);
                             Array.Copy(r, arr, r.Length);
-                            return arr;
+                            return (dynamic)arr;
                         }
                 }
             }
@@ -1900,7 +1906,7 @@ namespace Oblivia {
         public bool local = false;
         public XElement ToXML () => new("Map", src.ToXML(), map.ToXML());
         public string Source => $"{src.Source} | {map.Source}";
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var lhs = src.Eval(ctx);
             switch(lhs) {
                 case ValEmpty:
@@ -1912,7 +1918,7 @@ namespace Oblivia {
                 case ValTuple vt:
 
                     int index = 0;
-                    List<(string key, dynamic val)> items = [];
+                    List<(string key, object val)> items = [];
                     foreach(var (key, val) in vt.items) {
                         var inner_ctx = ExprMapFunc.MakeCondCtx(ctx, val, index);
                         var r = map.Eval(ExprMapFunc.MakeMapCtx(inner_ctx, val));
@@ -1929,7 +1935,7 @@ namespace Oblivia {
                     throw new Exception("Sequence expected");
             }
             object Map (dynamic seq) {
-                var result = new List<dynamic>();
+                var result = new List<object>();
                 int index = 0;
                 foreach(var item in seq) {
                     var inner_ctx = ExprMapFunc.MakeCondCtx(ctx, item, index);
@@ -1958,7 +1964,7 @@ namespace Oblivia {
                 Done:
                 return Convert(result);
             }
-            object Convert (List<dynamic> items) {
+            object Convert (List<object> items) {
                 var r = items.ToArray();
                 if(type != null) {
                     var t = (Type)type.Eval(ctx);
@@ -1975,7 +1981,7 @@ namespace Oblivia {
         public INode value;
         public XElement ToXML () => new("KeyVal", new XAttribute("key", key), value.ToXML());
         public string Source => $"{key}:{value?.Source ?? "null"}";
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var val = value.Eval(ctx);
             switch(val) {
                 case ValError ve:
@@ -2043,7 +2049,7 @@ namespace Oblivia {
         public INode result;
         //public XElement ToXML () => new("ExprFunc", [.. pars.Select(i => i.ToXML()), result.ToXML()]);
         //public string Source => $"@({string.Join(", ", pars.Select(p => p.Source))}) {result.Source}";
-        public dynamic Eval (IScope ctx) =>
+        public object Eval (IScope ctx) =>
          new ValFunc {
              expr = result,
              pars = pars.EvalTuple(ctx),
@@ -2053,8 +2059,8 @@ namespace Oblivia {
     public class ExprSeq : INode {
         public INode type;
         public List<INode> items;
-        public dynamic Eval (IScope ctx) {
-            List<dynamic> l = [];
+        public object Eval (IScope ctx) {
+            List<object> l = [];
             foreach(var it in items) {
                 var r = it.Eval(ctx);
                 switch(r) {
@@ -2084,7 +2090,7 @@ namespace Oblivia {
 		public static ExprTuple SpreadExpr (INode n) => SingleExpr(new ExprSpread { value = n });
 		public static ExprTuple SpreadVal (object v) => SpreadExpr(new ExprVal { value = v });
 		public ValTuple EvalTuple (IScope ctx) {
-            var it = new List<(string key, dynamic val)> { };
+            var it = new List<(string key, object val)> { };
             /*
             var t = new ValTuple { items = it };
 			var s = ctx.MakeTemp();
@@ -2107,8 +2113,20 @@ namespace Oblivia {
             return new ValTuple { items = it.ToArray() };
             //return t;
         }
-        public dynamic Eval (IScope ctx) => EvalTuple(ctx);
-        public void Spread (IScope ctx, List<(string key, dynamic val)> it) {
+        public object Eval (IScope ctx) => EvalTuple(ctx);
+
+
+        public object EvalExpression (IScope ctx) {
+            var a = EvalTuple(ctx);
+            switch(a.Length) {
+                case 0: return ValEmpty.VALUE;
+                case 1:
+                    return a.items.Single().val;
+                default:
+                    return a;
+            }
+        }
+        public void Spread (IScope ctx, List<(string key, object val)> it) {
             foreach(var (key, val) in items) {
                 it.Add((key, val.Eval(ctx)));
             }
@@ -2131,10 +2149,11 @@ namespace Oblivia {
          };
     }
     public class ValTuple : INode {
-        public (string key, dynamic val)[] items;
-        public dynamic[] vals => items.Select(i => i.val).ToArray();
-        public dynamic Eval (IScope ctx) => this;
-        public void Spread (List<(string key, dynamic val)> it) {
+        public int Length => items.Length;
+        public (string key, object val)[] items;
+        public object[] vals => items.Select(i => i.val).ToArray();
+        public object Eval (IScope ctx) => this;
+        public void Spread (List<(string key, object val)> it) {
             foreach(var (key, val) in items) {
                 it.Add((key, val));
             }
@@ -2158,7 +2177,7 @@ namespace Oblivia {
         public INode value;
         //public XElement ToXML () => new("DefineFunc", [new XAttribute("key", key), ..pars.Select(i => i.ToXML()), value.ToXML()]);
         //public string Source => $"{key}({string.Join(", ",pars.Select(p => p.Source))}): {value.Source}";
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             Define(ctx);
             return ValEmpty.VALUE;
         }
@@ -2185,7 +2204,7 @@ namespace Oblivia {
     public class StmtDefTuple : INode {
         public string[] symbols;
         public INode value;
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var val = value.Eval(ctx);
             switch(val) {
                 case ValTuple vt:
@@ -2204,7 +2223,7 @@ namespace Oblivia {
     public class StmtAssignTuple : INode {
         public ExprSymbol[] symbols;
         public INode value;
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var val = value.Eval(ctx);
             switch(val) {
                 case ValTuple vt:
@@ -2245,7 +2264,7 @@ namespace Oblivia {
         public INode value;
         XElement ToXML () => new("Reassign", symbol.ToXML(), value.ToXML());
         public string Source => $"{symbol.Source} := {value.Source}";
-        public dynamic Eval (IScope ctx) {
+        public object Eval (IScope ctx) {
             var curr = ctx.Get(symbol.key, symbol.up);
             var inner_ctx = (ValDictScope) ctx.MakeTemp(curr);
             inner_ctx.locals["_curr"] = curr;
@@ -2323,7 +2342,7 @@ namespace Oblivia {
     public interface INode {
         XElement ToXML () => new(GetType().Name);
         String Source => "";
-        dynamic Eval (IScope ctx);
+        object Eval (IScope ctx);
     }
     public class Tokenizer {
         string src;

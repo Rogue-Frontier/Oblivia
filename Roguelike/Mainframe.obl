@@ -1,20 +1,17 @@
 {
+    #import("test.obl")
     WB:ABGR/(White Black)%
     p:print
 
     Buf(T):class {
         mk:!HashSet.T/ctor!
         v:mk i:mk o:mk items:v,
-        (_add _rem):(i o)|/Add
+        (_add _sub):(i o)|/Add
         has:v/Contains
         new():_class{}
         add(e:T):has.e ?+ p*"already added" ?-_add.e
-        sub(e:T):has.e ?+ _rem.e ?- p*"already removed"
-        mut():{
-            v/UnionWith.i,
-            v/ExceptWith.o,
-            [i o]|/Clear!
-        }
+        sub(e:T):has.e ?+ _sub.e ?- p*"already removed"
+        mut():{v/UnionWith.i, v/ExceptWith.o, [i o]|/Clear!}
         ~
         ^(a:int):{}
         ^@(a:int):{}
@@ -39,7 +36,7 @@
             get:null 
             set:_ null
         )
-        left:set* { x:=_arg }
+        left:set*{x:=_arg}
         d:var.double
         e:val.double
         ~
@@ -48,10 +45,7 @@
         glyph:"@"@0,
         (front back):ABGR/(Magenta Black),
         arr(str:string):str|?(c:char) Tile{(glyph front back):=(c ABGR/(White Black)%)}
-        this:^$
-        print(sf:Sf pos:XY):{
-            sf/PrintChar(pos/(xi yi)% this/(glyph front back)%)
-        }
+        print(sf:Sf pos:XY):{sf/PrintChar(pos/(xi yi)% ^^^(glyph front back)%)}
     }
     Entity:interface { active:bool }
     Env:interface {}
@@ -91,13 +85,21 @@
         text:!tiles|/glyph
     }
     Enemy:class {
-        this:!^$
         hp:100 active:true name:"Enemy" pos:XY world:World
         tile:Tile{(glyph front back):=("E"@0 ABGR/(Red Transparent)%)}
         new(^pos ^world):Enemy{(pos world):=_arg}
-        update!:{not.active ?+ world/removeEntity*this}
-        damage(^hp):{^^^hp:=subi(_ _0) active:=gt(this/hp 0)
+        update!:{not.active ?+ world/rem*this}
+        damage(^hp):{^^^hp:=subi(_ _0) active:=gt(^^^hp 0)
             #active:=gt(_temp@0 0) #_temp@0 substitutes to ^^^hp
+        }
+        impl(Entity Actor)
+    }
+    Roachbot: class {
+        hp:100 active:true name:"Roachbot" pos:XY world:World
+        tile:Tile{(glyph front back):=("r"@0 ABGR/(Brown Transparent)%)}
+        new(^pos ^world):Enemy{(pos world):=_arg}
+        update!:{
+            not.active ?+ world/rem*this
         }
         impl(Entity Actor)
     }
@@ -141,34 +143,29 @@
     ItemType:class{name:string}
     World:class {
         B(T):Buf.T/new!
-        ent:B.Entity   act:B.Actor
+        ent:B.Entity
+        act:B.Actor
         tick:0
         needUpdate:true
         grid:ConcurrentDictionary(Pt HashSet.Entity)/ctor!
         new!:World {}
-        addEntity(e:Entity):{
+        add(e:Entity):{
             ent/add*e
             isActor.e ?+ act/add*e
         }
-        removeEntity(e:Entity):{
+        rem(e:Entity):{
             ent/sub*e
             isActor(e) ?+ act/sub*e
         }
         isActor(e:Entity):e=Actor
         update!:{
-            act/items|?(a)
-                not(a/active) ?+
-                    removeEntity.a ?-
-                    a/update!
+            act/v|?(a) not(a/active) ?+ rem.a ?- a/update!
             mut!
             tick:=addi(_ 1)
         }
-        mut!:{
-            (ent act)|/mut!
-            needUpdate:=true
-        }
+        mut!:{(ent act)|/mut! needUpdate:=true}
         getGrid:! {
-            not.needUpdate ?+ { ^^:=grid }
+            not.needUpdate ?+ ret*grid
             grid/Clear!
             #print* grid/Count
             ent/items|?(e) grid/GetOrAdd(e/pos/xyi HashSet.Entity/ctor!)/Add*e
@@ -198,7 +195,7 @@
         print * cat*[1 2, [:int 3 4]%]
         print * [1 2 3] | ?(i) i =+ 1 ?+ i
         world:=World/new!
-        add:world/addEntity
+        add:world/add
         range(0 30)|?(y:int)
             range(0 30)|?(x:int)
                 add*Floor/new*XY/i(x y)
@@ -226,29 +223,23 @@
         [world/getGrid]|?(g) g/Keys|?(p) g@p|?(e) e/tile/print(sf center/add*e/pos/sub*camera)
         sf_ui/Print(1 1 cat["tick:" world/tick] WB)
         invMenu:{
-            x:0 y:subi(sf/GridHeight 64) w:32 h:32
-            down:!{y:=addi(_ 1)}
+            x:0 y:subi(sf/GridHeight 64) w:32 h:32 down:!{y:=addi(_ 1)}
             Sf/DrawRect(sf_ui x y w h border) down
             sf_ui/Print(addi(x 2) y "Inventory" WB) down
-            Sf/DrawRect(sf_ui x y w 1 border)
+            Sf/DrawRect(sf_ui x y w 1 border) down
             plr/cargo|?(i:Item) {
-                down
                 i/tile/print(sf_ui XY/i(2 y))
-                sf_ui/Print(addi(x 4) y i/name WB)
+                sf_ui/Print(addi(x 4) y i/name WB) down
             }
         }
         log:{
-            x:0 y:subi(sf/GridHeight 32) w:64 h:32
-            down:!{y:=addi(_ 1)}
+            x:0 y:subi(sf/GridHeight 32) w:64 h:32 down:!{y:=addi(_ 1)}
             Sf/DrawRect(sf_ui x y w h border) down
             sf_ui/Print(addi(x 2) y "Log" WB) down
             Sf/DrawRect(sf_ui x y w 1 border) down
             plr/log|?(msg:Msg) {
                 x:2
-                msg/tiles|?(t:Tile) {
-                    t/print(sf_ui XY/i(x y))
-                    x:=addi(_ 1)
-                }
+                msg/tiles|?(t:Tile) {t/print(sf_ui XY/i(x y)) x:=addi(_ 1)}
                 down
                 y:=mini(y subi(sf_ui/GridHeight 1))
             }
@@ -257,7 +248,7 @@
         scene/Draw/Invoke*|[sf sf_ui]
     }
     handle_key(kb:KB):{
-        plr/busy ?+ {^^:={}}
+        plr/busy ?+ ret!
         menu=Menu:m ?+ {
             m/handle_key.kb
             ^^:={}
@@ -273,12 +264,11 @@
                 # Crashes with "type mismatch" error
                 #items!:world/getGrid[plr/pos/xyi] |/ ^$=Item:i ?+ i
                 #items!:world/getGrid[plr/pos/xyi] | ?(it) _0=Item:i ?+ i
-                print*"GET"
                 menu:=SelectMenu/new(title:"Get Items"
                     items:items!
                     invoke:?(i) {
                         it:menu/items@i,
-                        [world/removeEntity plr/cargo/Add] |* it
+                        [world/rem plr/cargo/Add] |* it
                         world/mut!
                         menu/setItems* items!
                     }
@@ -343,8 +333,7 @@
                 lt(ind items/Length) ?+ invoke*ind
             }
         }
-        handle_mouse(state:HandState):{
-        }
+        handle_mouse(state:HandState):{}
         render!:{
             x:pos/xi y:pos/yi w:32 h:32
             down:!{y:=addi(_ 1)}

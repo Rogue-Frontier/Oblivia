@@ -40,29 +40,29 @@ namespace Oblivia {
     public record ValRef {
         public Array src;
         public int[] index;
-        public void Set (dynamic value) =>
+        public void Set (object value) =>
          src.SetValue(value, index);
-        public dynamic Get () => src.GetValue(index);
+        public object Get () => src.GetValue(index);
     }
     public record ValConstructor (Type t) { }
     public record ValInstanceMethod (object src, string key) {
-        public dynamic Call (dynamic[] data) {
+        public object Call (dynamic[] data) {
             var tp = data.Select(d => (d as object).GetType()).ToArray();
             var fl = BindingFlags.Instance | BindingFlags.Public;
             return src.GetType().GetMethod(key, fl, tp).Invoke(src, data);
         }
     };
     public record ValStaticMethod (Type src, string key) {
-        public dynamic Call (dynamic[] data) {
+        public object Call (dynamic[] data) {
             var tp = data.Select(d => (d as object).GetType()).ToArray();
             var fl = BindingFlags.Static | BindingFlags.Public;
             return src.GetMethod(key, fl, tp).Invoke(src, data);
         }
     };
-    public record ValReturn (dynamic data, int up) {
+    public record ValReturn (object data, int up) {
 
 
-        public dynamic Up () => up == 1 ? data : this with { up = up - 1 };
+        public object Up () => up == 1 ? data : this with { up = up - 1 };
     }
 
     public enum ValKeyword {
@@ -1539,7 +1539,7 @@ namespace Oblivia {
 			}
             return obj ? f : r;
         }
-        public dynamic Apply (IScope f) {
+        public object Apply (IScope f) {
             object r = ValEmpty.VALUE;
             foreach(var s in statements) {
                 /*
@@ -1560,9 +1560,9 @@ namespace Oblivia {
             }
             return f;
         }
-        public dynamic MakeScope (IScope ctx) => new ValDictScope(ctx, false);
-        public dynamic StagedEval (IScope ctx) => StagedApply(MakeScope(ctx));
-        public dynamic StagedApply (ValDictScope f) {
+        public ValDictScope MakeScope (IScope ctx) => new ValDictScope(ctx, false);
+        public object StagedEval (IScope ctx) => StagedApply(MakeScope(ctx));
+        public object StagedApply (ValDictScope f) {
             var def = () => { };
             var seq = new List<INode> { };
             foreach(var s in statements) {
@@ -1610,7 +1610,7 @@ namespace Oblivia {
             }
             return f;
         }
-        public dynamic EvalDefer (ValDictScope ctx) {
+        public object EvalDefer (ValDictScope ctx) {
             return null;
         }
     }
@@ -1686,7 +1686,7 @@ namespace Oblivia {
                 case Args a: {
                         var ind = index.Single().Eval(ctx);
                         return Get(ind);
-                        dynamic Get(object ind) {
+                        object Get(object ind) {
 							return ind switch {
 								string s => a[s],
 								int i => a[i],
@@ -1703,7 +1703,7 @@ namespace Oblivia {
                         return de.DynamicInvoke([index.Select(a => a.Eval(ctx)).ToArray()]);
                     }
                 case ValTuple vt: {
-                        return (((string key, dynamic val))vt.items.ToArray().GetValue(index.Select(i => (int)i.Eval(ctx)).ToArray())).val;
+                        return (((string key, object val))vt.items.ToArray().GetValue(index.Select(i => (int)i.Eval(ctx)).ToArray())).val;
                     }
             }
             /*
@@ -1789,7 +1789,7 @@ namespace Oblivia {
                 }
 			}
 			throw new Exception("Fell out of match expression");
-			bool Is (dynamic pattern) {
+			bool Is (object pattern) {
                 if(subject == pattern) {
                     return true;
                 }
@@ -1823,7 +1823,7 @@ namespace Oblivia {
                 default:
                     throw new Exception("Sequence expected");
             }
-            dynamic Map (dynamic seq) {
+            object Map (dynamic seq) {
                 var result = new List<dynamic>();
                 var f = map.Eval(ctx);
                 int index = 0;
@@ -1928,7 +1928,7 @@ namespace Oblivia {
                 default:
                     throw new Exception("Sequence expected");
             }
-            dynamic Map (dynamic seq) {
+            object Map (dynamic seq) {
                 var result = new List<dynamic>();
                 int index = 0;
                 foreach(var item in seq) {
@@ -1958,7 +1958,7 @@ namespace Oblivia {
                 Done:
                 return Convert(result);
             }
-            dynamic Convert (List<dynamic> items) {
+            object Convert (List<dynamic> items) {
                 var r = items.ToArray();
                 if(type != null) {
                     var t = (Type)type.Eval(ctx);
@@ -1984,7 +1984,7 @@ namespace Oblivia {
                     return Init(ctx, key, val);
             }
         }
-        public static dynamic Init (IScope ctx, string key, dynamic val) {
+        public static object Init (IScope ctx, string key, object val) {
             var curr = ctx.GetLocal(key);
             if(curr is not ValError) {
                 throw new Exception();
@@ -2000,7 +2000,7 @@ namespace Oblivia {
             Set(ctx, key, val);
             return ValEmpty.VALUE;
         }
-        public static void Set (IScope ctx, string key, dynamic val) {
+        public static void Set (IScope ctx, string key, object val) {
             ctx.SetLocal(key, val);
         }
 
@@ -2257,9 +2257,9 @@ namespace Oblivia {
             var r = AssignSymbol(ctx, symbol, () => value.Eval(inner_ctx));
             return r;
         }
-        public static dynamic AssignLocal (IScope ctx, string key, Func<object> getNext) => Assign(ctx, key, 1, getNext);
-        public static dynamic AssignSymbol (IScope ctx, ExprSymbol sym, Func<object> getNext) => Assign(ctx, sym.key, sym.up, getNext);
-        public static dynamic Assign (IScope ctx, string key, int up, Func<object> getNext) {
+        public static object AssignLocal (IScope ctx, string key, Func<object> getNext) => Assign(ctx, key, 1, getNext);
+        public static object AssignSymbol (IScope ctx, ExprSymbol sym, Func<object> getNext) => Assign(ctx, sym.key, sym.up, getNext);
+        public static object Assign (IScope ctx, string key, int up, Func<object> getNext) {
             var curr = (object)ctx.Get(key, up);
             switch(curr) {
                 case ValError ve:
@@ -2273,7 +2273,7 @@ namespace Oblivia {
                 default:
                     return MatchType(curr?.GetType());
             }
-            dynamic Match (object type) {
+            object Match (object type) {
                 switch(type) {
                     case Type t:
                         return MatchType(t);
@@ -2282,7 +2282,7 @@ namespace Oblivia {
                 }
                 throw new Exception();
             }
-            dynamic MatchClass (ValClass cl) {
+            object MatchClass (ValClass cl) {
                 var next = getNext();
                 switch(next) {
                     case ValDictScope vds:
@@ -2293,15 +2293,13 @@ namespace Oblivia {
                         return ctx.Set(key, next, up);
                 }
             }
-            dynamic MatchType (Type t) {
+            object MatchType (Type t) {
                 var next = getNext();
                 if(t == null) {
                     goto Do;
                 }
-
                 switch(curr) {
                     case ValInterface vi:
-
                         if(next is ValDictScope vds) {
                             if(vds.HasInterface(vi)) {
                                 goto Do;
@@ -2310,7 +2308,6 @@ namespace Oblivia {
                         }
                         throw new Exception("Value must be a scope");
                 }
-
                 var nt = next.GetType();
                 if(!t.IsAssignableFrom(nt)) {
                     throw new Exception("Type mismatch");
@@ -2465,18 +2462,4 @@ namespace Oblivia {
 
         public string ToString () => $"[{type}] {str}";
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 }

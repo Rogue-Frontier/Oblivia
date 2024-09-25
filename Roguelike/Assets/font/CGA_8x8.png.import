@@ -5,7 +5,7 @@ type="CompressedTexture2D"
 uid="uid://dloh0ipjmbkdd"
 path="res://.godot/imported/CGA_8x8.png-d9aa59919f4a00c2208c5ae57ee157bb.ctex"
 metadata={
-"vram_texture": false
+"vram_texture":false
 }
 
 [deps]

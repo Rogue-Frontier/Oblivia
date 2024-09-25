@@ -70,10 +70,12 @@ namespace Oblivia {
         INTERFACE,
         ENUM,
         GET,
+        SET,
         IMPLEMENT,
         INHERIT,
         BREAK,
         CANCEL,
+        RET,
         REPEAT
     }
     public class ValEmpty {
@@ -81,6 +83,11 @@ namespace Oblivia {
     }
     public class ValDeclared {
         public object type;
+    }
+
+    public record ExprGetter : INode {
+        public INode expr;
+        public dynamic Eval (IScope ctx) => new ValGetter { ctx = ctx, expr = expr };
     }
     public record ValGetter {
         public INode expr;
@@ -613,7 +620,7 @@ namespace Oblivia {
                         switch(tokenType) {
                             case TokenType.SPARK:
                                 inc();
-                                return NextExpression(new ExprMapExpr { src = lhs, map = new ExprInvoke { expr = new ExprSelf { up = 1 }, args = new ExprTuple { items = [(null, NextExpression())] } } });
+                                return NextExpression(new ExprMapExpr { src = lhs, map = new ExprInvoke { expr = new ExprSelf { up = 1 }, args = ExprTuple.SingleExpr(NextExpression())  } });
 							case TokenType.SLASH:
 								inc();
 								return NextExpression(new ExprMapExpr { src = lhs, map = NextExpression() });
@@ -665,18 +672,18 @@ namespace Oblivia {
 
 								return NextExpression(new ExprInvoke {
 									expr = lhs,
-									args = new ExprTuple { items = [(null, new ExprSpread { value = NextExpression() })] },
+									args = ExprTuple.SpreadExpr(NextExpression()),
 								});
 						}
 
 					}
                 case TokenType.DOT: {
                         inc();
-                        return NextExpression(new ExprInvoke { expr = lhs, args = new ExprTuple { items = [(null, NextTerm())] } });
+                        return NextExpression(new ExprInvoke { expr = lhs, args = ExprTuple.SingleExpr(NextTerm()) });
                     }
                 case TokenType.SHOUT: {
                         inc();
-                        return NextExpression(new ExprInvoke { expr = lhs, args = new ExprTuple { items = [] } });
+                        return NextExpression(new ExprInvoke { expr = lhs, args = ExprTuple.Empty });
                     }
                 case TokenType.PERCENT: {
                         inc();
@@ -903,6 +910,9 @@ namespace Oblivia {
                     return NextBlock();
                 case TokenType.L_PAREN:
                     return NextTupleOrExpression();
+                case TokenType.SHOUT:
+                    inc();
+                    return new ExprGetter { expr = NextExpression() };
                 case TokenType.COMMA:
                     inc();
                     goto Read;
@@ -926,7 +936,7 @@ namespace Oblivia {
             switch(tokenType) {
                 case TokenType.R_PAREN:
                     inc();
-                    return new ExprTuple { items = [] };
+                    return ExprTuple.Empty;
                 default:
                     return NextTuple(NextExpression());
             }
@@ -994,7 +1004,7 @@ namespace Oblivia {
                 case TokenType.SHOUT: {
                         inc();
                         var result = NextExpression();
-                        return new ExprFunc { pars = new ExprTuple { items = [] }, result = result };
+                        return new ExprFunc { pars = ExprTuple.Empty, result = result };
                     }
                 case TokenType.L_PAREN:
                     inc();
@@ -1122,7 +1132,7 @@ namespace Oblivia {
         public string Source => $"{type} {source_block.Source}";
         public dynamic MakeScope (ValDictScope ctx) => source_block.MakeScope(ctx);
         public dynamic Eval (IScope ctx) {
-            var getResult = () => source_block.Eval(ctx);
+            var getResult = () => (object)source_block.Eval(ctx);
             var t = type.Eval(ctx);
 
             var getArgs = () => {
@@ -1131,7 +1141,7 @@ namespace Oblivia {
 					case ValDictScope vds:
                         return new ValTuple { items = vds.locals.Select(pair => (pair.Key, pair.Value)).ToArray() };
 					default:
-                        return new ExprTuple { items = [(null, new ExprSpread { value = new ExprVal {value= args } })] }.EvalTuple(ctx);
+                        return ExprTuple.SpreadVal(args).EvalTuple(ctx);
 				}
 			};
 
@@ -1289,7 +1299,7 @@ namespace Oblivia {
         public INode condition;
         public INode positive;
         public dynamic Eval (IScope ctx) {
-            dynamic r = ValEmpty.VALUE;
+            object r = ValEmpty.VALUE;
             Step:
             var cond = condition.Eval(ctx);
             switch(cond) {
@@ -1339,11 +1349,11 @@ namespace Oblivia {
         public static object GetReturnType (object f) {
             throw new Exception("Implement");
         }
-        public static dynamic InvokePars (IScope ctx, object lhs, ExprTuple pars) =>
+        public static object InvokePars (IScope ctx, object lhs, ExprTuple pars) =>
          InvokeFunc(ctx, lhs, () => pars.EvalTuple(ctx));
-        public static dynamic InvokeArgs (IScope ctx, object lhs, ValTuple args) =>
+        public static object InvokeArgs (IScope ctx, object lhs, ValTuple args) =>
          InvokeFunc(ctx, lhs, () => args);
-        public static dynamic InvokeFunc (IScope ctx, object lhs, Func<ValTuple> evalArgs) {
+        public static object InvokeFunc (IScope ctx, object lhs, Func<ValTuple> evalArgs) {
             switch(lhs) {
                 case ValEmpty: {
                         throw new Exception("Function not found");
@@ -1514,7 +1524,7 @@ namespace Oblivia {
                 return ValEmpty.VALUE;
             }
 			var f = new ValDictScope(ctx, false);
-			dynamic r = ValEmpty.VALUE;
+			object r = ValEmpty.VALUE;
 			foreach(var s in statements) {
 				r = s.Eval(f);
 				switch(r) {
@@ -1530,7 +1540,7 @@ namespace Oblivia {
             return obj ? f : r;
         }
         public dynamic Apply (IScope f) {
-            dynamic r = ValEmpty.VALUE;
+            object r = ValEmpty.VALUE;
             foreach(var s in statements) {
                 /*
                 if(s is StmtDefFunc or StmtDefKey or StmtDefTuple) {
@@ -1553,37 +1563,38 @@ namespace Oblivia {
         public dynamic MakeScope (IScope ctx) => new ValDictScope(ctx, false);
         public dynamic StagedEval (IScope ctx) => StagedApply(MakeScope(ctx));
         public dynamic StagedApply (ValDictScope f) {
-            dynamic r = ValEmpty.VALUE;
-            var stageA = () => { };
-            var stageB = () => { };
-            var stageD = new List<INode> { };
+            var def = () => { };
+            var seq = new List<INode> { };
             foreach(var s in statements) {
                 switch(s) {
-                    case StmtDefFunc df when df.value is ExprVarBlock { type: ExprSymbol { key: "class" } }: {
+					/*
+				case StmtDefFunc df: {
+						df.Define(f);
+						break;
+					}
+					*/
+					case StmtDefFunc df when df.value is ExprVarBlock { type: ExprSymbol { key: "class" or "interface" } }: {
                             df.Define(f);
                             break;
                         }
                     case StmtDefKey { value: ExprVarBlock { type: ExprSymbol { key: "class", up: -1 }, source_block: { } block } } kv: {
-                            var _static = StmtDefKey.InitClassA(f, block, kv.key);
-                            stageA += () => {
-                                block.StagedApply(_static);
-                            };
+                            var _static = StmtDefKey.DeclareClass(f, block, kv.key);
+                            def += () => block.StagedApply(_static);
                             break;
                         }
                     case StmtDefKey { value: ExprVarBlock { type: ExprSymbol { key: "interface", up: -1 }, source_block: { } block } } kv: {
-                            var _static = StmtDefKey.InitInterfaceA(f, block, kv.key);
-                            stageA += () => {
-                                block.StagedApply(_static);
-                            };
+                            var _static = StmtDefKey.DeclareInterface(f, block, kv.key);
+                            def += () => block.StagedApply(_static);
                             break;
                         }
                     default:
-                        stageD.Add(s);
+                        seq.Add(s);
                         break;
                 }
             }
-            stageA();
-            foreach(var s in stageD) {
+            def();
+			object r = ValEmpty.VALUE;
+			foreach(var s in seq) {
                 switch(s) {
                     case StmtDefKey { value: ExprVarBlock { type: ExprSymbol { key: "defer", up: -1 }, source_block: { } _block } }:
                         r = _block.EvalDefer(f);
@@ -1610,20 +1621,17 @@ namespace Oblivia {
         public string Source => $"{new string('^', up)}{key}";
         public dynamic Eval (IScope ctx) {
             var r = ctx.Get(key, up);
-
-            switch(r) {
-                case ValGetter vg:
-                    return vg.Eval();
-                default: return r;
-            }
-        }
+			return r switch {
+				ValGetter vg => vg.Eval(),
+				_ => r,
+			};
+		}
     }
     public class ExprSelf : INode {
         public int up;
         public dynamic Eval (IScope ctx) {
-            for(int i = 1; i < up; i++) {
+            for(int i = 1; i < up; i++)
                 ctx = ctx.parent;
-            }
             return ctx;
         }
     }
@@ -1632,20 +1640,16 @@ namespace Oblivia {
         public string key;
         public dynamic Eval (IScope ctx) {
             var source = src.Eval(ctx);
-
             switch(source) {
                 case ValDictScope s: {
-
                         if(s.locals.TryGetValue(key, out var v)) {
-                            switch(v) {
-                                case ValGetter vg:
-                                    return vg.Eval();
-                                default: return v;
-                            }
-                        } else {
-                            throw new Exception($"Variable not found {key}");
-                        }
-                    }
+							return v switch {
+								ValGetter vg => vg.Eval(),
+								_ => v,
+							};
+						}
+						throw new Exception($"Variable not found {key}");
+					}
                 case ValClass vc: {
                         return vc._static.locals.TryGetValue(key, out var v) ? v : throw new Exception("Variable not found");
                     }
@@ -1674,33 +1678,25 @@ namespace Oblivia {
                     }
                 case IEnumerable e: {
                         var ind = index.Single().Eval(ctx);
-                        switch(ind) {
-                            case int i:
-                                return e.Cast<object>().ElementAt(i);
-                            default:
-                                throw new Exception();
-                        }
-                    }
+						return ind switch {
+							int i => e.Cast<object>().ElementAt(i),
+							_ => throw new Exception(),
+						};
+					}
                 case Args a: {
                         var ind = index.Single().Eval(ctx);
                         return Get(ind);
-
                         dynamic Get(object ind) {
-
-							switch(ind) {
-								case string s:
-									return a[s];
-								case int i:
-									return a[i];
-                                case ValObjectScope vos:
-                                    return Get(vos.o);
-								default: throw new Exception();
-							}
+							return ind switch {
+								string s => a[s],
+								int i => a[i],
+								ValObjectScope vos => Get(vos.o),
+								_ => throw new Exception(),
+							};
 						}
                     }
                 case ValFunc vf: {
                         //return vf.Call(ctx, new ValRealTuple { items = [(null, index.Select(i => i.Eval(ctx)).ToArray())] });
-
                         throw new Exception("ugly");
                     }
                 case Delegate de: {
@@ -1791,14 +1787,14 @@ namespace Oblivia {
                 if(Is(b)) {
                     return yes.Eval(inner_ctx);
                 }
-            }
-            bool Is (dynamic pattern) {
+			}
+			throw new Exception("Fell out of match expression");
+			bool Is (dynamic pattern) {
                 if(subject == pattern) {
                     return true;
                 }
                 return false;
             }
-            throw new Exception("Fell out of match expression");
         }
     }
     public class ExprMapFunc : INode {
@@ -1810,7 +1806,6 @@ namespace Oblivia {
         public string Source => $"{src.Source} | {map.Source}";
         public dynamic Eval (IScope ctx) {
             var seq = src.Eval(ctx);
-
 			switch(seq) {
                 case ValEmpty:
                     throw new Exception("Variable not found");
@@ -2018,7 +2013,7 @@ namespace Oblivia {
             _static.AddClass(c);
             return c;
         }
-        public static ValDictScope InitClassA (IScope f, ExprBlock block, string key) {
+        public static ValDictScope DeclareClass (IScope f, ExprBlock block, string key) {
             var _static = (ValDictScope)block.MakeScope(f);
             var c = new ValClass {
                 name = key,
@@ -2031,7 +2026,7 @@ namespace Oblivia {
 			_static.AddClass(c);
             return _static;
         }
-        public static ValDictScope InitInterfaceA (IScope f, ExprBlock block, string key) {
+        public static ValDictScope DeclareInterface (IScope f, ExprBlock block, string key) {
             var _static = (ValDictScope)block.MakeScope(f);
             var vi = new ValInterface {
                 _static = _static
@@ -2083,7 +2078,12 @@ namespace Oblivia {
     }
     public class ExprTuple : INode {
         public (string key, INode value)[] items;
-        public ValTuple EvalTuple (IScope ctx) {
+        public static ExprTuple Empty => new ExprTuple { items = [] };
+		public static ExprTuple SingleExpr (INode v) => new ExprTuple { items = [(null, v)] };
+		public static ExprTuple SingleVal (object v) => SingleExpr(new ExprVal { value = v });
+		public static ExprTuple SpreadExpr (INode n) => SingleExpr(new ExprSpread { value = n });
+		public static ExprTuple SpreadVal (object v) => SpreadExpr(new ExprVal { value = v });
+		public ValTuple EvalTuple (IScope ctx) {
             var it = new List<(string key, dynamic val)> { };
             /*
             var t = new ValTuple { items = it };
@@ -2142,8 +2142,6 @@ namespace Oblivia {
         public ExprTuple expr => new ExprTuple {
             items = items.Select(pair => (pair.key, (INode)new ExprVal { value = pair.val })).ToArray()
         };
-
-
         public void Inherit(IScope ctx) {
             foreach(var(k, v) in items) {
                 if(k == null) {
@@ -2171,8 +2169,7 @@ namespace Oblivia {
                 parent_ctx = owner
             });
         }
-
-        public ValFunc DefineA (IScope owner) {
+        public ValFunc DeclareHead (IScope owner) {
             var vf = new ValFunc {
                 expr = value,
                 pars = new ValTuple { items = [] },
@@ -2181,7 +2178,7 @@ namespace Oblivia {
             owner.SetLocal(key, vf);
             return vf;
         }
-        public void DefineB (ValFunc vf) {
+        public void DefineHead (ValFunc vf) {
             vf.pars = pars.EvalTuple(vf.parent_ctx);
         }
     }
@@ -2250,8 +2247,13 @@ namespace Oblivia {
         public string Source => $"{symbol.Source} := {value.Source}";
         public dynamic Eval (IScope ctx) {
             var curr = ctx.Get(symbol.key, symbol.up);
-            var inner_ctx = ctx.MakeTemp(curr);
+            var inner_ctx = (ValDictScope) ctx.MakeTemp(curr);
             inner_ctx.locals["_curr"] = curr;
+            switch(curr) {
+                case ValDeclared vd:
+					inner_ctx.locals["_type"] = vd.type;
+					break;
+            }
             var r = AssignSymbol(ctx, symbol, () => value.Eval(inner_ctx));
             return r;
         }

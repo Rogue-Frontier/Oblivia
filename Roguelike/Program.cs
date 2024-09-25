@@ -51,7 +51,7 @@ var global = new ValDictScope {
 
 		["empty"] = ValEmpty.VALUE,
 
-		["default"] = Val((Type t) => t.IsValueType ? Activator.CreateInstance(t) : null),
+		["default"] = Val((Type t) => t.IsValueType ? Activator.CreateInstance(t) :null),
 
 		["null"] = null,
 
@@ -160,10 +160,10 @@ Type MakeGeneric (Type gen, object item) => item switch {
 
 var result = (ValDictScope)block.StagedEval(global);
 /*
-	A: class {
+	A:class {
 		a:B{}
 	}
-	B: class {
+	B:class {
 		b:A{}
 	}
  */
@@ -172,7 +172,7 @@ Runner.Run("Assets/font/IBMCGA+_8x8.font", r => {
 
 });
 return;
-class Mainframe : IScene {
+class Mainframe :IScene {
 	public Action<IScene> Go { get; set; }
 	public Action<Sf> Draw { get; set; }
 	public Action<SoundCtx> PlaySound { get; set; }

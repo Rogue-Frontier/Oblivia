@@ -27,6 +27,7 @@ var global = new ValDictScope {
 		["Pt"] = typeof((int, int)),
 
 		["pairi"] = _((int a, int b) => (a, b)),
+		["i32x2"] = _((int a, int b) => (a, b)),
 
 		["double_from"] = _((int i) => (double)i),
 		["int_from"] = _((double d) => (int)d),
@@ -91,7 +92,6 @@ var global = new ValDictScope {
 		["bt"] = _((double a, double b, double c) => a > b && a < c),
 		["beq"] = _((double a, double b, double c) => a >= b && a <= c),
 
-
 		["leq"] = _((double a, double b) => a <= b),
 		["eq"] = _((object a, object b) => Equals(a, b)),
 		["neq"] = _((object a, object b) => !Equals(a,b)),
@@ -109,14 +109,11 @@ var global = new ValDictScope {
 		["cat"] = _((object[] o) => string.Join(null, o)),
 		["range"] = _((int a, int b) => Enumerable.Range(a, b - a).ToArray()),
 		["newline"] = "\n",
-
 		["str"] = _((object o) => o.ToString()),
-
 		["Array"] = _((Type type, int dim) => type.MakeArrayType(dim)),
-		["array_get"] = _((Array a, int[] ind) => a.GetValue(ind)),
-		["array_set"] = _((Array a, int[] ind, object value) => a.SetValue(value, ind)),
-		["array_at"] = _((Array a, int[] ind) => new ValRef { src = a, index = ind }),
-
+		["arr_get"] = _((Array a, int[] ind) => a.GetValue(ind)),
+		["arr_set"] = _((Array a, int[] ind, object value) => a.SetValue(value, ind)),
+		["arr_at"] = _((Array a, int[] ind) => new ValRef { src = a, index = ind }),
 		["str_append"] = _((StringBuilder sb, object o) => sb.Append(o)),
 		["row_from"] = _((Type t, object[] items) => {
 			var result = Array.CreateInstance(t, items.Length);
@@ -144,8 +141,10 @@ var global = new ValDictScope {
 		["impl"] = ValKeyword.IMPLEMENT,
 		["inherit"] = ValKeyword.INHERIT,
 		["cut"] = ValKeyword.BREAK,
+		["skip"] = ValKeyword.CONTINUE,
 		["cancel"] = ValKeyword.CANCEL,
-		["ret"] = ValKeyword.RETURN
+		["ret"] = ValKeyword.RETURN,
+		["var"] = ValKeyword.VAR,
 	}
 };
 PriorityQueue<object, int> a = new();
@@ -165,18 +164,26 @@ class Mainframe :IScene {
 	public Mainframe (ValDictScope ctx) {
 		this.ctx = ctx;
 		ctx.locals["scene"] = this;
-		(ctx.locals["init"] as ValFunc).CallData(ctx, []);
+		
+		var VF = (string s) => (ValFunc)ctx.locals[s];
+		VF("init").CallData(ctx, []);
+		update = VF("update");
+		render = VF("render");
+		handle_key = VF("handle_key");
+		handle_mouse = VF("handle_mouse");
 	}
+
+	ValFunc update, render, handle_key, handle_mouse;
 	void IScene.Update(System.TimeSpan delta) {
-		(ctx.locals["update"] as ValFunc).CallData(ctx, [delta]);
+		update.CallData(ctx, [delta]);
 	}
 	void IScene.Render(System.TimeSpan delta) {
-		(ctx.locals["render"] as ValFunc).CallData(ctx, [delta]);
+		render.CallData(ctx, [delta]);
 	}
 	void IScene.HandleKey(LibGamer.KB kb) {
-		(ctx.locals["handle_key"] as ValFunc).CallData(ctx, [kb]);
+		handle_key.CallData(ctx, [kb]);
 	} 
 	void IScene.HandleMouse(LibGamer.HandState mouse) {
-		(ctx.locals["handle_mouse"] as ValFunc).CallData(ctx, [mouse]);
+		handle_mouse.CallData(ctx, [mouse]);
 	}
 }

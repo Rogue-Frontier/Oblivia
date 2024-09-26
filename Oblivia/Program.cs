@@ -13,6 +13,7 @@ using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 using System.Xml.Serialization;
+using static Oblivia.ExprMapFunc;
 using static System.Formats.Asn1.AsnWriter;
 
 namespace Oblivia {
@@ -71,9 +72,11 @@ namespace Oblivia {
         IMPLEMENT,
         INHERIT,
         BREAK,
+        CONTINUE,
         CANCEL,
         RETURN,
-        REPEAT
+        REPEAT,
+        VAR
     }
     public class ValEmpty {
         public static readonly ValEmpty VALUE = new();
@@ -425,7 +428,6 @@ namespace Oblivia {
         public bool temp = false;
         public IScope parent { get; set; } = null;
         public ConcurrentDictionary<string, dynamic> locals = new() {};
-
         public HashSet<ValClass> ClassSet => locals.GetOrAdd("_classSet", new HashSet<ValClass>() );
 		public HashSet<ValInterface> InterfaceSet => locals.GetOrAdd("_interfaceSet", new HashSet<ValInterface>());
 		public void AddClass (ValClass vc) {
@@ -433,13 +435,22 @@ namespace Oblivia {
             locals["_proto"] = this;
             ClassSet.Add(vc);
         }
-        public bool HasClass (ValClass vc) =>
-            ClassSet.Contains(vc);
-		public void AddInterface (ValInterface vi) {
-            InterfaceSet.Add(vi);
+        public bool HasClass (ValClass vc) => ClassSet.Contains(vc);
+		public void AddInterface (ValInterface vi) => InterfaceSet.Add(vi);
+        public bool HasInterface (ValInterface vi) => InterfaceSet.Contains(vi);
+        public ValFunc? _at => locals.TryGetValue("_at", out var f) ? f : null;
+        public bool _seq(out object seq) {
+            if(locals.TryGetValue("_seq", out dynamic f)) {
+                if(f is ValGetter vg) {
+                    f = vg.Eval();
+                }
+                seq = f;
+                return true;
+            } else {
+                seq = null;
+                return false;
+            }
         }
-        public bool HasInterface (ValInterface vi) =>
-            InterfaceSet.Contains(vi);
         public ValDictScope (IScope parent = null, bool temp = false) {
             this.temp = temp;
             this.parent = parent;
@@ -586,13 +597,13 @@ namespace Oblivia {
                                 pars = et,
                                 value = NextExpression()
                             };
-                        case ExprIndex { src: ExprSelf { up:1 or -1 }, index: [ExprTuple et] } ei:
+                        case ExprAt { src: ExprSelf { up:1 or -1 }, index: [ExprTuple et] } ei:
                             return new StmtDefFunc {
                                 key = "_at",
                                 pars = et,
                                 value = NextExpression()
                             };
-                        case ExprIndex { src: ExprSymbol { up: 1 or -1, key: { } k }, index: [ExprTuple et] } ei:
+                        case ExprAt { src: ExprSymbol { up: 1 or -1, key: { } k }, index: [ExprTuple et] } ei:
                             return new StmtDefFunc {
                                 key = k,
                                 pars = et,
@@ -739,10 +750,10 @@ namespace Oblivia {
                         switch(tokenType) {
                             case TokenType.PIPE:
                                 inc();
-                                return NextExpression(new ExprMapExpr { src = NextExpression(), map = new ExprIndex { src = lhs, index = [new ExprSelf { up = 1 }] } });
+                                return NextExpression(new ExprMapExpr { src = NextExpression(), map = new ExprAt { src = lhs, index = [new ExprSelf { up = 1 }] } });
                                 throw new Exception();
                         }
-                        return NextExpression(new ExprIndex { src = lhs, index = [NextTerm()] });
+                        return NextExpression(new ExprAt { src = lhs, index = [NextTerm()] });
                     }
                 case TokenType.L_SQUARE: {
                         inc();
@@ -751,7 +762,7 @@ namespace Oblivia {
                         switch(tokenType) {
                             case TokenType.R_SQUARE: {
                                     inc();
-                                    return NextExpression(new ExprIndex { src = lhs, index = index });
+                                    return NextExpression(new ExprAt { src = lhs, index = index });
                                 }
                         }
                         index.Add(NextExpression());
@@ -1291,6 +1302,9 @@ namespace Oblivia {
         public INode positive;
         public object Eval (IScope ctx) {
             object r = ValEmpty.VALUE;
+
+            //var r = new List<dynamic>();
+
             Step:
             var cond = condition.Eval(ctx);
             switch(cond) {
@@ -1311,6 +1325,8 @@ namespace Oblivia {
         public object Eval (IScope ctx) {
             var f = expr.Eval(ctx);
             switch(f) {
+                case ValKeyword.SET:
+                    throw new Exception();
                 case ValKeyword.GET:
                     return new ValGetter { ctx = ctx, expr = args };
                 case ValKeyword.RETURN:
@@ -1442,12 +1458,14 @@ namespace Oblivia {
                                 }
                             //TODO: Remove this
                             case null:
-                                return null;
+								return null;
                         }
                         throw new Exception();
                     }
-
                 case ValDictScope s: {
+                        if(s.locals.TryGetValue("_call", out var f) && f is ValFunc vf) {
+                            return vf.CallFunc(ctx, evalArgs);
+                        }
                         throw new Exception("Illegal");
                     }
                 case ValObjectScope vos: {
@@ -1612,8 +1630,7 @@ namespace Oblivia {
     public class ExprSelf : INode {
         public int up;
         public object Eval (IScope ctx) {
-            for(int i = 1; i < up; i++)
-                ctx = ctx.parent;
+            for(int i = 1; i < up; i++) ctx = ctx.parent;
             return ctx;
         }
     }
@@ -1648,7 +1665,7 @@ namespace Oblivia {
             throw new Exception("Object expected");
         }
     }
-    public class ExprIndex : INode {
+    public class ExprAt : INode {
         public INode src;
         public List<INode> index;
         public object Eval (IScope ctx) {
@@ -1687,6 +1704,12 @@ namespace Oblivia {
                 case ValTuple vt: {
                         return (((string key, object val))vt.items.ToArray().GetValue(index.Select(i => (int)i.Eval(ctx)).ToArray())).val;
                     }
+                case ValDictScope vds: {
+                        if(vds._at is ValFunc vf) {
+                            return vf.CallPars(ctx, ExprTuple.ListExpr(index));
+                        }
+						throw new Exception("Illegal");
+					}
             }
             /*
             if(false){
@@ -1787,71 +1810,36 @@ namespace Oblivia {
         public XElement ToXML () => new("Map", src.ToXML(), map.ToXML());
         public string Source => $"{src.Source} | {map.Source}";
         public object Eval (IScope ctx) {
-            var seq = src.Eval(ctx);
-			switch(seq) {
-                case ValEmpty:
-                    throw new Exception("Variable not found");
-                case ICollection c:
-                    return Map(c);
-                case IEnumerable e:
-                    return Map(e);
-                case ValTuple vt:
-                    //TO DO: rewrite
-                    var keys = vt.items.Select(i => i.key);
-                    var vals = vt.items.Select(i => i.val);
-                    var m = (IEnumerable<dynamic>)Map(vals);
-                    var r = new ValTuple { items = keys.Zip(m).ToArray() }; ;
-                    return r;
-                default:
-                    throw new Exception("Sequence expected");
-            }
+            var lhs = src.Eval(ctx);
             object Map (dynamic seq) {
-                var result = new List<object>();
-                var f = map.Eval(ctx);
-                int index = 0;
-                foreach(var item in seq) {
-                    var inner_ctx = ExprMapFunc.MakeCondCtx(ctx, item, index);
-                    index++;
-                    if(cond != null) {
-                        switch(cond.Eval(ctx)) {
-                            case true:
-                                goto Do;
-                            case false:
-                                goto Done;
-                            default:
-                                throw new Exception("Boolean expected");
-                        }
-                    }
-                    Do:
-                    var r = ExprInvoke.InvokeArgs(inner_ctx, f, item switch {
-                        ValTuple vt => vt,
-                        _ => ValTuple.Single(item)
-                    });
-                    switch(r) {
-                        case ValEmpty:
-                            continue;
-                        case ValKeyword.BREAK:
-                            return Convert(result);
-                        case ValReturn vr: return vr.Up();
-                        default:
-                            result.Add(r);
-                            continue;
-                    }
-                }
-                Done:
-                return Convert(result);
+				Func<Type>? t = type is { } _t ? () => (Type)_t.Eval(ctx) : null;
+				var f = map.Eval(ctx);
+				object tr (IScope inner_ctx, object item) =>
+					ExprInvoke.InvokeArgs(inner_ctx, f, item switch {
+						ValTuple vt => vt,
+						_ => ValTuple.Single(item)
+					});
+				return ExprMapFunc.Map(seq, ctx, cond, t, (Transform)tr);
             }
-            IEnumerable<dynamic> Convert (List<object> items) {
-                var r = items.ToArray();
-                switch(type) {
-                    case null:
-                        return r;
-                    default: {
-                            var arr = Array.CreateInstance((Type)type.Eval(ctx), r.Length);
-                            Array.Copy(r, arr, r.Length);
-                            return (dynamic)arr;
-                        }
-                }
+			switch(lhs) {
+                case ValEmpty: throw new Exception("Variable not found");
+                case ICollection c: return Map(c);
+                case IEnumerable e: return Map(e);
+				case ValDictScope vds: {
+						if(vds._seq(out var seq))
+							return Map(seq);
+						throw new Exception();
+					}
+				case ValTuple vt: {
+						//TO DO: rewrite
+						var keys = vt.items.Select(i => i.key);
+						var vals = vt.items.Select(i => i.val);
+						var m = (IEnumerable<dynamic>)Map(vals);
+						var r = new ValTuple { items = keys.Zip(m).ToArray() }; ;
+						return r;
+					}
+				default:
+                    throw new Exception("Sequence expected");
             }
         }
         public static IScope MakeCondCtx (IScope ctx, object item, int index) {
@@ -1868,86 +1856,93 @@ namespace Oblivia {
                   object o => new ValObjectScope { parent = inner_ctx, o = o },
               };
         }
-    }
+		public static object Convert (List<object> items, Func<Type>? type) {
+			var r = items.ToArray();
+			if(type != null) {
+				var t = type();
+				var arr = Array.CreateInstance(t, r.Length);
+				Array.Copy(r, arr, r.Length);
+				return arr;
+			}
+			return r;
+		}
+        public delegate object Transform (IScope inner_ctx, object item);
+		public static object Map (dynamic seq, IScope ctx, INode cond, Func<Type> t, Transform tr) {
+			var result = new List<object>();
+			int index = 0;
+			foreach(var item in seq) {
+				var inner_ctx = ExprMapFunc.MakeCondCtx(ctx, item, index);
+				index++;
+				if(cond != null) {
+					switch(cond.Eval(ctx)) {
+						case true:
+							goto Do;
+						case false:
+							goto Done;
+						default:
+							throw new Exception("Boolean expected");
+					}
+				}
+                Do:
+                var r = tr(inner_ctx, item);
+				switch(r) {
+					case ValEmpty: continue;
+					case ValKeyword.CONTINUE: continue;
+					case ValKeyword.BREAK: goto Done;
+					case ValReturn vr: return vr.Up();
+					default:
+						result.Add(r);
+						continue;
+				}
+			}
+			Done:
+			return Convert(result, t);
+		}
+	}
     public class ExprMapExpr : INode {
         public INode src;
         public INode map;
         public INode cond;
         public INode type;
-
         public bool local = false;
         public XElement ToXML () => new("Map", src.ToXML(), map.ToXML());
         public string Source => $"{src.Source} | {map.Source}";
         public object Eval (IScope ctx) {
             var lhs = src.Eval(ctx);
-            switch(lhs) {
+			object tr (IScope inner_ctx, object item) => map.Eval(MakeMapCtx(inner_ctx, item));
+			object Map (dynamic seq) {
+				Func<Type>? t = type is { } _t ? () => (Type)_t.Eval(ctx) : null;
+				return ExprMapFunc.Map(seq, ctx, cond, t, (Transform)tr);
+			}
+			switch(lhs) {
                 case ValEmpty:
                     throw new Exception("Variable not found");
-                case ICollection c:
-                    return Map(c);
-                case IEnumerable e:
-                    return Map(e);
-                case ValTuple vt:
-                    int index = 0;
-                    List<(string key, object val)> items = [];
-                    foreach(var (key, val) in vt.items) {
-                        var inner_ctx = ExprMapFunc.MakeCondCtx(ctx, val, index);
-                        var r = map.Eval(ExprMapFunc.MakeMapCtx(inner_ctx, val));
-                        index += 1;
-                        if(r is ValEmpty) {
-                            continue;
-                        }
-                        items.Add((key, r));
-                    }
-                    return new ValTuple {
-                        items = items.ToArray()
-                    };
-                default:
+                case ICollection c:return Map(c);
+                case IEnumerable e:return Map(e);
+                case ValDictScope vds: {
+                        if(vds._seq(out var seq)) return Map(seq);
+                        throw new Exception();
+					}
+				case ValTuple vt:
+					int index = 0;
+					List<(string key, object val)> items = [];
+					foreach(var (key, val) in vt.items) {
+						var inner_ctx = MakeCondCtx(ctx, val, index);
+						var r = map.Eval(MakeMapCtx(inner_ctx, val));
+						index += 1;
+						if(r is ValEmpty) {
+							continue;
+						}
+						items.Add((key, r));
+					}
+					return new ValTuple {
+						items = items.ToArray()
+					};
+				default:
                     throw new Exception("Sequence expected");
             }
-            object Map (dynamic seq) {
-                var result = new List<object>();
-                int index = 0;
-                foreach(var item in seq) {
-                    var inner_ctx = ExprMapFunc.MakeCondCtx(ctx, item, index);
-                    index++;
-                    if(cond != null) {
-                        switch(cond.Eval(ctx)) {
-                            case true: 
-                                goto Do;
-                            case false: 
-                                goto Done;
-                            default:
-                                throw new Exception();
-                        }
-                    }
-                    Do:
-                    inner_ctx = ExprMapFunc.MakeMapCtx(inner_ctx, item);
-                    var r = map.Eval(inner_ctx);
-                    switch(r) {
-                        case ValEmpty:
-                            continue;
-                        case ValReturn vr:return vr.Up();
-                        default:
-                            result.Add(r);
-                            break;
-                    }
-                }
-                Done:
-                return Convert(result);
-            }
-            object Convert (List<object> items) {
-                var r = items.ToArray();
-                if(type != null) {
-                    var t = (Type)type.Eval(ctx);
-                    var arr = Array.CreateInstance(t, r.Length);
-                    Array.Copy(r, arr, r.Length);
-                    return arr;
-                }
-                return r;
-            }
         }
-    }
+	}
     public class StmtDefKey : INode {
         public string key;
         public INode value;
@@ -1982,7 +1977,7 @@ namespace Oblivia {
             ctx.SetLocal(key, val);
         }
         public static ValClass MakeClass (IScope f, ExprBlock block) {
-            var _static = (ValDictScope)block.MakeScope(f);
+            var _static = block.MakeScope(f);
             block.StagedApply(_static);
             var c = new ValClass { name = "unknown", source_ctx = f, source_expr = block, _static = _static };
             _static.locals["_kind"] = ValKeyword.CLASS;
@@ -1990,7 +1985,7 @@ namespace Oblivia {
             return c;
         }
         public static ValDictScope DeclareClass (IScope f, ExprBlock block, string key) {
-            var _static = (ValDictScope)block.MakeScope(f);
+            var _static = block.MakeScope(f);
             var c = new ValClass {
                 name = key,
                 source_ctx = f,
@@ -2056,6 +2051,9 @@ namespace Oblivia {
 		public static ExprTuple SingleVal (object v) => SingleExpr(new ExprVal { value = v });
 		public static ExprTuple SpreadExpr (INode n) => SingleExpr(new ExprSpread { value = n });
 		public static ExprTuple SpreadVal (object v) => SpreadExpr(new ExprVal { value = v });
+        public static ExprTuple ListExpr (IEnumerable<INode> items) => new ExprTuple { items = items.Select(i => ((string)null, i)).ToArray() };
+
+
 		public ValTuple EvalTuple (IScope ctx) {
             var it = new List<(string key, object val)> { };
             /*

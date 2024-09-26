@@ -45,6 +45,17 @@
     Entity:interface { active:bool }
     Env:interface {}
     Actor:interface { update():{} }
+
+    Reticle: class {
+        active:true pos:XY
+        new(^pos): Reticle {
+            pos := _0
+        }
+        update():{
+            
+        }
+        impl(Entity Actor)
+    }
     Chasm:class{
         name:"Chasm" pos:XY active:true
         tile:!Tile{(glyph front back):=(char_from.10 ABGR/(Gray Transparent)%)}
@@ -181,6 +192,9 @@
     sf:Sf
     sf_ui:Sf
     menu:Menu * null
+
+    #dummy: set { print*_val }
+
     init!:{
         "aaa"=string:a ?+ print* a
         "aaa" ?{
@@ -199,6 +213,7 @@
                 add* Chasm/new* XY/i(x y)
         ~
         plr:=_type/new(XY/i(0 0) world)
+
         camera:=plr/pos
         add*|[plr Enemy/new(XY/i(10 10) world) Item/new(ItemType{name:="gun"} XY/i(5 5))]
         world/update!
@@ -253,11 +268,7 @@
         }
         kb/IsPress?[
             KC/G:{
-                # Does not crash
                 items!:world/getGrid[plr/pos/xyi] | ?(it) (it=Item:i) ?+ i
-                # Crashes with "type mismatch" error
-                #items!:world/getGrid[plr/pos/xyi] |/ ^$=Item:i ?+ i
-                #items!:world/getGrid[plr/pos/xyi] | ?(it) _0=Item:i ?+ i
                 menu:=SelectMenu/new(title:"Get Items"
                     items:items!
                     invoke:?(i) {
@@ -393,15 +404,15 @@
             down:!{y:=addi(_ 1)}
             Sf/DrawRect(sf_ui x y w h border) down
             sf_ui/Print(addi(x 2) y title WB) down
-            Sf/DrawRect(sf_ui x y w 1 border)
+            Sf/DrawRect(sf_ui x y w 1 border) down
             ind:0
             items=obj:it ?+
                 it|?(i:Entity) {
-                    down
                     i/tile/print(sf_ui XY/i(addi(x 2) y))
                     sf_ui/Print(addi(x 4) y i/name WB)
                     sf_ui/Print(subi(addi(x w) 2) y ABC@ind WB)
                     ind:=addi(ind 1)
+                    down
                 }
         }
         impl(Menu)

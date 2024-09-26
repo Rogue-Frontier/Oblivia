@@ -143,7 +143,7 @@ var global = new ValDictScope {
 		["get"] = ValKeyword.GET,
 		["impl"] = ValKeyword.IMPLEMENT,
 		["inherit"] = ValKeyword.INHERIT,
-		["break"] = ValKeyword.BREAK,
+		["cut"] = ValKeyword.BREAK,
 		["cancel"] = ValKeyword.CANCEL,
 		["ret"] = ValKeyword.RETURN
 	}

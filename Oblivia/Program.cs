@@ -60,11 +60,8 @@ namespace Oblivia {
         }
     };
     public record ValReturn (object data, int up) {
-
-
         public object Up () => up == 1 ? data : this with { up = up - 1 };
     }
-
     public enum ValKeyword {
         CLASS,
         INTERFACE,
@@ -84,7 +81,6 @@ namespace Oblivia {
     public class ValDeclared {
         public object type;
     }
-
     public record ExprGetter : INode {
         public INode expr;
         public object Eval (IScope ctx) => new ValGetter { ctx = ctx, expr = expr };
@@ -94,16 +90,21 @@ namespace Oblivia {
         public IScope ctx;
         public object Eval () => expr.Eval(ctx);
     }
-
+    public record ExprAlias:INode {
+        public INode expr;
+        public object Eval (IScope ctx) => expr.Eval(ctx);
+        public INode Sub => expr switch {
+            ExprAlias al => al.Sub,
+            _ => expr
+        };
+    }
 	public record ValLazy {
 		public INode expr;
 		public IScope ctx;
-
         public bool done = false;
         public object value;
 		public object Eval () => expr.Eval(ctx);
 	}
-
 	public record Args {
         public object this[string s] => dict[s];
         public object this[int s] => list[s];
@@ -760,8 +761,6 @@ namespace Oblivia {
                         inc();
                         switch(tokenType) {
                             case TokenType.PERCENT: {
-
-
                                     throw new Exception("TODO: Implement");
                                 }
                             case TokenType.PIPE: {
@@ -870,10 +869,8 @@ namespace Oblivia {
                                 }
                             default:
                                 dec();
-
                                 break;
                         }
-
                         break;
                     }
             }
@@ -915,11 +912,10 @@ namespace Oblivia {
                     return new ExprGetter { expr = NextExpression() };
                 case TokenType.SWIRL:
                     inc();
-                    return null;
+                    return new ExprAlias { expr = NextExpression() };
                 case TokenType.COMMA:
                     inc();
                     goto Read;
-
             }
             throw new Exception($"Unexpected token in expression: {currToken.type}");
         }
@@ -1115,9 +1111,7 @@ namespace Oblivia {
                     items.AddRange(vrt.items.Select(i => i.val));
                     break;
                 case Array a:
-                    foreach(var _a in a) {
-                        items.Add(_a);
-                    }
+                    foreach(var _a in a) {items.Add(_a);}
                     break;
                 case ValSpread vs:
                     vs.SpreadArray(items);
@@ -1168,15 +1162,6 @@ namespace Oblivia {
                     }
                 case ValKeyword.CLASS: {
                         return StmtDefKey.MakeClass(ctx, source_block);
-                        throw new Exception("not supported");
-                        switch(getResult()) {
-                            case ValDictScope s:
-                                var c = new ValClass { _static = s, source_expr = source_block, source_ctx = ctx };
-                                s.locals["class"] = c;
-                                return c;
-                            default:
-                                throw new Exception("Class expected");
-                        }
                     }
                 case ValKeyword.INTERFACE: {
                         if(getResult() is ValDictScope s) {
@@ -1327,26 +1312,31 @@ namespace Oblivia {
             var f = expr.Eval(ctx);
             switch(f) {
                 case ValKeyword.GET:
-                    return new ValGetter { ctx = ctx, expr = args.items.Single().value };
+                    return new ValGetter { ctx = ctx, expr = args };
                 case ValKeyword.RETURN:
 					return new ValReturn(args.EvalExpression(ctx), 1);
                 case ValKeyword.IMPLEMENT: {
-                        var vds = ctx as ValDictScope;
+                        var vds = (ValDictScope)ctx;
                         var arg = args.EvalTuple(ctx);
                         foreach(var (k, v) in arg.items) {
-                            if(v is ValInterface vi) {
-                                vi.Register(vds);
-                            } else {
-                                throw new Exception("Interface expected");
-                            }
+                            switch(v) {
+                                case ValInterface vi:
+									vi.Register(vds);
+                                    break;
+                                default:
+									throw new Exception("Interface expected");
+							}
                         }
                         return ValEmpty.VALUE;
                     }
                 case ValKeyword.INHERIT: {
                         foreach(var(k, v) in args.EvalTuple(ctx).items) {
-                            if(v is ValTuple vt) {
-                                vt.Inherit(ctx);
-                            }
+                            switch(v) {
+                                case ValTuple vt:
+                                    vt.Inherit(ctx);
+                                    break;
+
+							}
                         }
                         return ValEmpty.VALUE;
                     }
@@ -1419,7 +1409,6 @@ namespace Oblivia {
                     }
                 case Delegate de: {
                         var args = evalArgs();
-
 						var a = args.items.Select(pair => pair.val).ToArray();
                         var r = de.DynamicInvoke(a);
                         if(de.Method.ReturnType == typeof(void))
@@ -1534,13 +1523,7 @@ namespace Oblivia {
 			foreach(var s in statements) {
 				r = s.Eval(f);
 				switch(r) {
-					case ValReturn vr:
-						if(vr.up > 1) {
-							return vr with {
-								up = vr.up - 1
-							};
-						}
-						return vr.data;
+					case ValReturn vr:return vr.Up();
 				}
 			}
             return obj ? f : r;
@@ -1555,13 +1538,7 @@ namespace Oblivia {
                 */
                 r = s.Eval(f);
                 switch(r) {
-                    case ValReturn vr:
-                        if(vr.up > 1) {
-                            return vr with {
-                                up = vr.up - 1
-                            };
-                        }
-                        return vr.data;
+                    case ValReturn vr:return vr.Up();
                 }
             }
             return f;
@@ -1610,8 +1587,7 @@ namespace Oblivia {
                         break;
                 }
                 switch(r) {
-                    case ValReturn vr:
-                        return vr.data;
+                    case ValReturn vr:return vr.Up();
                 }
             }
             return f;
@@ -1849,18 +1825,14 @@ namespace Oblivia {
                     Do:
                     var r = ExprInvoke.InvokeArgs(inner_ctx, f, item switch {
                         ValTuple vt => vt,
-                        _ => new ValTuple { items = [(null, item)] }
+                        _ => ValTuple.Single(item)
                     });
                     switch(r) {
                         case ValEmpty:
                             continue;
                         case ValKeyword.BREAK:
                             return Convert(result);
-                        case ValReturn vr:
-                            if(vr.up > 1)
-                                return vr with { up = vr.up - 1 };
-                            else
-                                return vr;
+                        case ValReturn vr: return vr.Up();
                         default:
                             result.Add(r);
                             continue;
@@ -1916,7 +1888,6 @@ namespace Oblivia {
                 case IEnumerable e:
                     return Map(e);
                 case ValTuple vt:
-
                     int index = 0;
                     List<(string key, object val)> items = [];
                     foreach(var (key, val) in vt.items) {
@@ -1942,8 +1913,10 @@ namespace Oblivia {
                     index++;
                     if(cond != null) {
                         switch(cond.Eval(ctx)) {
-                            case true: goto Do;
-                            case false: goto Done;
+                            case true: 
+                                goto Do;
+                            case false: 
+                                goto Done;
                             default:
                                 throw new Exception();
                         }
@@ -1954,8 +1927,7 @@ namespace Oblivia {
                     switch(r) {
                         case ValEmpty:
                             continue;
-                        case ValReturn vr:
-                            return vr.Up();
+                        case ValReturn vr:return vr.Up();
                         default:
                             result.Add(r);
                             break;
@@ -2009,12 +1981,10 @@ namespace Oblivia {
         public static void Set (IScope ctx, string key, object val) {
             ctx.SetLocal(key, val);
         }
-
         public static ValClass MakeClass (IScope f, ExprBlock block) {
             var _static = (ValDictScope)block.MakeScope(f);
             block.StagedApply(_static);
             var c = new ValClass { name = "unknown", source_ctx = f, source_expr = block, _static = _static };
-
             _static.locals["_kind"] = ValKeyword.CLASS;
             _static.AddClass(c);
             return c;
@@ -2033,12 +2003,9 @@ namespace Oblivia {
             return _static;
         }
         public static ValDictScope DeclareInterface (IScope f, ExprBlock block, string key) {
-            var _static = (ValDictScope)block.MakeScope(f);
-            var vi = new ValInterface {
-                _static = _static
-            };
+            var _static = block.MakeScope(f);
+            var vi = new ValInterface {_static = _static};
             f.SetLocal(key, vi);
-
 			_static.locals["_kind"] = ValKeyword.INTERFACE;
 			_static.AddInterface(vi);
             return _static;
@@ -2113,7 +2080,7 @@ namespace Oblivia {
             return new ValTuple { items = it.ToArray() };
             //return t;
         }
-        public object Eval (IScope ctx) => EvalTuple(ctx);
+        public object Eval (IScope ctx) => EvalExpression(ctx);
 
 
         public object EvalExpression (IScope ctx) {
@@ -2153,6 +2120,8 @@ namespace Oblivia {
         public (string key, object val)[] items;
         public object[] vals => items.Select(i => i.val).ToArray();
         public object Eval (IScope ctx) => this;
+
+        public static ValTuple Single (object v) => new ValTuple { items = [(null, v)] };
         public void Spread (List<(string key, object val)> it) {
             foreach(var (key, val) in items) {
                 it.Add((key, val));
@@ -2266,7 +2235,7 @@ namespace Oblivia {
         public string Source => $"{symbol.Source} := {value.Source}";
         public object Eval (IScope ctx) {
             var curr = ctx.Get(symbol.key, symbol.up);
-            var inner_ctx = (ValDictScope) ctx.MakeTemp(curr);
+            var inner_ctx = ctx.MakeTemp(curr);
             inner_ctx.locals["_curr"] = curr;
             switch(curr) {
                 case ValDeclared vd:
@@ -2279,7 +2248,7 @@ namespace Oblivia {
         public static object AssignLocal (IScope ctx, string key, Func<object> getNext) => Assign(ctx, key, 1, getNext);
         public static object AssignSymbol (IScope ctx, ExprSymbol sym, Func<object> getNext) => Assign(ctx, sym.key, sym.up, getNext);
         public static object Assign (IScope ctx, string key, int up, Func<object> getNext) {
-            var curr = (object)ctx.Get(key, up);
+            var curr = ctx.Get(key, up);
             switch(curr) {
                 case ValError ve:
                     throw new Exception(ve.msg);

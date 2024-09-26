@@ -2,20 +2,15 @@
     #import("test.obl")
     WB:ABGR/(White Black)%
     p:print
-
     Buf(T):class {
         mk:!HashSet.T/ctor!
-        v:mk i:mk o:mk items:v,
+        v:mk i:mk o:mk,
         (_add _sub):(i o)|/Add
         has:v/Contains
         new():_class{}
         add(e:T):has.e ?+ p*"already added" ?-_add.e
         sub(e:T):has.e ?+ _sub.e ?- p*"already removed"
         mut():{v/UnionWith.i, v/ExceptWith.o, [i o]|/Clear!}
-        ~
-        ^(a:int):{}
-        ^@(a:int):{}
-        ~
     }
     XY:class {
         (x y):double_from*|(0 0)
@@ -50,7 +45,7 @@
     Entity:interface { active:bool }
     Env:interface {}
     Actor:interface { update():{} }
-    Chasm:class {
+    Chasm:class{
         name:"Chasm" pos:XY active:true
         tile:!Tile{(glyph front back):=(char_from.10 ABGR/(Gray Transparent)%)}
         new(^pos):Chasm{pos:=_0}
@@ -123,7 +118,7 @@
                         log/Add*Msg/new(Tile/arr*cat["Attack " e/name] time world/tick)
                         e/damage*10
                         attack:=true
-                        ^^:=break
+                        cut
                     }
                 }
             not.attack ?+ {
@@ -167,8 +162,7 @@
         getGrid:! {
             not.needUpdate ?+ ret*grid
             grid/Clear!
-            #print* grid/Count
-            ent/items|?(e) grid/GetOrAdd(e/pos/xyi HashSet.Entity/ctor!)/Add*e
+            ent/v|?(e) grid/GetOrAdd(e/pos/xyi HashSet.Entity/ctor!)/Add*e
             needUpdate:=false
             ^:grid
         }

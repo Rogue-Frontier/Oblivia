@@ -1,4 +1,13 @@
 {
+    ~
+    stage(1) {
+        
+    }
+    stage(2) {
+    
+    }
+    ~
+
     #import("test.obl")
     WB:ABGR/(White Black)%
     p:print
@@ -6,11 +15,18 @@
         mk:!HashSet.T/ctor!
         v:mk i:mk o:mk,
         (_add _sub):(i o)|/Add
-        has:v/Contains
+        _seq!: v
         new():_class{}
+        has:v/Contains
+        isType(e:obj): e = T
         add(e:T):has.e ?+ p*"already added" ?-_add.e
         sub(e:T):has.e ?+ _sub.e ?- p*"already removed"
-        mut():{v/UnionWith.i, v/ExceptWith.o, [i o]|/Clear!}
+        mut!:{v/UnionWith.i, v/ExceptWith.o, [i o]|/Clear!}
+        ~
+        addObj(e:obj): isType.e ?+ add.e
+        remObj(e:obj): isType.e ?+ rem.e
+        ~
+        needMut:!or[i/Count=-0 o/Count=-0]
     }
     XY:class {
         (x y):double_from*|(0 0)
@@ -21,10 +37,12 @@
         E:!XY/i(addi(0 1) 0)
         N:!XY/i(0 subi(0 1))
         S:!XY/i(0 addi(0 1))
+        Zero:!XY/i(0 0)
         i(x:int y:int):XY{(x y):=double_from*|(_0 _1)}
         f(^x ^y):XY{(x y):=_arg}
         add(rhs:XY):XY{x:=addf(^^^x _0/x) y:=addf(^^^y _0/y)}
         sub(rhs:XY):XY{x:=subf(^^^x _0/x) y:=subf(^^^y _0/y)}
+        mul(scale:int):XY{x:=mulf(^^^x _0) y:=mulf(^^^y _0)}
         div(scale:int):XY{x:=divf(^^^x _0) y:=divf(^^^y _0)}
         ~
         l:prop(
@@ -45,15 +63,12 @@
     Entity:interface { active:bool }
     Env:interface {}
     Actor:interface { update():{} }
-
     Reticle: class {
         active:true pos:XY
         new(^pos): Reticle {
             pos := _0
         }
-        update():{
-            
-        }
+        update():{}
         impl(Entity Actor)
     }
     Chasm:class{
@@ -149,33 +164,57 @@
     ItemType:class{name:string}
     World:class {
         B(T):Buf.T/new!
-        ent:B.Entity
-        act:B.Actor
+        v_entity:B.Entity
+        v_actor:B.Actor
         tick:0
-        needUpdate:true
-        grid:ConcurrentDictionary(Pt HashSet.Entity)/ctor!
+        placeActors:true
+        placeEntities:true
+        CD:ConcurrentDictionary
+        HS:HashSet
+        actorGrid:CD(Pt HS.Actor)/ctor!
+        entityGrid:CD(Pt HS.Entity)/ctor!
         new!:World {}
         add(e:Entity):{
-            ent/add*e
-            isActor.e ?+ act/add*e
+            isActor.e ?+
+                v_actor/add.e ?-
+                v_entity/add.e
         }
         rem(e:Entity):{
-            ent/sub*e
-            isActor(e) ?+ act/sub*e
+            isActor(e) ?+
+                v_actor/sub.e ?-
+                v_entity/sub.e
         }
         isActor(e:Entity):e=Actor
         update!:{
-            act/v|?(a) not(a/active) ?+ rem.a ?- a/update!
+            v_actor|?(a) not(a/active) ?+ rem.a ?- a/update!
             mut!
             tick:=addi(_ 1)
         }
-        mut!:{(ent act)|/mut! needUpdate:=true}
+        mut!:{
+            v_entity/needMut ?+ {placeEntities := true},
+            (v_entity v_actor)|/mut!
+            placeActors:=true
+        }
         getGrid:! {
-            not.needUpdate ?+ ret*grid
-            grid/Clear!
-            ent/v|?(e) grid/GetOrAdd(e/pos/xyi HashSet.Entity/ctor!)/Add*e
-            needUpdate:=false
-            ^:grid
+            placeActors ?+ {
+                actorGrid/Clear!
+                v_actor |?(a) actorGrid/GetOrAdd(a/pos/xyi HashSet.Actor/ctor!)/Add.a
+                placeActors:=false
+            }
+            placeEntities ?+ {
+                entityGrid/Clear!
+                v_entity |?(e) entityGrid/GetOrAdd(e/pos/xyi HashSet.Entity/ctor!)/Add.e
+                placeEntities:=false
+            }
+            ^:^^$
+        }
+        ^@(p:Pt): {
+            p:_0
+            #print*_0
+            res:HS.Entity/ctor(5)
+            entityGrid/ContainsKey(p) ?+ res/UnionWith*entityGrid[p]
+            actorGrid/ContainsKey(p) ?+ res/UnionWith*actorGrid[p]
+            ret.res
         }
         hasTile(type p:XY):{
             getGrid[p/xyi]=obj:loc ?+ loc|?(e) (e=type) ?+ {^^^:=true}
@@ -192,16 +231,8 @@
     sf:Sf
     sf_ui:Sf
     menu:Menu * null
-
     #dummy: set { print*_val }
-
     init!:{
-        "aaa"=string:a ?+ print* a
-        "aaa" ?{
-            _:print*_
-        }
-        print * cat*[1 2, [:int 3 4]%]
-        print * [1 2 3] | ?(i) i =+ 1 ?+ i
         world:=World/new!
         add:world/add
         range(0 30)|?(y:int)
@@ -226,10 +257,10 @@
         menu=Menu:m ?+ m/update {delta}
     }
     resetCamera!:{camera:=plr/pos}
-    center:!XY/i(sf/(GridWidth GridHeight)%)/div* 2
+    center:!XY/i(sf/(GridWidth GridHeight)%)/div*2
     render(delta:TimeSpan):{
-        [sf sf_ui]|?(s) s/Clear!,
-        [world/getGrid]|?(g) g/Keys|?(p) g@p|?(e) e/tile/print(sf center/add*e/pos/sub*camera)
+        [sf sf_ui]|/Clear!,
+        [world/getGrid/entityGrid world/getGrid/actorGrid]|?(g) g/Keys|?(p) g@p|?(e) e/tile/print(sf center/add*e/pos/sub*camera)
         sf_ui/Print(1 1 cat["tick:" world/tick] WB)
         invMenu:{
             x:0 y:subi(sf/GridHeight 64) w:32 h:32 down:!{y:=addi(_ 1)}
@@ -248,8 +279,7 @@
             Sf/DrawRect(sf_ui x y w 1 border) down
             plr/log|?(msg:Msg) {
                 x:2
-                msg/tiles|?(t:Tile) {t/print(sf_ui XY/i(x y)) x:=addi(_ 1)}
-                down
+                msg/tiles|?(t:Tile) {t/print(sf_ui XY/i(x y)) x:=addi(_ 1)} down
                 y:=mini(y subi(sf_ui/GridHeight 1))
             }
         }
@@ -273,9 +303,9 @@
                     items:items!
                     invoke:?(i) {
                         it:menu/items@i,
-                        [world/rem plr/cargo/Add] |* it
+                        [world/rem plr/cargo/Add]|*it
                         world/mut!
-                        menu/setItems* items!
+                        menu/setItems*items!
                     }
                 )
             }
@@ -400,7 +430,7 @@
         render():{
             lt(modf(time interval) divf(interval 2)) ?+
                 marker/print(sf center)
-            x:32 y:26 w:32 h:32
+            x:32,y:26,w:32,h:32,
             down:!{y:=addi(_ 1)}
             Sf/DrawRect(sf_ui x y w h border) down
             sf_ui/Print(addi(x 2) y title WB) down

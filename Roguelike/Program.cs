@@ -76,8 +76,8 @@ var global = new ValDictScope {
 		["sumi"] = _((int[] a) => a.Sum()),
 
 		["not"] = _((bool b) => !b),
-		["and"] = _((bool[] a) => a.All(a => a)),
-		["or"] = _((bool[] a) => a.Any(a => a)),
+		["and"] = _((object[] a) => a.All(a => (bool)a)),
+		["or"] = _((object[] a) => a.Any(a => (bool)a)),
 
 		["nullor"] = _((object a, object b) => a ?? b),
 

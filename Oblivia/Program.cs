@@ -13,7 +13,7 @@ using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 using System.Xml.Serialization;
-using static Oblivia.ExprMapFunc;
+using static Oblivia.ExprMap;
 using static System.Formats.Asn1.AsnWriter;
 
 namespace Oblivia {
@@ -76,7 +76,8 @@ namespace Oblivia {
         CANCEL,
         RETURN,
         REPEAT,
-        VAR
+        VAR,
+        STAGE
     }
     public class ValEmpty {
         public static readonly ValEmpty VALUE = new();
@@ -616,7 +617,6 @@ namespace Oblivia {
                     return NextExpression(lhs);
             }
         }
-
         public INode NextPattern () => NextExpression();
         public INode NextExpression () {
             var lhs = NextTerm();
@@ -632,10 +632,14 @@ namespace Oblivia {
                         switch(tokenType) {
                             case TokenType.SPARK:
                                 inc();
-                                return NextExpression(new ExprMapExpr { src = lhs, map = new ExprInvoke { expr = new ExprSelf { up = 1 }, args = ExprTuple.SingleExpr(NextExpression())  } });
+                                return NextExpression(new ExprMap { src = lhs, map = new ExprInvoke { expr = new ExprSelf { up = 1 }, args = ExprTuple.SingleExpr(NextExpression())  } , expr = true});
+                            case TokenType.DOT:
+								inc();
+								return NextExpression(new ExprMap { src = lhs, map = new ExprInvoke { expr = new ExprSelf { up = 1 }, args = ExprTuple.SingleExpr(NextTerm()) }, expr = true });
+
 							case TokenType.SLASH:
 								inc();
-								return NextExpression(new ExprMapExpr { src = lhs, map = NextExpression() });
+								return NextExpression(new ExprMap { src = lhs, map = NextExpression(), expr = true });
                             default: {
                                     var cond = default(INode);
                                     var type = default(INode);
@@ -660,8 +664,7 @@ namespace Oblivia {
                                                 break;
                                             }
                                     }
-                                    return NextExpression(new ExprMapFunc { src = lhs, cond = cond, type = type, map = NextTerm() });
-
+                                    return NextExpression(new ExprMap { src = lhs, cond = cond, type = type, map = NextTerm() });
                                 }
 						}
                     }
@@ -674,24 +677,29 @@ namespace Oblivia {
                         switch(tokenType) {
                             case TokenType.PIPE:
                                 inc();
-                                var emf = new ExprMapFunc {
-                                    src = NextExpression(),
-                                    map = lhs,
-                                };
-
-								return NextExpression(emf);
+								return NextExpression(new ExprMap {
+									src = NextExpression(),
+									map = lhs,
+								});
                             default:
-
 								return NextExpression(new ExprInvoke {
 									expr = lhs,
 									args = ExprTuple.SpreadExpr(NextExpression()),
 								});
 						}
-
 					}
                 case TokenType.DOT: {
                         inc();
-                        return NextExpression(new ExprInvoke { expr = lhs, args = ExprTuple.SingleExpr(NextTerm()) });
+                        switch(tokenType) {
+                            case TokenType.PIPE:
+                                inc();
+								return NextExpression(new ExprMap {
+									src = NextTerm(),
+									map = lhs,
+								});
+                            default:
+								return NextExpression(new ExprInvoke { expr = lhs, args = ExprTuple.SingleExpr(NextTerm()) });
+						}
                     }
                 case TokenType.SHOUT: {
                         inc();
@@ -750,7 +758,7 @@ namespace Oblivia {
                         switch(tokenType) {
                             case TokenType.PIPE:
                                 inc();
-                                return NextExpression(new ExprMapExpr { src = NextExpression(), map = new ExprAt { src = lhs, index = [new ExprSelf { up = 1 }] } });
+                                return NextExpression(new ExprMap { src = NextExpression(), map = new ExprAt { src = lhs, index = [new ExprSelf { up = 1 }] }, expr = true });
                                 throw new Exception();
                         }
                         return NextExpression(new ExprAt { src = lhs, index = [NextTerm()] });
@@ -768,7 +776,27 @@ namespace Oblivia {
                         index.Add(NextExpression());
                         goto Check;
                     }
-                case TokenType.QUERY: {
+
+				case (TokenType.PLUS): {
+						inc();
+						var positive = NextExpression();
+						var negative = default(INode);
+						switch(tokenType) {
+							case TokenType.DASH: {
+
+									inc();
+									negative = NextExpression();
+									break;
+								}
+						}
+						return NextExpression(new ExprBranch {
+							condition = lhs,
+							positive = positive,
+							negative = negative
+						});
+					}
+
+				case TokenType.QUERY: {
                         inc();
                         switch(tokenType) {
                             case TokenType.PERCENT: {
@@ -1371,6 +1399,7 @@ namespace Oblivia {
             switch(lhs) {
                 case ValEmpty: {
                         throw new Exception("Function not found");
+
                     }
                 case ValError ve: {
                         throw new Exception(ve.msg);
@@ -1649,18 +1678,10 @@ namespace Oblivia {
 						}
 						throw new Exception($"Variable not found {key}");
 					}
-                case ValClass vc: {
-                        return vc._static.locals.TryGetValue(key, out var v) ? v : throw new Exception("Variable not found");
-                    }
-                case Type t: {
-                        return new ValTypeScope { t = t }.GetAt(key, 1);
-                    }
-                case Args a: {
-                        return a[key];
-                    }
-                case object o: {
-                        return new ValObjectScope { o = o }.GetAt(key, 1);
-                    }
+                case ValClass vc: {return vc._static.locals.TryGetValue(key, out var v) ? v : throw new Exception("Variable not found");}
+                case Type t: {return new ValTypeScope { t = t }.GetAt(key, 1);}
+                case Args a: {return a[key];}
+                case object o: {return new ValObjectScope { o = o }.GetAt(key, 1);}
             }
             throw new Exception("Object expected");
         }
@@ -1706,7 +1727,9 @@ namespace Oblivia {
                     }
                 case ValDictScope vds: {
                         if(vds._at is ValFunc vf) {
-                            return vf.CallPars(ctx, ExprTuple.ListExpr(index));
+                            var et = ExprTuple.ListExpr(index);
+                            var vt = et.EvalTuple(ctx);
+							return vf.CallArgs(ctx, vt);
                         }
 						throw new Exception("Illegal");
 					}
@@ -1729,7 +1752,6 @@ namespace Oblivia {
     public class ExprCondSeq : INode {
         public INode type;
         public INode filter;
-
         public List<(INode cond, INode yes, INode no)> items;
         public object Eval (IScope ctx) {
             var f = filter.Eval(ctx);
@@ -1742,15 +1764,14 @@ namespace Oblivia {
                 var c = cond.Eval(ctx);
                 var b = ExprInvoke.InvokeArgs(ctx, f, c switch {
                     ValTuple vrt => vrt,
-                    _ => new ValTuple { items = [(null, c)] }
-                });
+                    _ => ValTuple.Single(c)
+				});
                 switch(b) {
                     case true: {
                             if(yes != null) {
                                 var v = yes.Eval(ctx);
                                 switch(v) {
-                                    case ValEmpty:
-                                        continue;
+                                    case ValEmpty:continue;
                                     default:
                                         lis.Add(v);
                                         continue;
@@ -1762,8 +1783,7 @@ namespace Oblivia {
                             if(no != null) {
                                 var v = no.Eval(ctx);
                                 switch(v) {
-                                    case ValEmpty:
-                                        continue;
+                                    case ValEmpty:continue;
                                     default:
                                         lis.Add(v);
                                         continue;
@@ -1773,7 +1793,6 @@ namespace Oblivia {
                         }
                     default:
                         throw new Exception("Boolean expected");
-
                 }
             }
             var arr = lis.ToArray();
@@ -1795,39 +1814,30 @@ namespace Oblivia {
 			}
 			throw new Exception("Fell out of match expression");
 			bool Is (object pattern) {
-                if(subject == pattern) {
+                if(subject == pattern)
                     return true;
-                }
-                return false;
+                else
+                    return false;
             }
         }
     }
-    public class ExprMapFunc : INode {
+    public class ExprMap : INode {
         public INode src;
         public INode map;
         public INode cond;
         public INode type;
+        public bool expr = false;
         public XElement ToXML () => new("Map", src.ToXML(), map.ToXML());
         public string Source => $"{src.Source} | {map.Source}";
         public object Eval (IScope ctx) {
             var lhs = src.Eval(ctx);
-            object Map (dynamic seq) {
-				Func<Type>? t = type is { } _t ? () => (Type)_t.Eval(ctx) : null;
-				var f = map.Eval(ctx);
-				object tr (IScope inner_ctx, object item) =>
-					ExprInvoke.InvokeArgs(inner_ctx, f, item switch {
-						ValTuple vt => vt,
-						_ => ValTuple.Single(item)
-					});
-				return ExprMapFunc.Map(seq, ctx, cond, t, (Transform)tr);
-            }
+            Func<dynamic, object> Map = expr ? MapExpr : MapFunc;
 			switch(lhs) {
                 case ValEmpty: throw new Exception("Variable not found");
                 case ICollection c: return Map(c);
                 case IEnumerable e: return Map(e);
 				case ValDictScope vds: {
-						if(vds._seq(out var seq))
-							return Map(seq);
+						if(vds._seq(out var seq) && seq is ValFunc vf) return Map(vf.CallPars(ctx, ExprTuple.Empty));
 						throw new Exception();
 					}
 				case ValTuple vt: {
@@ -1841,7 +1851,24 @@ namespace Oblivia {
 				default:
                     throw new Exception("Sequence expected");
             }
-        }
+
+
+			object MapFunc (dynamic seq) {
+				Func<Type>? t = type is { } _t ? () => (Type)_t.Eval(ctx) : null;
+				var f = map.Eval(ctx);
+				object tr (IScope inner_ctx, object item) =>
+					ExprInvoke.InvokeArgs(inner_ctx, f, item switch {
+						ValTuple vt => vt,
+						_ => ValTuple.Single(item)
+					});
+				return ExprMap.Map(seq, ctx, cond, t, (Transform)tr);
+			}
+			object MapExpr (dynamic seq) {
+				object tr (IScope inner_ctx, object item) => map.Eval(MakeMapCtx(inner_ctx, item));
+				Func<Type>? t = type is { } _t ? () => (Type)_t.Eval(ctx) : null;
+				return ExprMap.Map(seq, ctx, cond, t, (Transform)tr);
+			}
+		}
         public static IScope MakeCondCtx (IScope ctx, object item, int index) {
             var inner_ctx = (IScope)ctx.MakeTemp();
             inner_ctx.SetLocal("_item", item);
@@ -1871,7 +1898,7 @@ namespace Oblivia {
 			var result = new List<object>();
 			int index = 0;
 			foreach(var item in seq) {
-				var inner_ctx = ExprMapFunc.MakeCondCtx(ctx, item, index);
+				var inner_ctx = ExprMap.MakeCondCtx(ctx, item, index);
 				index++;
 				if(cond != null) {
 					switch(cond.Eval(ctx)) {
@@ -1899,50 +1926,6 @@ namespace Oblivia {
 			return Convert(result, t);
 		}
 	}
-    public class ExprMapExpr : INode {
-        public INode src;
-        public INode map;
-        public INode cond;
-        public INode type;
-        public bool local = false;
-        public XElement ToXML () => new("Map", src.ToXML(), map.ToXML());
-        public string Source => $"{src.Source} | {map.Source}";
-        public object Eval (IScope ctx) {
-            var lhs = src.Eval(ctx);
-			object tr (IScope inner_ctx, object item) => map.Eval(MakeMapCtx(inner_ctx, item));
-			object Map (dynamic seq) {
-				Func<Type>? t = type is { } _t ? () => (Type)_t.Eval(ctx) : null;
-				return ExprMapFunc.Map(seq, ctx, cond, t, (Transform)tr);
-			}
-			switch(lhs) {
-                case ValEmpty:
-                    throw new Exception("Variable not found");
-                case ICollection c:return Map(c);
-                case IEnumerable e:return Map(e);
-                case ValDictScope vds: {
-                        if(vds._seq(out var seq)) return Map(seq);
-                        throw new Exception();
-					}
-				case ValTuple vt:
-					int index = 0;
-					List<(string key, object val)> items = [];
-					foreach(var (key, val) in vt.items) {
-						var inner_ctx = MakeCondCtx(ctx, val, index);
-						var r = map.Eval(MakeMapCtx(inner_ctx, val));
-						index += 1;
-						if(r is ValEmpty) {
-							continue;
-						}
-						items.Add((key, r));
-					}
-					return new ValTuple {
-						items = items.ToArray()
-					};
-				default:
-                    throw new Exception("Sequence expected");
-            }
-        }
-	}
     public class StmtDefKey : INode {
         public string key;
         public INode value;
@@ -1951,10 +1934,8 @@ namespace Oblivia {
         public object Eval (IScope ctx) {
             var val = value.Eval(ctx);
             switch(val) {
-                case ValError ve:
-                    throw new Exception(ve.msg);
-                default:
-                    return Init(ctx, key, val);
+                case ValError ve: throw new Exception(ve.msg);
+                default: return Init(ctx, key, val);
             }
         }
         public static object Init (IScope ctx, string key, object val) {

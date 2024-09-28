@@ -146,6 +146,7 @@ var global = new ValDictScope {
 		["cancel"] = ValKeyword.CANCEL,
 		["ret"] = ValKeyword.RETURN,
 		["var"] = ValKeyword.VAR,
+		["yield"] = ValKeyword.YIELD,
 	}
 };
 PriorityQueue<object, int> a = new();

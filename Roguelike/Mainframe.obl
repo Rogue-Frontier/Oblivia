@@ -15,7 +15,9 @@
         m:!HashSet.T/ctor!
         v:m i:m o:m,
         (_add _sub):(i o)|/Add
-        _seq!:v
+
+        _seq():v
+        
         new():_class{}
         has:v/Contains
         isType(e:obj): e = T
@@ -57,12 +59,12 @@
     Tile:class {
         glyph:"@"@0,
         (front back):ABGR/(Magenta Black),
-        #g:'glyph
-        #f:'front
-        #b:'back
-        #gfb:'(g f b)
-        arr(str:string):str|?(c:char) Tile{(glyph front back):=(c ABGR/(White Black)%)}
-        print(sf:Sf pos:XY):{sf/PrintChar(pos/(xi yi)% ^^^(glyph front back)%)}
+        g:'glyph
+        f:'front
+        b:'back
+        gfb:'(g f b)
+        arr(str:string):str|?(c:char) Tile{gfb:=(c ABGR/(White Black)%)}
+        print(sf:Sf pos:XY):{sf/PrintChar(pos/(xi yi)% gfb%)}
     }
     Entity:interface { active:bool }
     Env:interface {}
@@ -77,7 +79,7 @@
     }
     Chasm:class{
         name:"Chasm" pos:XY active:true
-        tile:!Tile{(glyph front back):=(char_from.10 ABGR/(Gray Transparent)%)}
+        tile:!Tile{gfb:=(char_from.10 ABGR/(Gray Transparent)%)}
         new(^pos):Chasm{pos:=_0}
         impl(Entity Env)
     }
@@ -94,7 +96,7 @@
     }
     Wall:class {
         name:"Wall" pos:XY active:true
-        tile:!Tile{(glyph front back):=(char_from.249 ABGR/(Gray Transparent)%)}
+        tile:!Tile{gfb:=(char_from.249 ABGR/(Gray Transparent)%)}
         impl(Entity Env)
     }
     Msg:class {
@@ -111,7 +113,7 @@
     }
     Enemy:class {
         hp:100 active:true name:"Enemy" pos:XY world:World
-        tile:Tile{(glyph front back):=("r"@0 ABGR/(Red Transparent)%)}
+        tile:Tile{gfb:=("r"@0 ABGR/(Red Transparent)%)}
         new(^pos ^world):Enemy{(pos world):=_arg}
         update!:{not.active ?+ world/rem*this}
         damage(^hp):{^^^hp:=subi(_ _0) active:=gt(^^^hp 0)
@@ -121,7 +123,7 @@
     }
     Roachbot:class {
         hp:100 active:true name:"Roachbot" pos:XY world:World
-        tile:Tile{(glyph front back):=("r"@0 ABGR/(Brown Transparent)%)}
+        tile:Tile{gfb:=("r"@0 ABGR/(Brown Transparent)%)}
         new(^pos ^world):Enemy{(pos world):=_arg}
         update!:{
             not.active ?+ world/rem*this
@@ -133,7 +135,7 @@
         ^@(a:int):{}
         data@(a:int):{}
         name:"Player" pos:XY active:true world:World
-        tile:Tile{(glyph front back):=("@"[0] ABGR/(Magenta Transparent)%)}
+        tile:Tile{gfb:=("@"[0] ABGR/(Magenta Transparent)%)}
         busy:false
         L(T):List.T/ctor!
         log:L.Msg cargo:L.Item
@@ -175,7 +177,7 @@
         CD:ConcurrentDictionary HS:HashSet
         actorGrid:CD(Pt HS.Actor)/ctor!
         entityGrid:CD(Pt HS.Entity)/ctor!
-        new!:World {}
+        new!:_class{}
         add(e:Entity):{
             isActor.e ?+
                 v_actor/add.e ?-
@@ -232,6 +234,7 @@
     menu:Menu*null
     #dummy: set { print*_val }
     init!:{
+        #yield(5)
         fib: ?(i:int): i ?{0:0 1:1 _:addi(^^*subi(i 1) ^^*subi(i 2))}
         print*fib(3)
         
@@ -384,7 +387,7 @@
             items | ?(it) {
                 down
                 sf_ui/Print*|[
-                    (addi(x 2) y it/tile/(glyph front back)%),
+                    (addi(x 2) y it/tile/gfb%),
                     (addi(x 4) y it/name WB),
                     (subi(addi(x w) 3) y ABC@ind WB),
                 ]

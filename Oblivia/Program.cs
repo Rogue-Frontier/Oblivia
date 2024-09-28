@@ -69,15 +69,33 @@ namespace Oblivia {
         ENUM,
         GET,
         SET,
+        
+        AUTOFUNC,
         IMPLEMENT,
         INHERIT,
         BREAK,
         CONTINUE,
-        CANCEL,
         RETURN,
-        REPEAT,
+        YIELD,
+        AWAIT,
+
+		CANCEL,
+
+		REPEAT,
         VAR,
-        STAGE
+        STAGE,
+        UNION,      //any
+        INTERSECT   //all
+    }
+    public class ValMultiType {
+        public object[] items;
+        public bool intersect = false;
+        public bool Accept (object val) {
+            if(intersect) {
+
+            }
+            return false;
+        }
     }
     public class ValEmpty {
         public static readonly ValEmpty VALUE = new();
@@ -89,14 +107,37 @@ namespace Oblivia {
         public INode expr;
         public object Eval (IScope ctx) => new ValGetter { ctx = ctx, expr = expr };
     }
+
+    public record ValSetter {
+        public INode expr;
+        public IScope ctx;
+        public object Set (object val) {
+            var inner_ctx = ctx.MakeTemp();
+            inner_ctx.locals["_val"] = val;
+            return expr.Eval(inner_ctx);
+        }
+    }
     public record ValGetter {
         public INode expr;
         public IScope ctx;
-        public object Eval () => expr.Eval(ctx);
+        public object Deref () => expr.Eval(ctx);
     }
+
+    public record ValAlias {
+        public INode expr;
+        public IScope ctx;
+        public object Deref () => expr.Eval(ctx);
+
+        public object Assign(Func<object> getNext) {
+            if(expr is ExprSymbol es) {
+                return es.Assign(ctx, getNext);
+            }
+            throw new Exception();
+        }
+	}
     public record ExprAlias:INode {
         public INode expr;
-        public object Eval (IScope ctx) => expr.Eval(ctx);
+        public object Eval (IScope ctx) => new ValAlias { ctx = ctx, expr = Sub };
         public INode Sub => expr switch {
             ExprAlias al => al.Sub,
             _ => expr
@@ -443,7 +484,7 @@ namespace Oblivia {
         public bool _seq(out object seq) {
             if(locals.TryGetValue("_seq", out dynamic f)) {
                 if(f is ValGetter vg) {
-                    f = vg.Eval();
+                    f = vg.Deref();
                 }
                 seq = f;
                 return true;
@@ -611,7 +652,16 @@ namespace Oblivia {
                                 value = NextExpression()
                             };
                         default:
-                            throw new Exception("Cannot define this");
+							switch(tokenType) {
+								case TokenType.EQUAL: {
+										inc();
+                                        break;
+                                        return new StmtAssignSymbol { };
+									}
+							}
+
+
+							throw new Exception("Cannot define this");
                     }
                 default:
                     return NextExpression(lhs);
@@ -1196,6 +1246,9 @@ namespace Oblivia {
                 case ValKeyword.GET: {
                         return new ValGetter { ctx = ctx, expr = source_block };
                     }
+                case ValKeyword.SET: {
+                        return new ValSetter { ctx = ctx, expr = source_block };
+                    }
                 case ValKeyword.RETURN: {
                         return new ValReturn(getResult(), 1);
                     }
@@ -1354,10 +1407,14 @@ namespace Oblivia {
             var f = expr.Eval(ctx);
             switch(f) {
                 case ValKeyword.SET:
-                    throw new Exception();
+                    return new ValSetter { ctx= ctx, expr = args };
                 case ValKeyword.GET:
                     return new ValGetter { ctx = ctx, expr = args };
-                case ValKeyword.RETURN:
+                case ValKeyword.UNION:
+                    return new ValMultiType { items = args.EvalTuple(ctx).vals, intersect = false };
+                case ValKeyword.INTERSECT:
+					return new ValMultiType { items = args.EvalTuple(ctx).vals, intersect = true };
+				case ValKeyword.RETURN:
 					return new ValReturn(args.EvalExpression(ctx), 1);
                 case ValKeyword.IMPLEMENT: {
                         var vds = (ValDictScope)ctx;
@@ -1399,7 +1456,6 @@ namespace Oblivia {
             switch(lhs) {
                 case ValEmpty: {
                         throw new Exception("Function not found");
-
                     }
                 case ValError ve: {
                         throw new Exception(ve.msg);
@@ -1651,10 +1707,14 @@ namespace Oblivia {
         public object Eval (IScope ctx) {
             var r = ctx.Get(key, up);
 			return r switch {
-				ValGetter vg => vg.Eval(),
+				ValGetter vg => vg.Deref(),
+                ValAlias va => va.Deref(),
 				_ => r,
 			};
 		}
+        public object Assign(IScope ctx, Func<object> getNext) {
+            return StmtAssignSymbol.Assign(ctx, key, up, getNext);
+        }
     }
     public class ExprSelf : INode {
         public int up;
@@ -1672,7 +1732,7 @@ namespace Oblivia {
                 case ValDictScope s: {
                         if(s.locals.TryGetValue(key, out var v)) {
 							return v switch {
-								ValGetter vg => vg.Eval(),
+								ValGetter vg => vg.Deref(),
 								_ => v,
 							};
 						}
@@ -2213,7 +2273,7 @@ namespace Oblivia {
         XElement ToXML () => new("Reassign", symbol.ToXML(), value.ToXML());
         public string Source => $"{symbol.Source} := {value.Source}";
         public object Eval (IScope ctx) {
-            var curr = ctx.Get(symbol.key, symbol.up);
+            var curr = symbol.Eval(ctx);
             var inner_ctx = ctx.MakeTemp(curr);
             inner_ctx.locals["_curr"] = curr;
             switch(curr) {
@@ -2221,7 +2281,7 @@ namespace Oblivia {
 					inner_ctx.locals["_type"] = vd.type;
 					break;
             }
-            var r = AssignSymbol(ctx, symbol, () => value.Eval(inner_ctx));
+            var r = symbol.Assign(ctx, () => value.Eval(inner_ctx));
             return r;
         }
         public static object AssignLocal (IScope ctx, string key, Func<object> getNext) => Assign(ctx, key, 1, getNext);
@@ -2229,40 +2289,32 @@ namespace Oblivia {
         public static object Assign (IScope ctx, string key, int up, Func<object> getNext) {
             var curr = ctx.Get(key, up);
             switch(curr) {
-                case ValError ve:
-                    throw new Exception(ve.msg);
-                case ValDeclared vd:
-                    return Match(vd.type);
-                case ValClass vc:
-                    return MatchClass(vc);
-                case ValDictScope vds:
-                    return ctx.Set(key, getNext(), up);
-                default:
-                    return MatchType(curr?.GetType());
+				case ValError ve: throw new Exception(ve.msg);
+				case ValSetter vs:      return vs.Set(getNext());
+                case ValAlias va:       return va.Assign(getNext);
+                case ValDeclared vd:    return Assign(vd.type);
+                case ValClass vc:       return AssignClass(vc);
+                case ValDictScope vds:  return ctx.Set(key, getNext(), up);
+                default:                return AssignType(curr?.GetType());
             }
-            object Match (object type) {
+            object Assign (object type) {
                 switch(type) {
-                    case Type t:
-                        return MatchType(t);
-                    case ValClass vc:
-                        return MatchClass(vc);
+                    case Type t:        return AssignType(t);
+                    case ValClass vc:   return AssignClass(vc);
                 }
                 throw new Exception();
             }
-            object MatchClass (ValClass cl) {
+            object AssignClass (ValClass cl) {
                 var next = getNext();
                 switch(next) {
-                    case ValDictScope vds:
-                        return ctx.Set(key, vds, up);
-                    case ValError ve:
-                        throw new Exception(ve.msg);
-                    default:
-                        return ctx.Set(key, next, up);
+                    case ValDictScope vds:  return ctx.Set(key, vds, up);
+                    case ValError ve:       throw new Exception(ve.msg);
+                    default:                return ctx.Set(key, next, up);
                 }
             }
-            object MatchType (Type t) {
+            object AssignType (Type prevType) {
                 var next = getNext();
-                if(t == null) {
+                if(prevType == null) {
                     goto Do;
                 }
                 switch(curr) {
@@ -2276,16 +2328,94 @@ namespace Oblivia {
                         throw new Exception("Value must be a scope");
                 }
                 var nt = next.GetType();
-                if(!t.IsAssignableFrom(nt)) {
+                if(!prevType.IsAssignableFrom(nt)) {
                     throw new Exception("Type mismatch");
                 }
-                if(next is ValError ve) {
-                    throw new Exception(ve.msg);
+                switch(next) {
+                    case ValError ve: throw new Exception(ve.msg);
                 }
+
                 Do:
                 return ctx.Set(key, next, up);
             }
         }
+
+        public static bool CanAssign(object prev, object next) {
+			switch(prev) {
+				case ValError ve:
+					throw new Exception(ve.msg);
+				case ValDeclared vd:
+					return Match(vd.type);
+				case ValClass vc:
+					return MatchClass(vc);
+				case ValDictScope vds:
+					return true;
+				default:
+					return MatchType(prev?.GetType());
+			}
+			bool Match (object prevType) {
+				switch(prevType) {
+					case Type t:
+						return MatchType(t);
+					case ValClass vc:
+						return MatchClass(vc);
+				}
+				throw new Exception();
+			}
+			bool MatchClass (ValClass prevClass) {
+				switch(next) {
+					case ValDictScope vds:
+						return true;
+					case ValError ve:
+						throw new Exception(ve.msg);
+					default:
+						return true;
+				}
+			}
+			bool MatchType (Type prevType) {
+				if(prevType == null) {
+					goto Good;
+				}
+				switch(prev) {
+					case ValInterface vi:
+						if(next is ValDictScope vds) {
+							if(vds.HasInterface(vi)) {
+								goto Good;
+							}
+							throw new Exception("Does not implement interface");
+						}
+						throw new Exception("Value must be a scope");
+				}
+				var nt = next.GetType();
+				if(!prevType.IsAssignableFrom(nt)) {
+					throw new Exception("Type mismatch");
+				}
+				if(next is ValError ve) {
+					throw new Exception(ve.msg);
+				}
+				Good:
+				return true;
+			}
+		}
+    }
+    public record Var {
+		public bool pub;
+		public bool mut;
+        public bool init;
+        public object type;
+        public object val;
+
+        public void Init(ValCast vc) {
+            this.type = vc.type;
+            this.val = vc.val;
+        }
+        public void Assign(ValCast vc) {
+            this.val = vc.val;
+        }
+    }
+    public record ValCast {
+        public object type;
+        public object val;
     }
     public interface INode {
         XElement ToXML () => new(GetType().Name);

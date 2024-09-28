@@ -25,7 +25,8 @@ var scope = parser.NextBlock();
 T Val<T> (T t) => t;
 var global = new ValDictScope();
 
-global.locals = new Dictionary<string, dynamic> {
+global.locals = new() {
+	["class"] = ValKeyword.CLASS,
 	["void"] = typeof(void),
 	["bool"] = typeof(bool),
 	["int"] = typeof(int),
@@ -96,6 +97,6 @@ global.locals = new Dictionary<string, dynamic> {
 	["Dictionary"] = Val((Type key, Type val) => typeof(Dictionary<,>).MakeGenericType(key, val)),
 	["StringBuilder"] = typeof(StringBuilder)
 };
-var result = (ValDictScope)scope.Eval(global);
-var r = (result.locals["main"] as ValFunc).Call(result, [new ExprVal { value = "program" }]);
+var result = (ValDictScope)scope.StagedApply(global);
+var r = (result.locals["main"] as ValFunc).CallData(result, ["program"]);
 return;

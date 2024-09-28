@@ -11,11 +11,11 @@
     #import("test.obl")
     WB:ABGR/(White Black)%
     p:print
-    Buf(T):class {
-        mk:!HashSet.T/ctor!
-        v:mk i:mk o:mk,
+    Buf(T):class{
+        m:!HashSet.T/ctor!
+        v:m i:m o:m,
         (_add _sub):(i o)|/Add
-        _seq!: v
+        _seq!:v
         new():_class{}
         has:v/Contains
         isType(e:obj): e = T
@@ -115,7 +115,7 @@
         }
         impl(Entity Actor)
     }
-    Roachbot: class {
+    Roachbot:class {
         hp:100 active:true name:"Roachbot" pos:XY world:World
         tile:Tile{(glyph front back):=("r"@0 ABGR/(Brown Transparent)%)}
         new(^pos ^world):Enemy{(pos world):=_arg}
@@ -139,7 +139,7 @@
             dest:pos/add*disp
             attack:false
             world/getGrid[dest/xyi]=obj:o ?+
-                o | ?(e) {
+                o | ?(e:Entity) {
                     e=Enemy:e ?+ {
                         log/Add*Msg/new(Tile/arr*cat["Attack " e/name] time world/tick)
                         e/damage*10
@@ -225,16 +225,18 @@
     }
     time:double/Parse."0"
     move:false
-    camera:XY
-    plr:Player
-    world:World
-    sf:Sf
-    sf_ui:Sf
+    camera:XY plr:Player world:World
+    sf:Sf sf_ui:Sf
     menu:Menu * null
     #dummy: set { print*_val }
     init!:{
         world:=World/new!
         add:world/add
+
+
+        world/tick := 0
+
+
         range(0 30)|?(y:int)
             range(0 30)|?(x:int)
                 add*Floor/new*XY/i(x y)
@@ -244,7 +246,6 @@
                 add* Chasm/new* XY/i(x y)
         ~
         plr:=_type/new(XY/i(0 0) world)
-
         camera:=plr/pos
         add*|[plr Enemy/new(XY/i(10 10) world) Item/new(ItemType{name:="gun"} XY/i(5 5))]
         world/update!

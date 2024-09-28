@@ -138,6 +138,7 @@ var global = new ValDictScope {
 		["interface"] = ValKeyword.INTERFACE,
 		["enum"] = ValKeyword.ENUM,
 		["get"] = ValKeyword.GET,
+		["set"] = ValKeyword.SET,
 		["impl"] = ValKeyword.IMPLEMENT,
 		["inherit"] = ValKeyword.INHERIT,
 		["cut"] = ValKeyword.BREAK,

@@ -53,7 +53,7 @@
             life/SetCell(x y rand_bool!)
         count:1 prevCount:0 run:true
         Console/Clear!
-        run?*{ 
+        run ?% { 
             life/update!
             prevCount := count
             count := life/activeCount

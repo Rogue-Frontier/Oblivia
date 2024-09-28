@@ -19,7 +19,7 @@
         new():_class{}
         has:v/Contains
         isType(e:obj): e = T
-        add(e:T):has.e ?+ p*"already added" ?-_add.e
+        add(e:T):has.e ?+ p*"already added" ?- _add.e
         sub(e:T):has.e ?+ _sub.e ?- p*"already removed"
         mut!:{v/UnionWith.i, v/ExceptWith.o, [i o]|/Clear!}
         ~
@@ -33,11 +33,11 @@
         xi:!int_from.x yi:!int_from.y
         xf:!x yf:!y
         xyi:!pairi(xi yi)
-        W:!XY/i(subi(0 1) 0)
-        E:!XY/i(addi(0 1) 0)
-        N:!XY/i(0 subi(0 1))
-        S:!XY/i(0 addi(0 1))
-        Zero:!XY/i(0 0)
+        W:!i(subi(0 1) 0)
+        E:!i(addi(0 1) 0)
+        N:!i(0 subi(0 1))
+        S:!i(0 addi(0 1))
+        Zero:!i(0 0)
         i(x:int y:int):XY{(x y):=double_from*|(_0 _1)}
         f(^x ^y):XY{(x y):=_arg}
         add(rhs:XY):XY{x:=addf(^^^x _0/x) y:=addf(^^^y _0/y)}
@@ -57,6 +57,10 @@
     Tile:class {
         glyph:"@"@0,
         (front back):ABGR/(Magenta Black),
+        #g:'glyph
+        #f:'front
+        #b:'back
+        #gfb:'(g f b)
         arr(str:string):str|?(c:char) Tile{(glyph front back):=(c ABGR/(White Black)%)}
         print(sf:Sf pos:XY):{sf/PrintChar(pos/(xi yi)% ^^^(glyph front back)%)}
     }
@@ -107,7 +111,7 @@
     }
     Enemy:class {
         hp:100 active:true name:"Enemy" pos:XY world:World
-        tile:Tile{(glyph front back):=("E"@0 ABGR/(Red Transparent)%)}
+        tile:Tile{(glyph front back):=("r"@0 ABGR/(Red Transparent)%)}
         new(^pos ^world):Enemy{(pos world):=_arg}
         update!:{not.active ?+ world/rem*this}
         damage(^hp):{^^^hp:=subi(_ _0) active:=gt(^^^hp 0)
@@ -167,10 +171,8 @@
         v_entity:B.Entity
         v_actor:B.Actor
         tick:0
-        placeActors:true
-        placeEntities:true
-        CD:ConcurrentDictionary
-        HS:HashSet
+        placeActors:true placeEntities:true
+        CD:ConcurrentDictionary HS:HashSet
         actorGrid:CD(Pt HS.Actor)/ctor!
         entityGrid:CD(Pt HS.Entity)/ctor!
         new!:World {}
@@ -217,7 +219,7 @@
             ret.res
         }
         hasTile(type p:XY):{
-            getGrid[p/xyi]=obj:loc ?+ loc|?(e) (e=type) ?+ {^^^:=true}
+            getGrid[p/xyi]=obj:loc ?+ loc|?(e) (e=type) ?+ {^^^:true}
             ^:false
         }
         hasFloor(p:XY):hasTile(Floor p)
@@ -227,15 +229,16 @@
     move:false
     camera:XY plr:Player world:World
     sf:Sf sf_ui:Sf
-    menu:Menu * null
+    menu:Menu*null
     #dummy: set { print*_val }
     init!:{
+        fib: ?(i:int): i ?{0:0 1:1 _:addi(^^*subi(i 1) ^^*subi(i 2))}
+        print*fib(3)
+        
         world:=World/new!
         add:world/add
 
-
-        world/tick := 0
-
+        #world/tick := 0
 
         range(0 30)|?(y:int)
             range(0 30)|?(x:int)
@@ -291,7 +294,7 @@
         plr/busy ?+ ret!
         menu=Menu:m ?+ {
             m/handle_key.kb
-            ^^:={}
+            ^^:{}
         }
         kb/IsPress ?[KC/Left:XY/W KC/Right:XY/E KC/Up:XY/N KC/Down:XY/S]|?(dir){
             plr/move*dir
@@ -299,14 +302,15 @@
         }
         kb/IsPress?[
             KC/G:{
-                items!:world/getGrid[plr/pos/xyi] | ?(it) (it=Item:i) ?+ i
+                items!:world/getGrid[plr/pos/xyi] | ?(it): { (it=Item:i) ?+ i }
                 menu:=SelectMenu/new(title:"Get Items"
                     items:items!
                     invoke:?(i) {
                         it:menu/items@i,
                         [world/rem plr/cargo/Add]|*it
                         world/mut!
-                        menu/setItems*items!
+                        print(items!)
+                        menu/setItems(items!)
                     }
                 )
             }
@@ -423,7 +427,7 @@
             }
             move *| kb/IsPress ?[KC/Up:XY/N KC/Right:XY/E KC/Down:XY/S KC/Left:XY/W]
             kb/Press|?(k)
-                beq(k 65 90) ?+ items=obj:it ?+ subi(k 65)=int:ind ?+ lt(ind it/Length) ?+ invoke=obj:inv ?+
+                and[beq(k 65 90) items=obj:it subi(k 65)=int:ind lt(ind it/Length) invoke=obj:inv] ?+
                     inv*ind
         }
         handle_mouse(state:HandState):{}

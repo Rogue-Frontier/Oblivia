@@ -11,10 +11,12 @@ using Common;
 var tokenizer = new Tokenizer(File.ReadAllText("Mainframe.obl"));
 var parser = new Parser(tokenizer.GetAllTokens());
 var block = parser.NextBlock();
-
 T _<T> (T t) => t;
 var global = new ValDictScope {
 	locals = new () {
+
+		["_0x8080U"] = 0x8080U,
+
 		["Sf"] = typeof(Sf),
 		["ABGR"] = typeof(ABGR),
 		["TimeSpan"] = typeof(TimeSpan),
@@ -57,6 +59,7 @@ var global = new ValDictScope {
 		["null"] = null,
 
 		["addi"] = _((int a, int b) => a + b),
+		["addu"] = _((uint a, uint b) => a + b),
 		["subi"] = _((int a, int b) => a - b),
 		["muli"] = _((int a, int b) => a * b),
 		["divi"] = _((int a, int b) => a / b),
@@ -64,6 +67,10 @@ var global = new ValDictScope {
 		["xori"] = _((int a, int b) => a ^ b),
 		["mini"] = _((int a, int b) => Math.Min(a, b)),
 		["maxi"] = _((int a, int b) => Math.Max(a, b)),
+
+		["ori"] = _((int a, int b) => a | b),
+		["sl"] = _((int a, int b) => a << b),
+		["sr"] = _((int a, int b) => a >> b),
 
 		["addf"] = _((double a, double b) => a + b),
 		["subf"] = _((double a, double b) => a - b),
@@ -147,6 +154,8 @@ var global = new ValDictScope {
 		["ret"] = ValKeyword.RETURN,
 		["var"] = ValKeyword.VAR,
 		["yield"] = ValKeyword.YIELD,
+		["unmask"] = ValKeyword.ALIAS_OF,
+		["declare"] = ValKeyword.DECLARE
 	}
 };
 PriorityQueue<object, int> a = new();

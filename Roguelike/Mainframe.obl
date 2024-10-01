@@ -1,120 +1,139 @@
 {
-    ~
+    parse_d(s:string):double/Parse.s
+    trunc:int_from
+    FastAlphaMult(alpha:int red:int):{
+        alpha := ori(_ sl(alpha 8))
+        red := muli(_ alpha)
+        red := int_from*addu(uint_from._ _0x8080U)
+        ^:sr(red 16)
+    }
+    SlowAlphaMult(alpha:int red:int): {
+        norm:parse_d."255.0"
+        half:parse_d."0.5"
+        red := trunc*addf(divf(muli(alpha _) norm) half)
+        ^:red
+    }
+    test!:{
+        misses:0
+        range(0 256)|?(alpha:int):
+            range(0 256)|?(red:int):{
+                fastred:FastAlphaMult(alpha red)
+                slowred:SlowAlphaMult(alpha red)
+                fastred =- slowred ?+
+                    {inc('misses)}
+            }
+        ^:misses
+    }
+    main!:{
+        print*cat["number of mismatches = " test! "\n"]
+    }
+    /*
     stage(1) {
         
     }
     stage(2) {
     
     }
-    ~
-
+    */
+    
     #import("test.obl")
     WB:ABGR/(White Black)%
     p:print
     Buf(T):class{
-        m:!HashSet.T/ctor!
+        m:'HashSet.T/ctor!
         v:m i:m o:m,
         (_add _sub):(i o)|/Add
-
         _seq():v
-        
         new():_class{}
         has:v/Contains
         isType(e:obj): e = T
         add(e:T):has.e ?+ p*"already added" ?- _add.e
         sub(e:T):has.e ?+ _sub.e ?- p*"already removed"
         mut!:{v/UnionWith.i, v/ExceptWith.o, [i o]|/Clear!}
-        ~
+        /*
         addObj(e:obj): isType.e ?+ add.e
         remObj(e:obj): isType.e ?+ rem.e
-        ~
-        needMut:!or[i/Count=-0 o/Count=-0]
+        */
+        needMut:'or[i/Count=-0 o/Count=-0]
     }
     XY:class {
         (x y):double_from*|(0 0)
-        xi:!int_from.x yi:!int_from.y
-        xf:!x yf:!y
-        xyi:!pairi(xi yi)
-        W:!i(subi(0 1) 0)
-        E:!i(addi(0 1) 0)
-        N:!i(0 subi(0 1))
-        S:!i(0 addi(0 1))
-        Zero:!i(0 0)
+        xi:'int_from.x yi:'int_from.y
+        xf:'x yf:'y
+        xyi:'pairi(xi yi)
+        W:'i(subi(0 1) 0)
+        E:'i(addi(0 1) 0)
+        N:'i(0 subi(0 1))
+        S:'i(0 addi(0 1))
+        Zero:'i(0 0)
+        
         i(x:int y:int):XY{(x y):=double_from*|(_0 _1)}
         f(^x ^y):XY{(x y):=_arg}
         add(rhs:XY):XY{x:=addf(^^^x _0/x) y:=addf(^^^y _0/y)}
         sub(rhs:XY):XY{x:=subf(^^^x _0/x) y:=subf(^^^y _0/y)}
         mul(scale:int):XY{x:=mulf(^^^x _0) y:=mulf(^^^y _0)}
         div(scale:int):XY{x:=divf(^^^x _0) y:=divf(^^^y _0)}
-        ~
+        /*
         l:prop(
             get:null 
             set:_ null
         )
-        left:set*{x:=_arg}
         d:var.double
         e:val.double
-        ~
+        */
     }
     Tile:class {
-        glyph:"@"@0,
-        (front back):ABGR/(Magenta Black),
-        g:'glyph
-        f:'front
-        b:'back
-        gfb:'(g f b)
-        arr(str:string):str|?(c:char) Tile{gfb:=(c ABGR/(White Black)%)}
+        glyph:"@"@0,(front back):ABGR/(Magenta Black),gfb:'(glyph front back)
+        arr(str:string):str|?(c:char):Tile{gfb:=(c ABGR/(White Black)%)}
         print(sf:Sf pos:XY):{sf/PrintChar(pos/(xi yi)% gfb%)}
     }
-    Entity:interface { active:bool }
-    Env:interface {}
-    Actor:interface { update():{} }
+    Env:interface{}
+    Entity:interface{active:bool}
+    Actor:interface{update():{}}
     Reticle: class {
         active:true pos:XY
-        new(^pos): Reticle {
-            pos := _0
-        }
+        new(^pos):_class{pos:=_0}
         update():{}
         impl(Entity Actor)
     }
     Chasm:class{
-        name:"Chasm" pos:XY active:true
-        tile:!Tile{gfb:=(char_from.10 ABGR/(Gray Transparent)%)}
-        new(^pos):Chasm{pos:=_0}
+        
+        name:"Chasm" pos:XY active:true tile:Tile{gfb:=(char_from.10 ABGR/(Gray Transparent)%)}
+        new(^pos):_class{pos:=_0}
         impl(Entity Env)
     }
-    Floor:class {
+    Floor:class{
         name:"Floor" pos:XY active:true
-        tile:Tile {
+        tile:Tile{
             glyph:=char_from.254
             front:=ABGR/RGBA*byte_from*|(51 51 75 addi(204 rand_range(0 25)))
             back:=ABGR/Transparent
         }
-        new(^pos):Floor{pos:=_0}
+        new(^pos):_class{pos:=_0}
         update!:{}
         impl(Entity Env)
     }
-    Wall:class {
+    Wall:class{
         name:"Wall" pos:XY active:true
-        tile:!Tile{gfb:=(char_from.249 ABGR/(Gray Transparent)%)}
+        tile:Tile{gfb:=(char_from.249 ABGR/(Gray Transparent)%)}
         impl(Entity Env)
     }
     Msg:class {
         tiles:Row.Tile
         time:double/Parse."0"
         tick:int/Parse."0"
-        new(^tiles ^time ^tick):Msg {
+        new(^tiles ^time ^tick):_class{
             (tiles time tick):=_arg
         }
         repeats:1
         fadeTime:double/Parse."0"
-        once:!repeats =+ 1
-        text:!tiles|/glyph
+        once:'repeats =+ 1
+        text:'tiles|/glyph
     }
     Enemy:class {
         hp:100 active:true name:"Enemy" pos:XY world:World
         tile:Tile{gfb:=("r"@0 ABGR/(Red Transparent)%)}
-        new(^pos ^world):Enemy{(pos world):=_arg}
+        new(^pos ^world):_class{(pos world):=_arg}
         update!:{not.active ?+ world/rem*this}
         damage(^hp):{^^^hp:=subi(_ _0) active:=gt(^^^hp 0)
             #active:=gt(_temp@0 0) #_temp@0 substitutes to ^^^hp
@@ -124,7 +143,7 @@
     Roachbot:class {
         hp:100 active:true name:"Roachbot" pos:XY world:World
         tile:Tile{gfb:=("r"@0 ABGR/(Brown Transparent)%)}
-        new(^pos ^world):Enemy{(pos world):=_arg}
+        new(^pos ^world):_class{(pos world):=_arg}
         update!:{
             not.active ?+ world/rem*this
         }
@@ -140,12 +159,13 @@
         L(T):List.T/ctor!
         log:L.Msg cargo:L.Item
         new(^pos ^world):Player{(pos world):=_arg}
+        //.<pub fn>
         update!:{busy:=false}
         move(disp:XY):{
             dest:pos/add*disp
             attack:false
             world/getGrid[dest/xyi]=obj:o ?+
-                o | ?(e:Entity) {
+                o|?(e:Entity):{
                     e=Enemy:e ?+ {
                         log/Add*Msg/new(Tile/arr*cat["Attack " e/name] time world/tick)
                         e/damage*10
@@ -161,53 +181,54 @@
         impl(Entity Actor)
     }
     Item:class {
-        type:ItemType pos:XY active:true name:!type/name
+        type:ItemType pos:XY active:true name:'type/name
         tile:Tile{glyph:="r"@0 front:=ABGR/White}
         new(^type ^pos):Item{(type pos):=_arg}
         update!:{}
         impl(Entity)
     }
     ItemType:class{name:string}
-    World:class {
+    World:class{
         B(T):Buf.T/new!
-        v_entity:B.Entity
-        v_actor:B.Actor
+        E:Entity A:Actor
+        v_entity:B.E
+        v_actor:B.A
         tick:0
         placeActors:true placeEntities:true
         CD:ConcurrentDictionary HS:HashSet
-        actorGrid:CD(Pt HS.Actor)/ctor!
-        entityGrid:CD(Pt HS.Entity)/ctor!
+        actorGrid:CD(Pt HS.A)/ctor!
+        entityGrid:CD(Pt HS.E)/ctor!
         new!:_class{}
-        add(e:Entity):{
+        add(e:E):{
             isActor.e ?+
                 v_actor/add.e ?-
                 v_entity/add.e
         }
-        rem(e:Entity):{
+        rem(e:E):{
             isActor(e) ?+
                 v_actor/sub.e ?-
                 v_entity/sub.e
         }
-        isActor(e:Entity):e=Actor
+        isActor(e:E):e=A
         update!:{
-            v_actor|?(a) not(a/active) ?+ rem.a ?- a/update!
+            v_actor|?(a): not(a/active) ?+ rem.a ?- a/update!
             mut!
-            tick:=addi(_ 1)
+            inc('tick)
         }
         mut!:{
             v_entity/needMut ?+ {placeEntities := true},
             (v_entity v_actor)|/mut!
             placeActors:=true
         }
-        getGrid:! {
+        getGrid:'{
             placeActors ?+ {
                 actorGrid/Clear!
-                v_actor |?(a) actorGrid/GetOrAdd(a/pos/xyi HashSet.Actor/ctor!)/Add.a
+                v_actor |?(a:A): actorGrid/GetOrAdd(a/pos/xyi HashSet.A/ctor!)/Add.a
                 placeActors:=false
             }
             placeEntities ?+ {
                 entityGrid/Clear!
-                v_entity |?(e) entityGrid/GetOrAdd(e/pos/xyi HashSet.Entity/ctor!)/Add.e
+                v_entity |?(e:E): entityGrid/GetOrAdd(e/pos/xyi HashSet.E/ctor!)/Add.e
                 placeEntities:=false
             }
             ^:^^$
@@ -215,91 +236,111 @@
         ^@(p:Pt): {
             p:_0
             #print*_0
-            res:HS.Entity/ctor(5)
+            res:HS.E/ctor(2)
             entityGrid/ContainsKey(p) ?+ res/UnionWith*entityGrid[p]
             actorGrid/ContainsKey(p) ?+ res/UnionWith*actorGrid[p]
             ret.res
         }
         hasTile(type p:XY):{
-            getGrid[p/xyi]=obj:loc ?+ loc|?(e) (e=type) ?+ {^^^:true}
+            getGrid[p/xyi]=obj:loc ?+ loc|?(e): (e=type) ?+ {^^^:true}
             ^:false
         }
         hasFloor(p:XY):hasTile(Floor p)
         hasWall(p:XY):hasTile(Wall p)
     }
-    time:double/Parse."0"
+    time:parse_d."0"
     move:false
     camera:XY plr:Player world:World
     sf:Sf sf_ui:Sf
     menu:Menu*null
-    #dummy: set { print*_val }
+    dummy:set{print*_val}
+    inc(x):{
+        #print*unmask(x)
+        x:=addi(_ 1)
+    }
+
+    //e: signal
     init!:{
+        a:5
+        b:6
+        c:7
+        inc*|['a 'b 'c]
+        print*a
         #yield(5)
-        fib: ?(i:int): i ?{0:0 1:1 _:addi(^^*subi(i 1) ^^*subi(i 2))}
+        /*
+        memo(F): {
+            table: Dictionary(object object)/ctor!
+            _call: mimic.F {
+                table/ContainsKey._arg ?+ {
+                    ^^:table@_arg
+                }
+                r:F*_arg
+                table/Add(_arg r)
+                ^:r
+            }
+        }
+        */
+        fib:?(i:int):i?{0:0 1:1 _:addi(^^*subi(i 1)^^*subi(i 2))}
         print*fib(3)
-        
         world:=World/new!
         add:world/add
-
         #world/tick := 0
-
-        range(0 30)|?(y:int)
-            range(0 30)|?(x:int)
+        range(0 30)|?(y:int):range(0 30)|?(x:int):
                 add*Floor/new*XY/i(x y)
-        ~
-        range(0 40) | ?(y)
-            range(0 40) | ?(x)
+        /*
+        range(0 40) | ?(y):
+            range(0 40) | ?(x):
                 add* Chasm/new* XY/i(x y)
-        ~
-        plr:=_type/new(XY/i(0 0) world)
+        */
+        plr:=_type/new(XY/i(0 0)world)
         camera:=plr/pos
-        add*|[plr Enemy/new(XY/i(10 10) world) Item/new(ItemType{name:="gun"} XY/i(5 5))]
+        add*|[plr Enemy/new(XY/i(10 10)world)Item/new(ItemType{name:="gun"}XY/i(5 5))]
         world/update!
-        sf:=Sf/ctor(Runner/(WIDTH HEIGHT)% scene/FONT_8x8)
-        sf_ui:=Sf/ctor(divi(muli(4 Runner/WIDTH) 3) Runner/HEIGHT scene/FONT_6x8)
+        sf:=Sf/ctor(Runner/(WIDTH HEIGHT)%scene/FONT_8x8)
+        sf_ui:=Sf/ctor(divi(muli(4 Runner/WIDTH)3)Runner/HEIGHT scene/FONT_6x8)
     }
     update(delta:TimeSpan):{
         time:=addf(_ delta/TotalSeconds)
-        plr/busy ?+ world/update!
-        menu=Menu:m ?+ m/update {delta}
+        plr/busy?+world/update!
+        menu=Menu:m?+m/update{delta}
     }
     resetCamera!:{camera:=plr/pos}
-    center:!XY/i(sf/(GridWidth GridHeight)%)/div*2
+    center:'XY/i(sf/(GridWidth GridHeight)%)/div*2
     render(delta:TimeSpan):{
         [sf sf_ui]|/Clear!,
-        [world/getGrid/entityGrid world/getGrid/actorGrid]|?(g) g/Keys|?(p) g@p|?(e) e/tile/print(sf center/add*e/pos/sub*camera)
+        [world/getGrid/(entityGrid actorGrid)%]|?(g):g/Keys|?(p):g@p|?(e):e/tile/print(sf center/add*e/pos/sub*camera)
         sf_ui/Print(1 1 cat["tick:" world/tick] WB)
         invMenu:{
-            x:0 y:subi(sf/GridHeight 64) w:32 h:32 down:!{y:=addi(_ 1)}
+            x:0 y:subi(sf/GridHeight 64) w:32 h:32 down:'{inc('y)}
             Sf/DrawRect(sf_ui x y w h border) down
             sf_ui/Print(addi(x 2) y "Inventory" WB) down
             Sf/DrawRect(sf_ui x y w 1 border) down
-            plr/cargo|?(i:Item) {
+            plr/cargo|?(i:Item): {
                 i/tile/print(sf_ui XY/i(2 y))
                 sf_ui/Print(addi(x 4) y i/name WB) down
             }
         }
         log:{
-            x:0 y:subi(sf/GridHeight 32) w:64 h:32 down:!{y:=addi(_ 1)}
+            x:0 y:subi(sf/GridHeight 32) w:64 h:32 down:'{inc('y)}
             Sf/DrawRect(sf_ui x y w h border) down
             sf_ui/Print(addi(x 2) y "Log" WB) down
             Sf/DrawRect(sf_ui x y w 1 border) down
-            plr/log|?(msg:Msg) {
+            plr/log|?(msg:Msg): {
                 x:2
-                msg/tiles|?(t:Tile) {t/print(sf_ui XY/i(x y)) x:=addi(_ 1)} down
+                msg/tiles|?(t:Tile): {t/print(sf_ui XY/i(x y)) inc('x)} down
                 y:=mini(y subi(sf_ui/GridHeight 1))
             }
         }
         menu=Menu:m ?+ m/render!
         scene/Draw/Invoke*|[sf sf_ui]
     }
-    handle_key(kb:KB):{
+    handle_key(kb:KB): {
         plr/busy ?+ ret!
         menu=Menu:m ?+ {
             m/handle_key.kb
             ^^:{}
         }
-        kb/IsPress ?[KC/Left:XY/W KC/Right:XY/E KC/Up:XY/N KC/Down:XY/S]|?(dir){
+        kb/IsPress ?[KC/Left:XY/W KC/Right:XY/E KC/Up:XY/N KC/Down:XY/S]|?(dir):{
             plr/move*dir
             resetCamera!
         }
@@ -308,7 +349,7 @@
                 items!:world/getGrid[plr/pos/xyi] | ?(it): { (it=Item:i) ?+ i }
                 menu:=SelectMenu/new(title:"Get Items"
                     items:items!
-                    invoke:?(i) {
+                    invoke:?(i): {
                         it:menu/items@i,
                         [world/rem plr/cargo/Add]|*it
                         world/mut!
@@ -321,13 +362,13 @@
                 menu:=SelectMenu/new(
                     title:"Fire Item"
                     items:plr/cargo/ToArray!
-                    invoke:?(ind){
+                    invoke:?(ind):{
                         it:menu/items@ind
                         menu:=TargetMenu/new(
                             title:"Fire Target"
-                            invoke:?(ind){
+                            invoke:?(ind):{
                                 target:menu/items
-                                print*target
+                                print(target)
                             }
                         )
                         # menu/setItems* plr/cargo/ToArray!
@@ -350,6 +391,12 @@
         handle_mouse(state:HandState):{}
         render():{}
     }
+
+    /*
+    extend(Menu) {
+    
+    }
+    */
     SelectMenu:class {
         title:string
         items:Row.Item
@@ -371,7 +418,7 @@
                     (escape=obj:o) ?+ o! ?- {menu:=null}
                 }
             ]
-            kb/Press | ?(k) beq(k 65 90) ?+ {
+            kb/Press | ?(k): beq(k 65 90) ?+ {
                 ind:subi(k 65)
                 lt(ind items/Length) ?+ invoke*ind
             }
@@ -379,19 +426,15 @@
         handle_mouse(state:HandState):{}
         render!:{
             x:pos/xi y:pos/yi w:32 h:32
-            down:!{y:=addi(_ 1)}
+            down:'{inc('y)}
             Sf/DrawRect(sf_ui x y int_from*Common/Lerp(time 0 divf(1 10) 1 w 1) h border) down
             sf_ui/Print(addi(x 2) y title WB) down
-            Sf/DrawRect(sf_ui x y w 1 borderMenu)
+            Sf/DrawRect(sf_ui x y w 1 borderMenu) down
             ind:0
-            items | ?(it) {
+            items | ?(it): {
+                sf_ui/Print*|[(addi(x 2) y it/tile/gfb%),(addi(x 4) y it/name WB),(subi(addi(x w) 3) y ABC@ind WB)]
                 down
-                sf_ui/Print*|[
-                    (addi(x 2) y it/tile/gfb%),
-                    (addi(x 4) y it/name WB),
-                    (subi(addi(x w) 3) y ABC@ind WB),
-                ]
-                ind:=addi(_ 1)
+                inc('ind)
             }
         }
         impl(Menu)
@@ -413,7 +456,7 @@
             time:=addf(delta/TotalSeconds _)
         }
         updateItems!:{
-            items:=world/getGrid[camera/xyi] | ?(o) o
+            items:=world/getGrid[camera/xyi] | ?(o): o
         }
         handle_key(kb:KB):{
             kb/IsPress ?[
@@ -429,7 +472,7 @@
                 updateItems!
             }
             move *| kb/IsPress ?[KC/Up:XY/N KC/Right:XY/E KC/Down:XY/S KC/Left:XY/W]
-            kb/Press|?(k)
+            kb/Press|?(k):
                 and[beq(k 65 90) items=obj:it subi(k 65)=int:ind lt(ind it/Length) invoke=obj:inv] ?+
                     inv*ind
         }
@@ -439,18 +482,18 @@
             lt(modf(time interval) divf(interval 2)) ?+
                 marker/print(sf center)
             x:32,y:26,w:32,h:32,
-            down:!{y:=addi(_ 1)}
+            down:'{inc('y)}
             Sf/DrawRect(sf_ui x y w h border) down
             sf_ui/Print(addi(x 2) y title WB) down
             Sf/DrawRect(sf_ui x y w 1 border) down
             ind:0
             items=obj:it ?+
-                it|?(i:Entity) {
+                it|?(i:Entity): {
                     i/tile/print(sf_ui XY/i(addi(x 2) y))
                     sf_ui/Print(addi(x 4) y i/name WB)
                     sf_ui/Print(subi(addi(x w) 2) y ABC@ind WB)
-                    ind:=addi(ind 1)
                     down
+                    inc('ind)
                 }
         }
         impl(Menu)

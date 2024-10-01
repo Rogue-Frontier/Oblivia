@@ -97,12 +97,14 @@ There are no arithmetic operators. See global function table for arithmetic func
 - `^A`: Get value of symbol `A` from the current scope
 - `^^A`: Get value of symbol `A` from the parent scope.
 - `^^^A`: Get value of symbol `A` from parent's parent scope.
+- `'A`: Alias of expression `A`. Assignments on variable `B:'A` will attempt to assign to `A`.
 - `A ?+ B ?- C`: If A then B else C.
 - `A | B`: Map array A by function B.
 - `A |/ B`: From every item in `A` get value of symbol `B`.
 - `A |* B`: From every item in `A` call with arg `B`
-- `A ?* B`: While A, evaluate B.
-- `A/B`: From expression `A` get member named B.
+- `A ?% B`: While A, evaluate B.
+- `A/B`: In the scope of *expression* `A` evaluate *expression* B. Cannot access outer scopes.
+- `A/{B}`: In the scope of *expression* `A`, evaluate statements `B`. Can access outer scopes.
 - `A/ctor`: From .NET type `A` get the unnamed constructor.
 - `A*B`: Call `A` with arg *expression* `B` (automatic spread)
 - `A.B`: Call `A` with arg *term* `B` (no spread)
@@ -124,6 +126,12 @@ There are no arithmetic operators. See global function table for arithmetic func
     B2:C2
     B3:C3
 ]`: Conditional sequence; for each pair `B:C`, if `A(B)` is `true` then include `C` in the result.
+- `A ?{
+    B0:C0
+    B1:C1
+    B2:C2
+    B3:C3
+}`: Match expression (naive): For each pair `B:C`, if `A = B`, then returns `C`. TODO: Allow lambda branches.
 - `A =+ B`: Returns true if `A` equals `B`
 - `A =- B`: Returns true if `A` does not equal `B`
 - `A = B`: Returns true if `A` matches pattern `B`

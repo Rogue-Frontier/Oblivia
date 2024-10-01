@@ -1,6 +1,6 @@
 # Oblivia
 
-Oblivia is an experimental programming language that aims to do with objects what Lisp does with lists. Where Lisp looks like list initializers, Oblivia looks like object initializers. Oblivia follows these ideas:
+Inspired by K, MATLAB, Lisp, JavaScript. Oblivia is an experimental programming language that aims to do with objects what Lisp does with lists. Where Lisp looks like list initializers, Oblivia looks like object initializers. Oblivia follows these ideas:
 - **Scopes are objects.** The syntax you use to create objects in JavaScript is now the syntax you use to create blocks in Oblivia. A block with no explicit return simply returns itself as an object.
 - **Terse syntax.** Common operations use fewer columns. There are no keywords other than functions and values. Defining variables is as easy as `A: B(C)` where `A` is the variable name, `B` is the type, and `C` is the initial value.
 
@@ -97,12 +97,11 @@ There are no arithmetic operators. See global function table for arithmetic func
 ### Invoke
 - `A! = A()`: call A with 0 args
 - `A*B = A(B)`: call A with arg B (associative-right)
-- `A-B = A(B)`: call A with arg B (associative-left)
-- `A(B,C)`: call A with args B, C
-- `A-B-C-D = ((A*B)*C)*D`
+- `A.B = A(B)`: call A with arg B (associative-left)
+- `A(B, C)`: call A with args B, C
+- `A.B.C.D = ((A*B)*C)*D`
 - `A*B*C*D = A(B(C(D)))`
-- `A(B)`: If `A` is a non-generic or fully parametrized (e.g. does not accept generic arguments) type, then calling it simply casts `B` to that type.
-- `A(B)`: If `A` is a generic type, then `A(B)` is the fully parametrized version of the type.
+- `A(B)`: If `A` is a generic type, then `A(B)` is the fully parametrized version of the type. If `A` is a non-generic or fully parametrized (e.g. does not accept generic arguments) type, then calling it simply casts `B` to that type.
 ### Expression
 - `A`: Get value of identifier `A` from the latest scope that defines it (current scope, then parent scope, then parent-parent scope)
 - `^A`: Get value of identifier `A` from the current scope
@@ -111,11 +110,14 @@ There are no arithmetic operators. See global function table for arithmetic func
 - `A | B`: Map array A by function B
 - `A ?* B`: While A, evaluate B
 - `A/B`: From A get member named B
+- `A*B`
+- `A.B`
 - `A@B`: From array A get item at index of value B
 - `[A B C]`: Make an object array
-- `[#type A B C]`: Make an array parametrized to the `type`
-- `A { B }`: If `A` is a class, then constructs an instance of `A` and applies the statements `B` to it.
-- `{ A }`: Creates an object and applies the statements `B` to it.
+- `[:type A B C]`: Make an array parametrized to the `type`
+- `A { B }`:
+  - If `A` is a class, then constructs an instance of `A` and applies the statements `B` to it.
+- `{ A }`: Creates an scope and applies the statements `A` to it. If the scope has no locals or returns, then the scope returns the result of the last statement (empty if no statements). Otherwise returns an object.
 - `@! A`: Creates a lambda with no arguments and output `A`
 - `@(A,B) C`: Creates a lambda with arguments A,B and output `C`
 ## Design philosophy

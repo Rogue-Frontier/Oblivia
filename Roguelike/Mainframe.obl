@@ -97,7 +97,6 @@
         impl(Entity Actor)
     }
     Chasm:class{
-        
         name:"Chasm" pos:XY active:true tile:Tile{gfb:=(char_from.10 ABGR/(Gray Transparent)%)}
         new(^pos):_class{pos:=_0}
         impl(Entity Env)

@@ -12,7 +12,7 @@ var parser = new Parser(tokenizer.GetAllTokens());
 var block = parser.NextBlock();
 T _<T> (T t) => t;
 var global = new ValDictScope {
-	locals = new () {
+	locals = new() {
 
 		["_0x8080U"] = 0x8080U,
 

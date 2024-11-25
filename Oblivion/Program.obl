@@ -1,84 +1,111 @@
-Parse: class {
-	err:magic()
-	src:str
-	ind:i8
-	valid:get* lt(ind src/Length)
-	cur:get* valid ?+ src.ind ?- err
-	inc: ?(): { ind := addi(ind 1) }
-	ParseExpr: ?(lhs:""): {
-		cur ?{
-			chr."{":ret*ParseStruct.lhs
-			chr."\"":ret*ParseString()
-			any*chr*|(" " "\t" "\r" "\n"):{
-				inc()
-				go*Do
-			}
-			err:ret*err
-			_:{
-				sym: ParseSymbol()
-				ret*ParseExpr(sym)
-			}
+{
+	main:{
+		parser:Parser{
+			src := File/ReadAllText("Example.oml")
 		}
+		parser/ParseExpr()
 	}
-	ParseStruct: ?(tag:"") {
-		inc()
-		result: OmlStruct{}
-		content: List.object/ctor!
-		result/keys."content" := content
-		Do: label
-		cur ?{
-			chr."}": {
-				inc()
-				ret*result
-			}
-			chr."\"": {
-				str: ParseString()
-				cur ?{
-					chr.":":{
-						inc()
-						result/keys(str) := ParseExpr()
-					}
+	Parser: class {
+		chr:parse_char
+		err:magic()
+		src:str
+		ind:i4(0)
+		valid:get* lt(ind src/Length)
+		cur:get* valid ?+ src.ind ?- err
+		inc: ?(): { ind := addi(ind 1) }
+		ParseExpr: ?(lhs:""): {
+			cur ?{
+				chr*"{":ret*ParseStruct.lhs
+				chr*"\"":ret*ParseString()
+				any*ch_arr(" \t\r\n"):{
+					inc()
+					go*Do
 				}
-			}
-			chr."{": {
-				content/Add*ParseStruct()
-			}
-			any*chr.|(" " "\t" "\r" "\n"): {
-				inc()
-			}
-			_:{
-				key: ParseSymbol()
-				cur ?{
-					chr*":":{
-						inc()
-						result/keys.key := ParseExpr()
-					}
-					_:{
-						content/Add*key
-					}
+				err:ret*err
+				_:{
+					sym:ParseSymbol()
+					ret*ParseExpr(sym)
 				}
 			}
 		}
-		go*Do
-	}
-	ParseSymbol: ?(): {
-		result:""
-		Do:label
-		cur ?{
-			any*chr.|(":" "{" " " "\t" "\r" "\n" "\""):{
-				(result/Length = 0) ?+
-					ret*err ?-
+		ParseStruct: ?(tag:"") {
+			inc()
+			result:OmlStruct{}
+			content:List.object/ctor!
+			result/keys."content" := content
+			Do:label
+			cur ?{
+				chr*"}":{
+					inc()
 					ret*result
+				}
+				chr*"\"":{
+					str: ParseString()
+					cur ?{
+						chr.":":{
+							inc()
+							result/keys(str) := ParseExpr()
+						}
+					}
+				}
+				chr*"{":{
+					content/Add*ParseStruct()
+				}
+				any*ch_arr(" \t\r\n"):{
+					inc()
+				}
+				_:{
+					key: ParseSymbol()
+					cur ?{
+						chr*":":{
+							inc()
+							result/keys.key := ParseExpr()
+						}
+						_:{
+							content/Add*key
+						}
+					}
+				}
 			}
-			err: ret*err
-			_:{
-				result := append(result cur)
-				inc()
-				go*Do
+			go*Do
+		}
+		ParseSymbol: ?():{
+			result:""
+			Do:label
+			cur ?{
+				any*ch_arr(":{ \t\r\n\""):{
+					(result/Length = 0) ?+
+						ret*err ?- {
+							^^^:result
+						}
+				}
+				err:ret*err
+				#autoret(err)
+				_:{
+					result := append_ch(_ cur)
+					inc()
+					go*Do
+				}
+			}
+		}
+		ParseString: ?(){
+			inc()
+			result:""
+			Do:label
+			cur ?{
+				chr."\"":{
+					inc()
+					ret*result
+				}
+				_:{
+					result := append(_ cur)
+					inc()
+					go*Do
+				}
 			}
 		}
 	}
-}
-OmlStruct: class {
-	keys: Dictionary(str obj)
+	OmlStruct: class {
+		keys: Dict(str obj)
+	}
 }

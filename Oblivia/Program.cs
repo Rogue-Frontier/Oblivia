@@ -16,9 +16,158 @@ using System.Xml.Linq;
 using System.Xml.Serialization;
 using static Oblivia.ExprMap;
 using static System.Formats.Asn1.AsnWriter;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 //TODO: Remove '@' Indexer
 namespace Oblivia {
-    public class ValError {
+
+	public class Std {
+        public static ValDictScope std;
+		static Std () {
+			T _<T> (T t) => t;
+			Type MakeGeneric (Type gen, params object[] item) => gen.MakeGenericType(item.Select(i => i switch { Type t => t, _ => typeof(object) }).ToArray());
+			std = new ValDictScope {
+				locals = new() {
+                    ["File"] = typeof(File),
+
+					["Pt"] = typeof((int, int)),
+
+					["i4x2"] = _((int a, int b) => (a, b)),
+
+					["i4_f8"] = _((int i) => (double)i),
+					["f8_i4"] = _((double d) => (int)d),
+					["i4_u4"] = _((int i) => (uint)i),
+					["i4_ch"] = _((int i) => (char)i),
+					["i4_u1"] = _((int i) => (byte)i),
+
+					["void"] = typeof(void),
+					["char"] = typeof(char),
+					["bit"] = typeof(bool),
+
+					["i8"] = typeof(long),
+					["i4"] = typeof(int),
+					["i2"] = typeof(short),
+					["i1"] = typeof(sbyte),
+					["u8"] = typeof(ulong),
+					["u4"] = typeof(uint),
+					["u2"] = typeof(ushort),
+					["u1"] = typeof(byte),
+					["f8"] = typeof(double),
+					["f4"] = typeof(float),
+					["str"] = typeof(string),
+					["obj"] = typeof(object),
+					
+                    ["yes"] = true,
+					["no"] = false,
+
+                    ["parse_char"] = _((string s) => char.Parse(s)),
+
+					["empty"] = ValEmpty.VALUE,
+					["default"] = _((Type t) => t.IsValueType ? Activator.CreateInstance(t) : null),
+					["addi"] = _((int a, int b) => a + b),
+					["addu"] = _((uint a, uint b) => a + b),
+					["subi"] = _((int a, int b) => a - b),
+					["muli"] = _((int a, int b) => a * b),
+					["divi"] = _((int a, int b) => a / b),
+					["modi"] = _((int a, int b) => a % b),
+					["xori"] = _((int a, int b) => a ^ b),
+					["mini"] = _((int a, int b) => Math.Min(a, b)),
+					["maxi"] = _((int a, int b) => Math.Max(a, b)),
+					["ori"] = _((int a, int b) => a | b),
+					["sl"] = _((int a, int b) => a << b),
+					["sr"] = _((int a, int b) => a >> b),
+					["addf"] = _((double a, double b) => a + b),
+					["subf"] = _((double a, double b) => a - b),
+					["mulf"] = _((double a, double b) => a * b),
+					["divf"] = _((double a, double b) => a / b),
+					["modf"] = _((double a, double b) => Math.IEEERemainder(a, b) + b / 2),
+					["minf"] = _((double a, double b) => Math.Min(a, b)),
+					["maxf"] = _((double a, double b) => Math.Max(a, b)),
+
+					["not"] = _((bool b) => !b),
+					["and"] = _((object[] a) => a.All(a => (bool)a)),
+					["or"] = _((object[] a) => a.Any(a => (bool)a)),
+
+					["nullor"] = _((object a, object b) => a ?? b),
+
+					["count"] = _((IEnumerable data, object value) => data.Cast<object>().Count(d => {
+						var result = d.Equals(value);
+						return result;
+					})),
+					["gt"] = _((double a, double b) => a > b),
+					["geq"] = _((double a, double b) => a >= b),
+					["lt"] = _((double a, double b) => a < b),
+					["leq"] = _((double a, double b) => a <= b),
+
+					["bt"] = _((double a, double b, double c) => a > b && a < c),
+					["beq"] = _((double a, double b, double c) => a >= b && a <= c),
+
+					["eq"] = _((object a, object b) => Equals(a, b)),
+					["neq"] = _((object a, object b) => !Equals(a, b)),
+
+					["cat"] = _((object[] o) => string.Join(null, o)),
+					["range"] = _((int a, int b) => Enumerable.Range(a, b - a).ToArray()),
+					["newline"] = "\n",
+					["obj_str"] = _((object o) => o.ToString()),
+
+                    ["ch_arr"] = _((string s) => s.ToCharArray()),
+
+					["Array"] = _((Type type, int dim) => type.MakeArrayType(dim)),
+					["arr_get"] = _((Array a, int[] ind) => a.GetValue(ind)),
+					["arr_set"] = _((Array a, int[] ind, object value) => a.SetValue(value, ind)),
+					["arr_at"] = _((Array a, int[] ind) => new ValRef { src = a, index = ind }),
+					["str_append"] = _((StringBuilder sb, object o) => sb.Append(o)),
+                    ["append"] = _((string a, string b) => a + b),
+					["append_ch"] = _((string a, char b) => a + b),
+					["row_from"] = _((Type t, object[] items) => {
+						var result = Array.CreateInstance(t, items.Length);
+						Array.Copy(items, result, items.Length);
+						return result;
+					}),
+					["rand_bool"] = _(() => new Random().Next(2) == 1),
+					["randf"] = _(new Random().NextDouble),
+					["rand_range"] = _((int a, int b) => new Random().Next(a, b)),
+					["Row"] = _((object type) => (type as Type ?? typeof(object)).MakeArrayType(1)),
+					["Grid"] = _((Type type) => type.MakeArrayType(2)),
+					["List"] = _((object item) => MakeGeneric(typeof(List<>), item)),
+					["HashSet"] = _((object item) => MakeGeneric(typeof(HashSet<>), item)),
+					["Dict"] = _((Type key, Type val) => typeof(Dictionary<,>).MakeGenericType(key, val)),
+					["ConcDict"] = _((Type key, Type val) => typeof(ConcurrentDictionary<,>).MakeGenericType(key, val)),
+					["StrBuild"] = typeof(StringBuilder),
+					["Fn"] = typeof(ValFunc),
+					["PQ"] = _((object a, object b) => MakeGeneric(typeof(PriorityQueue<,>), a, b)),
+					["class"] = ValKeyword.CLASS,
+					["interface"] = ValKeyword.INTERFACE,
+					["ext"] = ValKeyword.EXTEND,
+					["enum"] = ValKeyword.ENUM,
+					["get"] = ValKeyword.GET,
+					["set"] = ValKeyword.SET,
+					["impl"] = ValKeyword.IMPLEMENT,
+					["inherit"] = ValKeyword.INHERIT,
+					["cut"] = ValKeyword.BREAK,
+					["skip"] = ValKeyword.CONTINUE,
+					["cancel"] = ValKeyword.CANCEL,
+					["ret"] = ValKeyword.RETURN,
+					["var"] = ValKeyword.VAR,
+					["yield"] = ValKeyword.YIELD,
+					["unmask"] = ValKeyword.UNALIAS,
+					["declare"] = ValKeyword.DECLARE,
+					["complement"] = ValKeyword.COMPLEMENT,
+					["any"] = ValKeyword.ANY,
+					["all"] = ValKeyword.ALL,
+					["fmt"] = ValKeyword.FMT,
+					["regex"] = ValKeyword.REGEX,
+					["replace"] = ValKeyword.REPLACE,
+					["macro"] = ValKeyword.MACRO,
+                    ["magic"] = ValKeyword.MAGIC,
+                    ["label"] = ValKeyword.LABEL,
+                    ["go"] = ValKeyword.GO,
+				}
+			};
+		}
+	}
+
+    public class ValMagic();
+	public class ValError {
         public string msg;
         public ValError () { }
         public ValError (string msg) {
@@ -75,7 +224,6 @@ namespace Oblivia {
         DECLARE,
         COMPLEMENT,
 
-
         REPLACE,
 
 		REPEAT,
@@ -86,14 +234,40 @@ namespace Oblivia {
         FMT,REGEX,
         FN,
         MAKE,
-        PUB, PRIV, STATIC, MACRO,
+        PUB, PRIV, STATIC, MACRO, TEMPLATE,
 
-        FIELDS_OF,
-		METHODS_OF,
-		MEMBERS_OF,
 
-        XML,
-        JSON,
+        FIELDS_OF,METHODS_OF,MEMBERS_OF,
+        ATTR,
+        MARK,
+        XML,JSON,
+
+        PREV_ITER,SEEK_ITER,
+
+        //function is provably halting
+        HALTING,
+        //function that is constant-time
+        PATTERN,
+        //a = match(func) = func(a)
+        MATCH,
+
+        //fn_c(2)*foo(_0 _1)
+        FN_C,
+        //fn_t(int int)*foo(_0 _1)
+        FN_T,
+        //immutable
+        VAL,
+
+        //Create a label
+        LABEL,
+        //Go to label
+        GO,
+        //Go to the top of the current scope
+        REDO,
+
+        NOP,
+        //Creates a magic constant e.g. null
+        MAGIC,
     }
     public class ValMultiPattern {
         public object[] items;
@@ -140,6 +314,11 @@ namespace Oblivia {
         public object on;
     }
     public record ValPattern { }
+	public record ValGo {
+		public ExprSymbol target;
+
+		public object Up () => this with { target = target with { up = target.up - 1 } };
+	}
     public record ExprGetter : INode {
         public INode get;
         public object Eval (IScope ctx) => new ValGetter { ctx = ctx, get = get };
@@ -240,6 +419,7 @@ namespace Oblivia {
             var result = expr.Eval(func_ctx);
             return result;
         }
+        public object CallVoid (IScope ctx) => CallData(ctx, []);
         public object CallData (IScope caller_ctx, IEnumerable<object> args) => CallFunc(caller_ctx, () => new ValTuple {
             items = args.Select(a => ((string) null, (object) a)).ToArray()
         });
@@ -648,6 +828,11 @@ namespace Oblivia {
         public Parser (List<Token> tokens) {
             this.tokens = tokens;
         }
+
+        public static ExprBlock FromFile(string path) {
+			var tokenizer = new Tokenizer(File.ReadAllText(path));
+			return new Parser(tokenizer.GetAllTokens()).NextBlock();
+		}
         void inc () => index++;
         void dec () => index--;
         public Token currToken => tokens[index];
@@ -759,8 +944,8 @@ namespace Oblivia {
 							switch(tokenType) {
 								case TokenType.EQUAL: {
 										inc();
-										throw new Exception();
 										return new StmtAssignSymbol { };
+										throw new Exception("TODO");
 									}
 							}
 							throw new Exception("Cannot define this");
@@ -913,6 +1098,7 @@ namespace Oblivia {
                                 return NextExpression(new ExprApply { lhs = lhs, rhs = NextExpression(), local = true });
                         }
                     }
+                    /*
                 case TokenType.SWIRL: {
                         inc();
                         switch(tokenType) {
@@ -923,6 +1109,7 @@ namespace Oblivia {
                         }
                         return NextExpression(new ExprAt { src = lhs, index = [NextTerm()] });
                     }
+                    */
                 case TokenType.L_SQUARE: {
                         var arr = NextArray();
 
@@ -1592,6 +1779,9 @@ namespace Oblivia {
         public object Eval (IScope ctx) {
             var f = expr.Eval(ctx);
             switch(f) {
+
+                case ValKeyword.MAGIC:      return new ValMagic();
+                case ValKeyword.GO:         return new ValGo { target = args.items[0].value as ExprSymbol };
                 case ValKeyword.SET:        return new ValSetter { ctx= ctx, set = args };
                 case ValKeyword.GET:        return new ValGetter { ctx = ctx, get = args };
                 case ValKeyword.ANY:        return new ValMultiPattern { items = args.EvalTuple(ctx).vals, all = false };
@@ -1651,8 +1841,6 @@ namespace Oblivia {
                         return ValEmpty.VALUE;
                     }
                 case ValKeyword.FN:
-
-
                 default:    return InvokePars(ctx, f, args);
             }
         }
@@ -1915,6 +2103,8 @@ namespace Oblivia {
         public object StagedApply (ValDictScope f) {
             var def = () => { };
             var seq = new List<INode> { };
+
+            var labels = new Dictionary<string, int>();
             foreach(var s in statements) {
                 switch(s) {
 					/*
@@ -1937,33 +2127,60 @@ namespace Oblivia {
                             def += () => block.StagedApply(_static);
                             break;
                         }
+                    case StmtDefKey { key:{ }key, value: ExprSymbol { key: "label" } }:
+                        labels[key] = seq.Count;
+                        seq.Add(s);
+                        break;
                     default:
                         seq.Add(s);
                         break;
                 }
             }
             def();
-			object r = ValEmpty.VALUE;
-			foreach(var s in seq) {
-                switch(s) {
-                    case StmtDefKey { value: ExprVarBlock { type: ExprSymbol { key: "defer", up: -1 }, source_block: { } _block } }:
-                        r = _block.EvalDefer(f);
-                        break;
-                    default:
-                        r = s.Eval(f);
-                        break;
-                }
-                switch(r) {
-                    case ValReturn vr:return vr.Up();
-                }
+
+
+
+            var i = 0;
+            while(i < seq.Count) {
+				object r = ValEmpty.VALUE;
+				var s = seq[i];
+				switch(s) {
+					case StmtDefKey { value: ExprVarBlock { type: ExprSymbol { key: "defer", up: -1 }, source_block: { } _block } }:
+						r = _block.EvalDefer(f);
+						break;
+					default:
+						r = s.Eval(f);
+						break;
+				}
+				switch(r) {
+					case ValReturn vr:
+						return vr.Up();
+					case ValGo vg:
+						if(vg.target.up == 1) {
+							if(labels.TryGetValue(vg.target.key, out var ind)) {
+                                i = ind;
+                                continue;
+							}
+							throw new Exception();
+						}
+						if(vg.target.up == -1) {
+							if(labels.TryGetValue(vg.target.key, out var ind)) {
+                                i = ind;
+                                continue;
+							}
+							return vg;
+						}
+						return vg.Up();
+				}
+				i++;
             }
-            return f;
-        }
+			return f;
+		}
         public object EvalDefer (ValDictScope ctx) {
             return null;
         }
     }
-    public class ExprSymbol : INode {
+    public record ExprSymbol : INode {
         public int up = -1;
         public string key;
         public XElement ToXML () => new("Symbol", new XAttribute("key", key), new XAttribute("level", $"{up}"));
@@ -2678,7 +2895,7 @@ namespace Oblivia {
     }
     public interface INode {
         XElement ToXML () => new(GetType().Name);
-        String Source => "";
+        string Source => "";
         object Eval (IScope ctx);
     }
     public class Tokenizer {
@@ -2772,17 +2989,34 @@ namespace Oblivia {
                     }
                 case ('"'): {
                         int dest = index + 1;
-                        while(dest < src.Length && src[dest] != '"') {
-                            dest += 1;
+                        var v = "";
+                        while(dest < src.Length) {
+                            if(src[dest] == '\\') {
+                                dest += 1;
+								v += src[dest] switch {
+                                    'r' => '\r',
+                                    'n' => '\n',
+                                    't' => '\t',
+                                    '\\' => '\\',
+                                    '"' => '"'
+                                };
+                                dest++;
+							} else if(src[dest] == '"') {
+                                break;
+                            } else {
+                                v += src[dest];
+                                dest += 1;
+                            }
                         }
                         dest += 1;
-                        var v = src[(index + 1)..(dest - 1)];
                         index = dest;
                         return new Token { type = TokenType.STRING, str = v };
                     }
+                    /*
                 case '\t':
                     throw new Exception("Illegal token");
-                case (' ' or '\r' or '\n'): {
+                    */
+                case (' ' or '\r' or '\n' or '\t'): {
                         inc();
                         goto Check;
                     }

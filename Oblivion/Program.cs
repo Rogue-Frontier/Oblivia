@@ -1,7 +1,13 @@
-﻿var src = File.ReadAllText("Example.oml");
+﻿using Oblivia;
+var parser = Parser.FromFile("Program.obl");
+var result = (ValDictScope)parser.StagedEval(Std.std);
+(result.locals["main"] as ValFunc).CallVoid(result);
+/*
+var src = File.ReadAllText("Example.oml");
 var expr = new Parse {
 	src = src,
 }.ParseExpr();
+*/
 Console.WriteLine();
 class Parse {
 	public string src;
@@ -45,8 +51,10 @@ class Parse {
 							inc();
 							result.keys[str] = ParseExpr();
 							goto Do;
+						default:
+							content.Add(str);
+							goto Do;
 					}
-					goto Do;
 				case '{':
 					content.Add(ParseStruct());
 					goto Do;
@@ -55,10 +63,17 @@ class Parse {
 					goto Do;
 				default:
 					var key = ParseSymbol();
+					Next:
 					switch(cur) {
+						case ' ':
+							inc();
+							goto Next;
 						case ':':
 							inc();
 							result.keys[key] = ParseExpr();
+							goto Do;
+						case '{':
+							content.Add(ParseStruct(key));
 							goto Do;
 						default:
 							content.Add(key);
@@ -67,6 +82,9 @@ class Parse {
 			}
 		}
 		throw new Exception("EOF error");
+	}
+	public object ParseArray () {
+		throw new Exception();
 	}
 	public string ParseSymbol() {
 		var result = "";
@@ -78,7 +96,6 @@ class Parse {
 			case '"':
 				if(result.Length == 0) throw new Exception();
 				return result;
-			
 			default:
 				result += cur;
 				inc();

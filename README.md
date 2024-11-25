@@ -1,7 +1,8 @@
 # Oblivia
-Oblivia is an experimental programming language that aims to do with objects what Lisp does with lists. Where Lisp looks like list initializers, Oblivia looks like object initializers. Oblivia follows these ideas:
+Oblivia is an experimental programming language that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
 - **Scopes are objects.** The syntax you use to create objects in JavaScript is now the syntax you use to create blocks in Oblivia. A block with no explicit return simply returns itself as an object (if it has keys) or the last expression (if there are no keys).
-- **Hyper-terse syntax.** The most frequent operations (for some context) use fewer columns. There are no keywords other than functions and values. Casting values is as easy as `A(B)` with type `A` and value `B`. Defining variables is simply `A:B(C)` with variable name `A`, type `B`, and value `C`.
+- **Hyper-terse infix-based syntax.** A small set of primitive operations are given the most terse syntax. Casting values is as easy as `A(B)` with type `A` and value `B`. Defining variables is simply `A:B(C)` with variable name `A`, type `B`, and value `C`.
+- **No keywords.** In Oblivia, a keyword is simply a function or value.
 
 ## Example
 The following code implements a Conway's Game of Life and updates until the count of active cells becomes unchanging
@@ -88,7 +89,7 @@ There are no arithmetic operators. See global function table for arithmetic func
 - `A! = A()`: call A with 0 args
 - `A*B = A(B)`: call A with arg B (associative-right)
 - `A.B = A(B)`: call A with arg B (associative-left)
-- `A(B, C)`: call A with args B, C
+- `A(B C)`: call A with args B, C
 - `A.B.C.D = ((A*B)*C)*D = ((A(B))(C))(D)`
 - `A*B*C*D = A(B(C(D)))`
 - `A(B)`: If `A` is a generic type, then `A(B)` is the fully parametrized version of the type. If `A` is a non-generic or fully parametrized (e.g. does not accept generic arguments) type, then calling it simply casts `B` to that type.
@@ -106,19 +107,16 @@ There are no arithmetic operators. See global function table for arithmetic func
 - `A/B`: In the scope of *expression* `A` evaluate *expression* B. Cannot access outer scopes.
 - `A/{B}`: In the scope of *expression* `A`, evaluate statements `B`. Can access outer scopes.
 - `A/ctor`: From .NET type `A` get the unnamed constructor.
-- `A*B`: Call `A` with arg *expression* `B` (automatic spread)
+- `A*B`: Call `A` with arg *expression* `B` (spread if tuple)
 - `A.B`: Call `A` with arg *term* `B` (no spread)
-- `A *| B`: Call `A` with every item from *expression* `B` (automatic spread)
+- `A *| B`: Call `A` with every item from *expression* `B` (spread if tuple)
 - `A .| B`: Call `A` with every item from *term* `B` (no spread)
-- `A@B`: From array `A` get item at index *term* `B`
-- `A[B]`: From array `A` get item at index `B`
-- `A@|B`: From array `A` get item at each index in `B`
 - `[A B C]`: Make an object array
 - `[:type A B C]`: Make an array of `type`
-- `A { B }`: Initializer block
+- `A { B }`: Call `A` with the result of `{ B }`
   - If `A` is a class, then constructs an instance of `A` and applies the statements `B` to it.
 - `{ A }`: Creates an scope and applies the statements `A` to it. If the scope has no locals or returns, then the scope returns the result of the last statement (empty if no statements). Otherwise returns an object.
-- `?!: A`: Creates a lambda with no arguments and output `A`
+- `?(): A`: Creates a lambda with no arguments and output `A`
 - `?(A,B): C`: Creates a lambda with arguments A,B and output `C`
 - `A ?[
     B0:C0
@@ -131,7 +129,7 @@ There are no arithmetic operators. See global function table for arithmetic func
     B1:C1
     B2:C2
     B3:C3
-}`: Match expression (naive): For each pair `B:C`, if `A = B`, then returns `C`. TODO: Allow lambda branches.
+}`: Match expression (naive): For each pair `B:C`, if `A = B`, then returns `C`.
 - `A =+ B`: Returns true if `A` equals `B`
 - `A =- B`: Returns true if `A` does not equal `B`
 - `A = B`: Returns true if `A` matches pattern `B`

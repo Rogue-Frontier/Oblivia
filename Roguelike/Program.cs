@@ -6,7 +6,6 @@ using System.Collections;
 using SadConsole.Effects;
 using SadConsole.Input;
 using System.Collections.Concurrent;
-using Common;
 
 var tokenizer = new Tokenizer(File.ReadAllText("Mainframe.obl"));
 var parser = new Parser(tokenizer.GetAllTokens());
@@ -42,6 +41,18 @@ var global = new ValDictScope {
 		["bool"] = typeof(bool),
 		["int"] = typeof(int),
 		["uint"] = typeof(uint),
+
+		["i8"] = typeof(long),
+		["i4"] = typeof(int),
+		["i2"] = typeof(short),
+		["i1"] = typeof(sbyte),
+		["u8"] = typeof(ulong),
+		["u4"] = typeof(uint),
+		["u2"] = typeof(ushort),
+		["u1"] = typeof(byte),
+		["f8"] = typeof(double),
+		["f4"] = typeof(float),
+
 		["double"] = typeof(double),
 		["string"] = typeof(string),
 		["str"] = typeof(string),
@@ -143,6 +154,7 @@ var global = new ValDictScope {
 		["PQ"] = _((object a, object b) => MakeGeneric(typeof(PriorityQueue<,>), a, b)),
 		["class"] = ValKeyword.CLASS,
 		["interface"] = ValKeyword.INTERFACE,
+		["ext"] = ValKeyword.EXTEND,
 		["enum"] = ValKeyword.ENUM,
 		["get"] = ValKeyword.GET,
 		["set"] = ValKeyword.SET,
@@ -154,8 +166,16 @@ var global = new ValDictScope {
 		["ret"] = ValKeyword.RETURN,
 		["var"] = ValKeyword.VAR,
 		["yield"] = ValKeyword.YIELD,
-		["unmask"] = ValKeyword.ALIAS_OF,
-		["declare"] = ValKeyword.DECLARE
+		["unmask"] = ValKeyword.UNALIAS,
+		["declare"] = ValKeyword.DECLARE,
+		["complement"] = ValKeyword.COMPLEMENT,
+		["any"] = ValKeyword.ANY,
+		["all"] = ValKeyword.ALL,
+		["is"] = ValKeyword.ALL,
+		["fmt"] = ValKeyword.FMT,
+		["regex"] = ValKeyword.REGEX,
+		["replace"] = ValKeyword.REPLACE,
+		["macro"] = ValKeyword.MACRO,
 	}
 };
 PriorityQueue<object, int> a = new();
@@ -183,7 +203,6 @@ class Mainframe :IScene {
 		handle_key = VF("handle_key");
 		handle_mouse = VF("handle_mouse");
 	}
-
 	ValFunc update, render, handle_key, handle_mouse;
 	void IScene.Update(System.TimeSpan delta) {
 		update.CallData(ctx, [delta]);

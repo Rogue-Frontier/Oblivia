@@ -46,8 +46,6 @@ global.locals = new() {
 	["mulf"] = Val((double a, double b) => a * b),
 	["divf"] = Val((double a, double b) => a / b),
 
-	["sumi"] = Val((int[] a) => a.Sum()),
-
 	["count"] = Val((IEnumerable data, object value) => data.Cast<object>().Count(d => {
 		var result = d.Equals(value);
 		return result;

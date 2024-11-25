@@ -5,9 +5,11 @@ VisualStudioVersion = 17.10.35027.167
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Oblivia", "Oblivia\Oblivia.csproj", "{56E0B388-1F12-46CF-87CA-3B1420E20620}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Life", "Life\Life.csproj", "{E3ED1C8D-2E23-4137-9975-88364B82CF83}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Life", "Life\Life.csproj", "{E3ED1C8D-2E23-4137-9975-88364B82CF83}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Roguelike", "Roguelike\Roguelike.csproj", "{FBBED64C-AA69-4D8F-837E-1CAF606794E0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Roguelike", "Roguelike\Roguelike.csproj", "{FBBED64C-AA69-4D8F-837E-1CAF606794E0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Oblivion", "Oblivion\Oblivion.csproj", "{F59A665F-B8B7-4798-9371-5FF9D9A1582D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -27,6 +29,10 @@ Global
 		{FBBED64C-AA69-4D8F-837E-1CAF606794E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FBBED64C-AA69-4D8F-837E-1CAF606794E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FBBED64C-AA69-4D8F-837E-1CAF606794E0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F59A665F-B8B7-4798-9371-5FF9D9A1582D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F59A665F-B8B7-4798-9371-5FF9D9A1582D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F59A665F-B8B7-4798-9371-5FF9D9A1582D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F59A665F-B8B7-4798-9371-5FF9D9A1582D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

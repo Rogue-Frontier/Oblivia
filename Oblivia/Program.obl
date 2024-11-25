@@ -1,0 +1,56 @@
+{
+	ValError: class {
+		msg: str
+		new: ?(msg:str): _class {
+			msg := ^^msg
+		}
+	}
+	ValRef: class {
+	
+	}
+
+	ValConstructor: rec(t:Type)
+	ValInstanceMethod: rec(src:obj key:str) {
+		Call: ?(data:Row.obj): obj*{
+			
+		}
+	}
+	ValStaticMethod: rec(src:Type key:str){
+		
+	}
+
+	ValReturn: rec(data:obj up:i8) {
+		Up: ?(): up = 1 ?+ data ?- copy.ValReturn { up: subi(up 1) }
+	}
+	ValYield: rec(data:obj)
+
+	ValKeyword: enum(
+		CLASS INTERFACE ENUM
+		GET SET PROP
+		MIMIC IMPLEMENT INHERIT
+		BREAK CONTINUE
+		RETURN YIELD
+		EXTEND
+		ASYNC AWAIT
+
+		DEFER
+		AUTO ABSTRACT
+
+		CANCEL
+		ALIAS UNALIAS
+
+		DECLARE COMPLEMENT
+
+		REPLACE
+		REPEAT
+		VAR
+		STAGE
+		ANY ALL
+		TYPE
+		FMT REGEX
+		FN
+		NAME
+		PUB PRIV STATIC MACRO
+	
+	)
+}

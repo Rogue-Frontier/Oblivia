@@ -1,0 +1,486 @@
+Module {
+	Sovereign {
+		codename:     "sovereign_dark_star"
+		alignment:    "DestructiveOrder"
+	}
+	ItemType {
+		codename:     "item_dagger_cannon"
+		name:         "Dagger cannon"
+		attributes:   "DarkStar"
+		level:        "1"
+		mass:         "2000"
+		value:        "3000"
+		desc:         ""
+		Weapon {
+			initialCharges:  "1200"
+			powerUse:        "20"
+			fireCooldown:    "24"
+			repeat:          "2"
+			repeatDelay:     "5"
+			repeatDelayEnd:  "60"
+			Projectile {
+				count:              "3"
+				spreadAngle:        "9"
+				missileSpeed:       "60"
+				damageType:         "1"
+				damageHP:           "1d4"
+				shock:              "2"
+				lifetime:           "180"
+				glyph:              "+"
+				foreground:         "White"
+				background:         "Transparent"
+				Trail {
+					lifetime:              "7"
+					glyph:                 "+"
+					foreground:            "White"
+					background:            "Transparent"
+				}
+			}
+		}
+	}
+	ItemType {
+		codename:     "item_shrapnel_bomb"
+		name:         "Fragmentation grenade"
+		attributes:   "DarkStar"
+		level:        "2"
+		mass:         "200"
+		value:        "8"
+		desc:         "This grenade is loaded with armor-piercing fragments. To be caught in the blast is dangerous; to be hit is deadly."
+	}
+	ItemType {
+		codename:     "item_bomb_launcher"
+		name:         "Grenade launcher"
+		attributes:   "DarkStar"
+		level:        "2"
+		mass:         "2000"
+		value:        "400"
+		invoke:       "installWeapon"
+		desc:         "This launcher utilizes a pneumatic propellant mechanism to preserve stealth. In order to maximize damage potential, fragmentation grenades detonate only on direct impact. Since Dark Star assassins are expected to be highly skilled, it should be relatively easy to land direct hits with this weapon."
+		Weapon {
+			powerUse:        "10"
+			fireCooldown:    "90"
+			ammoType:        "item_shrapnel_bomb"
+			sound:           "dynamite_launcher.wav"
+			quiet:           "true"
+			Projectile {
+				missileSpeed:       "50"
+				damageType:         "1"
+				damageHP:           "5"
+				lifetime:           "90"
+				glyph:              "\235"
+				foreground:         "A0A0A0FF"
+				background:         "Black"
+				detonateSound:      "dynamite.wav"
+				Trail {
+					lifetime:              "9"
+					glyph:                 "\249"
+					foreground:            "A0A0A0FF"
+					background:            "Transparent"
+				}
+				Fragment {
+					count:                 "32"
+					spreadAngle:           "360"
+					missileSpeed:          "60"
+					damageType:            "1"
+					damageHP:              "1d5"
+					lifetime:              "5"
+					glyph:                 "+"
+					foreground:            "Red"
+					shock:                 "3"
+				}
+				Fragment {
+					count:                 "32"
+					spreadAngle:           "360"
+					missileSpeed:          "55"
+					damageType:            "1"
+					damageHP:              "1d4"
+					lifetime:              "10"
+					glyph:                 "+"
+					foreground:            "Orange"
+					shock:                 "2"
+				}
+				Fragment {
+					count:                 "32"
+					spreadAngle:           "360"
+					missileSpeed:          "50"
+					damageType:            "1"
+					damageHP:              "1d3"
+					lifetime:              "15"
+					glyph:                 "+"
+					foreground:            "Yellow"
+				}
+			}
+		}
+	}
+	ItemType {
+		codename:     "item_cloaking_shield"
+		name:         "Cloaking shield"
+		attributes:   "DarkStar"
+		level:        "2"
+		mass:         "200"
+		desc:         "This shield generates a darkening field that provides stealth."
+		Shield {
+			powerUse:        "30"
+			idlePowerUse:    "1"
+			maxHP:           "30"
+			damageDelay:     "90"
+			depletionDelay:  "180"
+			regen:           "30 / 300"
+			stealth:         "8"
+		}
+	}
+	ItemType {
+		codename:     "item_darkened_knightsteel_plate"
+		name:         "Prince armor"
+		attributes:   "DarkStar"
+		mass:         "6000"
+		level:        "1"
+		value:        "5000"
+		desc:         "This version of knight plate is darkened with a stealthing compound"
+		Armor {
+			maxHP:           "150"
+			stealth:         "8"
+			minAbsorb:       "1"
+			reflectFactor:   "1.0"
+		}
+	}
+	ShipClass {
+		codename:     "ship_brutus"
+		inherit:      "ship_beowulf"
+		name:         "Brutus-class gunship"
+		Tile {
+			glyph:           "b"
+			foreground:      "798cabFF"
+			background:      "Black"
+		}
+		Cargo {
+			Item {
+				codename:           "item_shrapnel_bomb"
+				count:              "60"
+			}
+			Item {
+				codename:           "item_simple_fuel_rod"
+				count:              "12"
+			}
+			Item {
+				codename:           "item_armor_repair_patch"
+				count:              "4"
+			}
+		}
+		Devices {
+			Weapon {
+				codename:           "item_dagger_cannon"
+			}
+			Weapon {
+				codename:           "item_bomb_launcher"
+			}
+			Shield {
+				codename:           "item_cloaking_shield"
+			}
+			Reactor {
+				codename:           "item_20mw_generator"
+			}
+			Reactor {
+				codename:           "item_30mw_secondary"
+			}
+		}
+		LayeredArmorSystem {
+			Armor {
+				codename:           "item_darkened_knightsteel_plate"
+			}
+			Armor {
+				codename:           "item_knightsteel_plate"
+			}
+			Armor {
+				codename:           "item_knightsteel_plate"
+			}
+		}
+		PlayerSettings {
+			startingClass:   "false"
+		}
+	}
+	ShipClass {
+		codename:     "ship_machiavelli"
+		inherit:      "ship_beowulf"
+		name:         "Machiavelli-class gunship"
+		Tile {
+			glyph:           "b"
+			foreground:      "505e75FF"
+			background:      "Black"
+		}
+		Cargo {
+			Item {
+				codename:           "item_shrapnel_bomb"
+				count:              "32"
+			}
+			Item {
+				codename:           "item_simple_fuel_rod"
+				count:              "12"
+			}
+			Item {
+				codename:           "item_armor_repair_patch"
+				count:              "4"
+			}
+		}
+		Devices {
+			Weapon {
+				codename:           "item_dagger_cannon"
+			}
+			Weapon {
+				codename:           "item_bomb_launcher"
+			}
+			Shield {
+				codename:           "item_cloaking_shield"
+			}
+			Reactor {
+				codename:           "item_20mw_generator"
+			}
+			Reactor {
+				codename:           "item_30mw_secondary"
+			}
+		}
+		LayeredArmorSystem {
+			Armor {
+				codename:           "item_darkened_knightsteel_plate"
+			}
+			Armor {
+				codename:           "item_knightsteel_plate"
+			}
+			Armor {
+				codename:           "item_knightsteel_plate"
+			}
+		}
+		PlayerSettings {
+			startingClass:   "false"
+		}
+	}
+	ShipClass {
+		codename:     "ship_berserker"
+		inherit:      "ship_beowulf"
+		name:         "Berserker-class gunship"
+		Tile {
+			glyph:           "B"
+			foreground:      "505e75FF"
+		}
+		Cargo {
+			Item {
+				codename:           "item_maw_missile"
+				count:              "96"
+			}
+			Item {
+				codename:           "item_simple_fuel_rod"
+				count:              "12"
+			}
+			Item {
+				codename:           "item_armor_repair_patch"
+				count:              "4"
+			}
+		}
+		Devices {
+			Weapon {
+				codename:           "item_maw_launcher"
+			}
+			Shield {
+				codename:           "item_buckler_shield"
+			}
+			Reactor {
+				codename:           "item_20mw_generator"
+			}
+			Reactor {
+				codename:           "item_30mw_secondary"
+			}
+		}
+		LayeredArmorSystem {
+			Armor {
+				codename:           "item_knightsteel_plate"
+			}
+			Armor {
+				codename:           "item_knightsteel_plate"
+			}
+			Armor {
+				codename:           "item_knightsteel_plate"
+			}
+		}
+		PlayerSettings {
+			startingClass:   "false"
+		}
+	}
+	ShipClass {
+		codename:     "ship_bandit"
+		inherit:      "ship_clark"
+		name:         "Bandit-class freighter"
+		Tile {
+			glyph:           "c"
+			foreground:      "798cabFF"
+			background:      "Black"
+		}
+		Cargo {
+			Item {
+				codename:           "item_shrapnel_bomb"
+				count:              "32"
+			}
+			Item {
+				codename:           "item_simple_fuel_rod"
+				count:              "12"
+			}
+			Item {
+				codename:           "item_armor_repair_patch"
+				count:              "4"
+			}
+		}
+		Devices {
+			Weapon {
+				codename:           "item_dagger_cannon"
+			}
+			Weapon {
+				codename:           "item_bomb_launcher"
+			}
+			Shield {
+				codename:           "item_cloaking_shield"
+			}
+			Reactor {
+				codename:           "item_20mw_generator"
+			}
+			Reactor {
+				codename:           "item_30mw_secondary"
+			}
+		}
+		LayeredArmorSystem {
+			Armor {
+				codename:           "item_bandit_plate"
+			}
+			Armor {
+				codename:           "item_bumpersteel_plate"
+			}
+			Armor {
+				codename:           "item_bumpersteel_plate"
+			}
+		}
+		PlayerSettings {
+			startingClass:   "false"
+		}
+	}
+	ShipClass {
+		codename:     "ship_swindler"
+		inherit:      "ship_clark"
+		name:         "Swindler-class freighter"
+		Tile {
+			glyph:           "c"
+			foreground:      "505e75FF"
+			background:      "Black"
+		}
+		Cargo {
+			Item {
+				codename:           "item_shrapnel_bomb"
+				count:              "32"
+			}
+			Item {
+				codename:           "item_simple_fuel_rod"
+				count:              "12"
+			}
+			Item {
+				codename:           "item_armor_repair_patch"
+				count:              "4"
+			}
+		}
+		Devices {
+			Weapon {
+				codename:           "item_dagger_cannon"
+			}
+			Weapon {
+				codename:           "item_bomb_launcher"
+			}
+			Shield {
+				codename:           "item_cloaking_shield"
+			}
+			Reactor {
+				codename:           "item_20mw_generator"
+			}
+			Reactor {
+				codename:           "item_30mw_secondary"
+			}
+		}
+		LayeredArmorSystem {
+			Armor {
+				codename:           "item_bandit_plate"
+			}
+			Armor {
+				codename:           "item_bumpersteel_plate"
+			}
+			Armor {
+				codename:           "item_bumpersteel_plate"
+			}
+		}
+		PlayerSettings {
+			startingClass:   "false"
+		}
+	}
+	StationType {
+		codename:     "station_dark_star_fortress"
+		name:         "Dark Star fortress"
+		sovereign:    "sovereign_dark_star"
+		stealth:      "2"
+		structure:    "station_dark_star_fortress.dat"
+		HP {
+			maxHP:           "600"
+		}
+		Weapons {
+
+		}
+		Ships {
+			Ship {
+				codename:           "ship_brutus"
+				count:              "8"
+				order:              "guard"
+			}
+			Ship {
+				codename:           "ship_machiavelli"
+				count:              "4"
+				order:              "guard"
+			}
+		}
+	}
+	StationType {
+		codename:     "station_dark_star_shipyard"
+		name:         "Dark Star shipyard"
+		sovereign:    "sovereign_dark_star"
+		stealth:      "2"
+		structure:    "station_dark_star_shipyard.dat"
+		HP {
+			maxHP:           "800"
+		}
+		Weapons {
+			Weapon {
+				codename:           "item_dagger_cannon"
+				posX:               "3"
+				posY:               "0"
+			}
+			Weapon {
+				codename:           "item_dagger_cannon"
+				posX:               "-3"
+				posY:               "0"
+			}
+		}
+		Construction {
+			max:             "15"
+			Construct {
+				time:               "900"
+				codename:           "ship_brutus"
+				order:              "patrol"
+				patrolRadius:       "20"
+			}
+		}
+		Ships {
+			Ship {
+				codename:           "ship_brutus"
+				count:              "8"
+				order:              "guard"
+			}
+			Ship {
+				codename:           "ship_machiavelli"
+				count:              "4"
+				order:              "guard"
+			}
+		}
+	}
+}

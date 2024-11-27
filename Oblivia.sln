@@ -9,7 +9,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Life", "Life\Life.csproj", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Roguelike", "Roguelike\Roguelike.csproj", "{FBBED64C-AA69-4D8F-837E-1CAF606794E0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Oblivion", "Oblivion\Oblivion.csproj", "{F59A665F-B8B7-4798-9371-5FF9D9A1582D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Oblivion", "Oblivion\Oblivion.csproj", "{F59A665F-B8B7-4798-9371-5FF9D9A1582D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ECS", "ECS\ECS.csproj", "{E579ED02-D866-42E9-8FE2-BE9F41457989}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ObliviaTalk", "ObliviaTalk\ObliviaTalk.csproj", "{87CA11BC-1B79-4DA1-9276-8D3F9C90DFD7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +37,14 @@ Global
 		{F59A665F-B8B7-4798-9371-5FF9D9A1582D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F59A665F-B8B7-4798-9371-5FF9D9A1582D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F59A665F-B8B7-4798-9371-5FF9D9A1582D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E579ED02-D866-42E9-8FE2-BE9F41457989}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E579ED02-D866-42E9-8FE2-BE9F41457989}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E579ED02-D866-42E9-8FE2-BE9F41457989}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E579ED02-D866-42E9-8FE2-BE9F41457989}.Release|Any CPU.Build.0 = Release|Any CPU
+		{87CA11BC-1B79-4DA1-9276-8D3F9C90DFD7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{87CA11BC-1B79-4DA1-9276-8D3F9C90DFD7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{87CA11BC-1B79-4DA1-9276-8D3F9C90DFD7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{87CA11BC-1B79-4DA1-9276-8D3F9C90DFD7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

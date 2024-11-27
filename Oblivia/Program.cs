@@ -27,7 +27,10 @@ namespace Oblivia {
 			Type MakeGeneric (Type gen, params object[] item) => gen.MakeGenericType(item.Select(i => i switch { Type t => t, _ => typeof(object) }).ToArray());
 			std = new ValDictScope {
 				locals = new() {
-                    ["File"] = typeof(File),
+					["File"] = typeof(File),
+					["Console"] = typeof(Console),
+
+                    ["char"] = typeof(char),
 
 					["Pt"] = typeof((int, int)),
 
@@ -111,11 +114,17 @@ namespace Oblivia {
 
                     ["ch_arr"] = _((string s) => s.ToCharArray()),
 
-					["Array"] = _((Type type, int dim) => type.MakeArrayType(dim)),
+					["Array"] = _((Type type, int dim) =>
+                    
+                    type.MakeArrayType(dim)),
 					["arr_get"] = _((Array a, int[] ind) => a.GetValue(ind)),
 					["arr_set"] = _((Array a, int[] ind, object value) => a.SetValue(value, ind)),
 					["arr_at"] = _((Array a, int[] ind) => new ValRef { src = a, index = ind }),
-					["str_append"] = _((StringBuilder sb, object o) => sb.Append(o)),
+                    ["arr_mk"] = _((Type t, int l) => Array.CreateInstance(t, l)),
+                    
+                    ["str_append"] = _((StringBuilder sb, object o) => sb.Append(o)),
+                    
+                    
                     ["append"] = _((string a, string b) => a + b),
 					["append_ch"] = _((string a, char b) => a + b),
 					["row_from"] = _((Type t, object[] items) => {
@@ -126,7 +135,7 @@ namespace Oblivia {
 					["rand_bool"] = _(() => new Random().Next(2) == 1),
 					["randf"] = _(new Random().NextDouble),
 					["rand_range"] = _((int a, int b) => new Random().Next(a, b)),
-					["Row"] = _((object type) => (type as Type ?? typeof(object)).MakeArrayType(1)),
+					["Row"] = _((object type) => (type is Type t ? t : typeof(object)).MakeArrayType(1)),
 					["Grid"] = _((Type type) => type.MakeArrayType(2)),
 					["List"] = _((object item) => MakeGeneric(typeof(List<>), item)),
 					["HashSet"] = _((object item) => MakeGeneric(typeof(HashSet<>), item)),
@@ -135,6 +144,7 @@ namespace Oblivia {
 					["StrBuild"] = typeof(StringBuilder),
 					["Fn"] = typeof(ValFunc),
 					["PQ"] = _((object a, object b) => MakeGeneric(typeof(PriorityQueue<,>), a, b)),
+                    ["default"] = ValKeyword.DEFAULT,
 					["class"] = ValKeyword.CLASS,
 					["interface"] = ValKeyword.INTERFACE,
 					["ext"] = ValKeyword.EXTEND,
@@ -174,6 +184,13 @@ namespace Oblivia {
             this.msg = msg;
         }
     }
+
+
+    public record ValIndex {
+        public Action<object> Set;
+        public Func<object> Get;
+    }
+
     public record ValRef {
         public Array src;
         public int[] index;
@@ -204,6 +221,7 @@ namespace Oblivia {
         CLASS,INTERFACE,ENUM,
         GET,SET,PROP,
 
+        DEFAULT,
         MIMIC,
         IMPLEMENT,INHERIT,
         BREAK,CONTINUE,
@@ -242,7 +260,10 @@ namespace Oblivia {
         MARK,
         XML,JSON,
 
-        PREV_ITER,SEEK_ITER,
+        PREV_ITER,SEEK_ITER, WAIT_ITER,
+
+        //autoret(item) = (match(item), item)
+        AUTORET,
 
         //function is provably halting
         HALTING,
@@ -268,6 +289,11 @@ namespace Oblivia {
         NOP,
         //Creates a magic constant e.g. null
         MAGIC,
+
+        //Provides multiple values for tuple
+        DECONSTRUCT,
+        //Gets all keys from the target for deconstruct-assign
+        STRUCT_KEYS,
     }
     public class ValMultiPattern {
         public object[] items;
@@ -276,7 +302,9 @@ namespace Oblivia {
             if(all) {
 				return items.All(i => ExprMatch.Is(val, i));
 			} else {
-                return items.Any(i => ExprMatch.Is(val, i));
+                var r = items.Any(i => ExprMatch.Is(val, i));
+
+				return r;
 			}
         }
     }
@@ -284,6 +312,7 @@ namespace Oblivia {
         public static readonly ValEmpty VALUE = new();
     }
     public class ValDeclared {
+        public string name;
         public object type;
     }
     public class ValAuto { }
@@ -944,7 +973,7 @@ namespace Oblivia {
 							switch(tokenType) {
 								case TokenType.EQUAL: {
 										inc();
-										return new StmtAssignSymbol { };
+										return new StmtAssignExpr { lhs = lhs, rhs = NextExpression() };
 										throw new Exception("TODO");
 									}
 							}
@@ -1396,6 +1425,25 @@ namespace Oblivia {
                     return new ExprSeq { items = items, type = type };
                 default:
                     var item = NextExpression();
+                    if(tokenType == TokenType.COLON) {
+                        
+                    } else {
+
+                    }
+                    switch(tokenType) {
+                        case TokenType.COLON:
+                            var l = new List<INode> { item };
+                            while(tokenType == TokenType.COLON) {
+                                inc();
+                                l.Add(NextExpression());
+                            }
+                            var tuple = ExprTuple.ListExpr(l);
+                            items.Add(tuple);
+                            break;
+                        default:
+							items.Add(item);
+                            break;
+					}
                     /*
                     switch(tokenType) {
                         case TokenType.COLON:
@@ -1404,7 +1452,7 @@ namespace Oblivia {
                             goto Check;
                     }
                     */
-                    items.Add(item);
+                    
                     goto Check;
             }
         }
@@ -1525,7 +1573,7 @@ namespace Oblivia {
                     break;
                 case Array a:
                     foreach(var item in a) {
-                        it.Add((null, a));
+                        it.Add((null, item));
                     }
                     break;
                 default:
@@ -1645,6 +1693,9 @@ namespace Oblivia {
         public string? key;
         public object Eval(IScope ctx) {
             var l = lhs.Eval(ctx);
+
+
+
             var r = rhs.Eval(ctx);
 			ctx.SetLocal("_lhs", l);
 			ctx.SetLocal("_rhs", r);
@@ -1784,7 +1835,11 @@ namespace Oblivia {
                 case ValKeyword.GO:         return new ValGo { target = args.items[0].value as ExprSymbol };
                 case ValKeyword.SET:        return new ValSetter { ctx= ctx, set = args };
                 case ValKeyword.GET:        return new ValGetter { ctx = ctx, get = args };
-                case ValKeyword.ANY:        return new ValMultiPattern { items = args.EvalTuple(ctx).vals, all = false };
+                case ValKeyword.ANY:
+
+                    var at = args.EvalTuple(ctx);
+
+					return new ValMultiPattern { items = at.vals, all = false };
                 case ValKeyword.ALL:        return new ValMultiPattern { items = args.EvalTuple(ctx).vals, all = true };
                 case ValKeyword.EXTEND:     return new ExtendTicket { on = args.EvalExpression(ctx), inherit = true };
                 case ValKeyword.COMPLEMENT: return new Complement { on = args.EvalExpression(ctx) };
@@ -1943,6 +1998,8 @@ namespace Oblivia {
                         }
                         throw new Exception();
                     }
+                case ValIndex vi:
+                    return vi.Get();
                 case ExtendObject ext:
                     
                     throw new Exception();
@@ -1960,12 +2017,15 @@ namespace Oblivia {
                     }
 				case IDictionary d: {
 						var ind = evalArgs().vals.Single();
-						return d[ind];
+                        return new ValIndex { Get = () => d[ind], Set = (object o) => d[ind] = o };
 					}
 				case IEnumerable e: {
 						var ind = evalArgs().vals.Single();
 						return ind switch {
-							int i => e.Cast<object>().ElementAt(i),
+							int i => new ValIndex {
+                                Get = () => e.Cast<object>().ElementAt(i),
+                                Set = o => throw new Exception()
+							},
 							_ => throw new Exception(),
 						};
 					}
@@ -2191,6 +2251,7 @@ namespace Oblivia {
 			var r = ctx.Get(key, up);
 			return r switch {
 				ValGetter vg => vg.Get(),
+                ValIndex vi => vi.Get(),
 				ValAlias va => va.Deref(),
 				_ => r,
 			};
@@ -2299,6 +2360,10 @@ namespace Oblivia {
         public List<(INode cond, INode yes)> branches;
         public object Eval (IScope ctx) {
             var val = item.Eval(ctx);
+
+            if(val is ValIndex vi) {
+                val = vi.Get();
+            }
             return Match(ctx, branches, val);
 		}
         public static object Match(IScope ctx, List<(INode cond, INode yes)> branches, object val) {
@@ -2308,12 +2373,16 @@ namespace Oblivia {
 			foreach(var (cond, yes) in branches) {
                 //TODO: Allow lambda matches
 				var b = cond.Eval(inner_ctx);
-				if(Is(b)) {
+				if(Is(b) || b is ValKeyword.DEFAULT) {
 					return yes.Eval(inner_ctx);
 				}
 			}
 			throw new Exception("Fell out of match expression");
 			bool Is (object pattern) {
+                switch(pattern) {
+                    case ValMultiPattern mp:
+                        return mp.Accept(val);
+                }
 				if(Equals(val, pattern))
 					return true;
 				else
@@ -2446,10 +2515,10 @@ namespace Oblivia {
             }
             switch(val) {
                 case Type t:
-                    val = new ValDeclared { type = t };
+                    val = new ValDeclared { type = t, name = key };
                     break;
                 case ValClass vc:
-                    val = new ValDeclared { type = vc };
+                    val = new ValDeclared { type = vc, name = key };
                     break;
             }
             Set(ctx, key, val);
@@ -2738,6 +2807,27 @@ namespace Oblivia {
             throw new Exception();
 		}
     }
+
+    public class StmtAssignExpr:INode {
+        public INode lhs;
+        public INode rhs;
+
+		public object Eval (IScope ctx) {
+            var l = lhs.Eval(ctx);
+            var r = rhs.Eval(ctx);
+			switch(l) {
+                case ValIndex vi:
+
+
+                    vi.Set(r);
+                    return r;
+                case ValSetter vs:
+                    vs.Set(r);
+                    return r;
+            }
+            throw new Exception();
+		}
+	}
     public class StmtAssignSymbol : INode {
         public ExprSymbol symbol;
         public INode value;

@@ -1,32 +1,57 @@
 {
-	main:{
+	print:Console/WriteLine
+	main:?(){
 		parser:Parser{
 			src := File/ReadAllText("Example.oml")
 		}
-		parser/ParseExpr()
+		ret*parser/ParseExpr()
 	}
 	Parser: class {
+		spaces:any*ch_arr*" \t\r\n"
 		chr:parse_char
 		err:magic()
 		src:str
 		ind:i4(0)
 		valid:get* lt(ind src/Length)
-		cur:get* valid ?+ src.ind ?- err
-		inc: ?(): { ind := addi(ind 1) }
+		cur:get* valid ?+ src.ind() ?- err
+		inc: ?(){ ind := addi(ind 1) }
 		ParseExpr: ?(lhs:""): {
-			cur ?{
-				chr*"{":ret*ParseStruct.lhs
-				chr*"\"":ret*ParseString()
-				any*ch_arr(" \t\r\n"):{
-					inc()
-					go*Do
+			result: obj
+			print.cur
+			active:yes
+
+			parts: deconstruct(
+				(active result),
+
+			
+			)
+			
+
+			active ?%
+				cur ?{
+					chr*"{":{
+						result := ParseStruct.lhs
+						active := no
+						}
+					chr*"\"":{
+						result := ParseString()
+						active := no
+						}
+					spaces:{
+						print."space"
+						inc()
+					}
+					err:{
+						result := err
+						active := no
+					}
+					default:{
+						sym:ParseSymbol()
+						result := ParseExpr(sym)
+						active := no
+					}
 				}
-				err:ret*err
-				_:{
-					sym:ParseSymbol()
-					ret*ParseExpr(sym)
-				}
-			}
+			^:result
 		}
 		ParseStruct: ?(tag:"") {
 			inc()
@@ -37,7 +62,6 @@
 			cur ?{
 				chr*"}":{
 					inc()
-					ret*result
 				}
 				chr*"\"":{
 					str: ParseString()
@@ -47,14 +71,18 @@
 							result/keys(str) := ParseExpr()
 						}
 					}
+					go*Done
 				}
 				chr*"{":{
 					content/Add*ParseStruct()
+					go*Done
 				}
-				any*ch_arr(" \t\r\n"):{
+				spaces:{
 					inc()
+					print*"space"
+					go*Done
 				}
-				_:{
+				default:{
 					key: ParseSymbol()
 					cur ?{
 						chr*":":{
@@ -65,28 +93,28 @@
 							content/Add*key
 						}
 					}
+					go*Done
 				}
 			}
-			go*Do
+			^:result
 		}
 		ParseSymbol: ?():{
 			result:""
 			Do:label
 			cur ?{
 				any*ch_arr(":{ \t\r\n\""):{
-					(result/Length = 0) ?+
-						ret*err ?- {
-							^^^:result
-						}
+					print."space"
+					(result/Length = 0) ?+ { ^^^:err }
 				}
-				err:ret*err
+				err:{^^:err}
 				#autoret(err)
-				_:{
+				default:{
 					result := append_ch(_ cur)
 					inc()
 					go*Do
 				}
 			}
+			^:result
 		}
 		ParseString: ?(){
 			inc()
@@ -95,17 +123,17 @@
 			cur ?{
 				chr."\"":{
 					inc()
-					ret*result
 				}
-				_:{
+				default:{
 					result := append(_ cur)
 					inc()
 					go*Do
 				}
 			}
+			^:result
 		}
 	}
 	OmlStruct: class {
-		keys: Dict(str obj)
+		keys: Dict(str obj)/ctor()
 	}
 }

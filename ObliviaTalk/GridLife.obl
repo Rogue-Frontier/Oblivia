@@ -1,0 +1,54 @@
+{
+GRID_SIZE_X: val*divi(500 1727)
+GRID_SIZE_Y: val*divi(300 839)
+NEIGHBOR_X: [subi(1) 0 1 subi(1) 1 subi(1) 0 1]
+NEIGHBOR_Y: [subi(1) subi(1) subi(1) 0 0 1 1 1]
+
+gridData: Grid(i4 GRID_SIZE_X GRID_SIZE_Y)
+
+for(x 0 subi(GRID_SIZE_X 1)) {
+	for(y 0 subi(GRID_SIZE_Y 1)) {
+		gridData(x y) = random(0 1)
+	}
+}
+
+gridCtrl: UI/create("canvasGrid", {
+	color:"#00cc58"
+	background: "Neutral_Paper",
+	data: gridData
+})
+
+gridCtrl/onclick: ?(x y){
+	newValue: i4*eq(gridData(x y) 1) ?+ 0 ?- 1
+	gridData(x y) = newValue
+	gridCtrl/setAt(x y newValue)
+}
+
+gridCtrl/ondrag: ?(dragInfo){
+	foreach(xy dragInfo/path) {
+		cur: gridCtrl/getAt(xy.0 xy.1)
+		gridCtrl/setAt(xy.0 xy.1 eq(cur 1) ?+ 0 ?+ 1)
+	}
+}
+gridCtrl/onsize: ?(width height){}
+enabled: false
+quit:false
+
+UI/setCommands[
+	{label:"Start/Stop" onaction:?(){ enabled := not(_) }},
+	{label:"Clear" onaction:?(){ ClearAll() enabled:=false }},
+	{label:"Random" onaction:?(){ InitRandom() }}
+]
+
+UI/show.gridCtrl
+
+UI/run*?(){
+	enabled ?+ {
+		gridData := NextGeneration._
+		gridCtrl/data := gridData
+	}
+}
+
+^: 0
+
+}

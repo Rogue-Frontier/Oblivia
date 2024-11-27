@@ -1,0 +1,20 @@
+use*ecs/meta
+
+MaxSpeed: struct {
+	value:f4
+}
+Position: struct {
+	x:f4 y:f4
+}
+SpaceShip: prefab {
+	MaxSpeed: {value:100}
+	cockpit: {
+		Position: { x:subi(10) y:0 }
+	}
+}
+my_spaceship: entity {
+	tag.SpaceShip
+}
+my_entity: entity {
+	
+}

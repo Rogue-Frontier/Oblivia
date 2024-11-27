@@ -1,17 +1,4 @@
 {
-	alpha:		any*ch_arr."ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-	colon:		any*ch_arr.":"
-	l_paren:	parse_char."("
-	r_paren:	parse_char.")"
-	l_square:	parse_char."["
-	r_square:	parse_char."]"
-	l_curly:	parse_char."{"
-	r_curly:	parse_char."}"
-	l_angle:	parse_char."<"
-	r_angle:	parse_char.">"
-	quote:		parse_char."\""
-	space:		any*ch_arr." \t\r\n"
-
 	dict:[
 		"addi(<lhs> <rhs>)"								:	"<lhs> + <rhs>"
 		"subi(<lhs> <rhs>)"								:	"<lhs> - <rhs>"
@@ -28,24 +15,52 @@
 		"<cond> ?+ <yes> ?- <no>"						:	"if <cond> do <yes> else do <no> end"
 		"<cond> ?+ <yes>"								:	"if <cond> do <yes> end"
 	]
-
+	
+	alpha:		any*ch_arr."ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+	colon:		any*ch_arr.":"
+	l_paren:	parse_char."("
+	r_paren:	parse_char.")"
+	l_square:	parse_char."["
+	r_square:	parse_char."]"
+	l_curly:	parse_char."{"
+	r_curly:	parse_char."}"
+	l_angle:	parse_char."<"
+	r_angle:	parse_char.">"
+	quote:		parse_char."\""
+	space:		any*ch_arr." \t\r\n"
 	Capture: class {
 		items: List.obj/ctor()
+		write(): {
+			s:""
+			items | ?(p){
+				s := append(_ p/text)
+			}
+			^: s
+		}
+		fmt(s:""):{
+			items | ?(p){
+				p = CaptureStr:c ?+ {
+					print(cat[c/name "=" c/text])
+					s := s/Replace(c/name c/text)
+				}
+			}
+			^: s
+		}
 	}
-
+	CaptureStr: class {
+		expr: no
+		text: str
+		name: str
+	}
 	Matcher: class {
 		parts: List.obj/ctor()
 		read(other:StrDex):{
 			good:yes
 			ind_l:0
 			ind_r:0
-
+			result: Capture{}
 			matchAll: no
-			matchNode: MatchExp
-
-
-
-
+			matchNode: CaptureStr
 			and[good lt(ind_l other/len)] ?% {
 				(other/src.ind_l() = space) ?+ {
 					print."SPACE"
@@ -59,19 +74,20 @@
 							matchAll ?+ {
 								term: other/getTerm.ind_l
 								matchNode/{
-									capture := append(_ cat[" " term])
-									ind_l := addi(_ term/Length)
-
+									text := append(_ cat[" " term])
 								}
-
+								ind_l := addi(_ term/Length)
 								print(cat["capture more " lhs])
 							} ?- {
-							
 								ind_l := 0
 								print."NO MATCH"
 							}
 						} ?- {
 							print."MATCH"
+							result/items/Add* CaptureStr {
+								name := lhs
+								text := lhs
+							}
 							ind_l := addi(_ s/len)
 							ind_r := addi(_ 1)
 						}
@@ -79,14 +95,18 @@
 						lhs:other/getTerm(ind_l)
 						print(cat["LHS    " lhs "\nEXPECT " e/name])
 						print."MATCH"
-						e/{
-							capture := lhs
+						item:CaptureStr{
+							expr := yes
+							text := lhs
+							name := e/name
 							print(cat["capture " lhs])
-						
+						}
+						result/items/Add*item
+						e/{
 							matchAll := all
 							matchAll ?+ {
 								print."capture more"
-								matchNode := e
+								matchNode := item
 							}
 						}
 						ind_l := addi(_ lhs/Length)
@@ -94,22 +114,7 @@
 					}
 				}
 			}
-		}
-		write(): {
-			s:""
-			parts | ?(p){
-				s := append(_ p/out)
-			}
-			^: s
-		}
-		fmt(s:""):{
-			parts | ?(p){
-				p = MatchExp:e ?+ {
-					print(cat[e/name "=" e/capture])
-					s := s/Replace(e/name e/capture)
-				}
-			}
-			^: s
+			^:result
 		}
 		parse(s:str): Matcher/new(Lexer/new(s)/read())
 		new(from:StrDex): Matcher {
@@ -146,27 +151,17 @@
 	MatchStr: class {
 		src: str
 		len: 'src/Length
-		out: 'src
 	}
 	MatchExp: class {
 		all: yes
 		name:str
-		capture:str
-		out: 'capture
 	}
-
-	CaptureStr: class {
-		expr: no
-		text: str
-	}
-
 	StrDex: class {
 		src: str
 		end: Array(i4 1)
 		getEnd(i:i4): end.i()
 		getChar(i:i4): src.i()
 		getTerm(i:i4): src/Substring(i subi(getEnd.i i))
-
 		len: 'src/Length
 	}
 	print:Console/WriteLine
@@ -177,9 +172,10 @@
 		m2: Matcher/parse("[<items>]")
 
 
-		m2/read.m1
-		#print*m2/fmt("<lhs> // <rhs>")
-		print*m2/fmt("array(<items>)")
+
+		cap: m2/read.m1
+		#print*cap/fmt("<lhs> // <rhs>")
+		print*cap/fmt("array(<items>)")
 	}
 	Lexer: class {
 		src:str

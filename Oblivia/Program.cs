@@ -1774,11 +1774,16 @@ namespace Oblivia {
             switch(cond) {
                 case true:
                     return  positive.Eval(ctx);
+                case false:
                 default:
                     switch(negative) {
                         case null:  return ValEmpty.VALUE;
                         default:    return negative.Eval(ctx);
                     }
+                    /*
+                default:
+                    throw new Exception("bit expected");
+                    */
             }
         }
     }

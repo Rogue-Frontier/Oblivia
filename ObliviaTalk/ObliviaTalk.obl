@@ -66,8 +66,8 @@
 					print."SPACE"
 					ind_l := other/getEnd.ind_l
 				} ?- {
-					p:parts.ind_r()
-					p = MatchStr:s ?+ {
+					p:parts.ind_r(),
+					(p = MatchStr:s) ?+ {
 						lhs:other/src/Substring(ind_l s/len)
 						print(cat["LHS    " lhs "\nEXPECT " s/src])
 						not(lhs/Equals(s/src)) ?+ {
@@ -91,7 +91,7 @@
 							ind_l := addi(_ s/len)
 							ind_r := addi(_ 1)
 						}
-					} ?- p = MatchExp:e ?+ {
+					} ?- (p = MatchExp:e) ?+ {
 						lhs:other/getTerm(ind_l)
 						print(cat["LHS    " lhs "\nEXPECT " e/name])
 						print."MATCH"
@@ -166,16 +166,24 @@
 	}
 	print:Console/WriteLine
 	main:?(){
-		#m1: Lexer/lex("divi(1 2)")
-		#m2: Matcher/parse("divi(<lhs> <rhs>)")
+		m1: Lexer/lex("divi(1 2)")
+		m2: Matcher/parse("divi(<lhs> <rhs>)")
+		cap: m2/read.m1
+		print*cap/fmt("<lhs> // <rhs>")
+		
+		/*
 		m1: Lexer/lex("[1 2 3 4]")
 		m2: Matcher/parse("[<items>]")
-
-
-
 		cap: m2/read.m1
-		#print*cap/fmt("<lhs> // <rhs>")
 		print*cap/fmt("array(<items>)")
+
+		m1: Lexer/lex("NEIGHBOR_Y: [subi(1) subi(1) subi(1) 0 0 1 1 1]")
+		m2: Matcher/parse("<name>:[<items>]")
+		cap: m2/read.m1
+		print*cap/fmt("var <name> = [<items>]")
+		*/
+		
+		
 	}
 	Lexer: class {
 		src:str

@@ -1102,9 +1102,9 @@ namespace Oblivia {
                                     case TokenType.COLON:
                                         inc();
                                         var symbol = NextSymbol();
-                                        return new ExprMatch { lhs = lhs, rhs = pattern, key = symbol.key };
+                                        return NextExpression( new ExprMatch { lhs = lhs, rhs = pattern, key = symbol.key });
                                     default:
-                                        return new ExprMatch{ lhs = lhs, rhs = pattern, key = "_"};
+                                        return NextExpression( new ExprMatch{ lhs = lhs, rhs = pattern, key = "_"});
                                 }
                                 throw new Exception();
                         }
@@ -1247,30 +1247,37 @@ namespace Oblivia {
                                 }
                             case (TokenType.PLUS): {
                                     inc();
-                                    var positive = NextExpression();
-                                    var negative = default(INode);
+
+
                                     switch(tokenType) {
-                                        case TokenType.QUERY: {
-                                                inc();
-                                                switch(tokenType) {
-                                                    case TokenType.DASH: {
-                                                            inc();
-                                                            negative = NextExpression();
-                                                            break;
-                                                        }
-                                                    default: {
-                                                            dec();
-                                                            break;
-                                                        }
-                                                }
-                                            }
-                                            break;
-                                    }
-                                    return NextExpression(new ExprBranch {
-                                        condition = lhs,
-                                        positive = positive,
-                                        negative = negative
-                                    });
+                                        case TokenType.PLUS:
+                                            return NextExpression(new ExprLoop { condition = lhs, positive = NextExpression() });
+                                        default:
+											var positive = NextExpression();
+											var negative = default(INode);
+											switch(tokenType) {
+												case TokenType.QUERY: {
+														inc();
+														switch(tokenType) {
+															case TokenType.DASH: {
+																	inc();
+																	negative = NextExpression();
+																	break;
+																}
+															default: {
+																	dec();
+																	break;
+																}
+														}
+													}
+													break;
+											}
+											return NextExpression(new ExprBranch {
+												condition = lhs,
+												positive = positive,
+												negative = negative
+											});
+									}
                                 }
                             default:
                                 dec();
@@ -1775,15 +1782,12 @@ namespace Oblivia {
                 case true:
                     return  positive.Eval(ctx);
                 case false:
-                default:
                     switch(negative) {
                         case null:  return ValEmpty.VALUE;
                         default:    return negative.Eval(ctx);
                     }
-                    /*
                 default:
                     throw new Exception("bit expected");
-                    */
             }
         }
     }

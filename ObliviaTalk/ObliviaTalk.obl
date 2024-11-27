@@ -28,12 +28,24 @@
 		"<cond> ?+ <yes> ?- <no>"						:	"if <cond> do <yes> else do <no> end"
 		"<cond> ?+ <yes>"								:	"if <cond> do <yes> end"
 	]
+
+	Capture: class {
+		items: List.obj/ctor()
+	}
+
 	Matcher: class {
 		parts: List.obj/ctor()
 		read(other:StrDex):{
 			good:yes
 			ind_l:0
 			ind_r:0
+
+			matchAll: no
+			matchNode: MatchExp
+
+
+
+
 			and[good lt(ind_l other/len)] ?% {
 				(other/src.ind_l() = space) ?+ {
 					print."SPACE"
@@ -44,8 +56,20 @@
 						lhs:other/src/Substring(ind_l s/len)
 						print(cat["LHS    " lhs "\nEXPECT " s/src])
 						not(lhs/Equals(s/src)) ?+ {
-							ind_l := 0
-							print."NO MATCH"
+							matchAll ?+ {
+								term: other/getTerm.ind_l
+								matchNode/{
+									capture := append(_ cat[" " term])
+									ind_l := addi(_ term/Length)
+
+								}
+
+								print(cat["capture more " lhs])
+							} ?- {
+							
+								ind_l := 0
+								print."NO MATCH"
+							}
 						} ?- {
 							print."MATCH"
 							ind_l := addi(_ s/len)
@@ -58,6 +82,12 @@
 						e/{
 							capture := lhs
 							print(cat["capture " lhs])
+						
+							matchAll := all
+							matchAll ?+ {
+								print."capture more"
+								matchNode := e
+							}
 						}
 						ind_l := addi(_ lhs/Length)
 						ind_r := addi(_ 1)
@@ -99,7 +129,7 @@
 					}
 					l_angle: {
 						print."TERM"
-						parts/Add* MatchExp { all := no name:= from/getTerm.i }
+						parts/Add* MatchExp { all := yes name:= from/getTerm.i }
 						i := from/getEnd.i
 						#print._
 					}
@@ -119,11 +149,17 @@
 		out: 'src
 	}
 	MatchExp: class {
-		all: bit
+		all: yes
 		name:str
 		capture:str
 		out: 'capture
 	}
+
+	CaptureStr: class {
+		expr: no
+		text: str
+	}
+
 	StrDex: class {
 		src: str
 		end: Array(i4 1)
@@ -135,10 +171,15 @@
 	}
 	print:Console/WriteLine
 	main:?(){
-		m1: Lexer/lex("divi(1 2)")
-		m2: Matcher/parse("divi(<lhs> <rhs>)")
+		#m1: Lexer/lex("divi(1 2)")
+		#m2: Matcher/parse("divi(<lhs> <rhs>)")
+		m1: Lexer/lex("[1 2 3 4]")
+		m2: Matcher/parse("[<items>]")
+
+
 		m2/read.m1
-		print*m2/fmt("<lhs> // <rhs>")
+		#print*m2/fmt("<lhs> // <rhs>")
+		print*m2/fmt("array(<items>)")
 	}
 	Lexer: class {
 		src:str

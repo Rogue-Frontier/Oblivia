@@ -14,22 +14,29 @@
 		"<cond> ?+ <yes> ?- <cond2> ?+ <yes> ?- <no>"	:	"if <cond> do <yes> else if <cond2> do <yes> else <no>"
 		"<cond> ?+ <yes> ?- <no>"						:	"if <cond> do <yes> else do <no> end"
 		"<cond> ?+ <yes>"								:	"if <cond> do <yes> end"
+		"i4"											:	"Int32"
+
+		"<name>: val*<body>"							:	"const <name> = <body>"
+		"<name>:[<items>]":"var <name> = [<items>]"
+
 	]
 	
-	alpha:		any*ch_arr."ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-	colon:		any*ch_arr.":"
-	l_paren:	parse_char."("
-	r_paren:	parse_char.")"
-	l_square:	parse_char."["
-	r_square:	parse_char."]"
-	l_curly:	parse_char."{"
-	r_curly:	parse_char."}"
-	l_angle:	parse_char."<"
-	r_angle:	parse_char.">"
-	quote:		parse_char."\""
+	alpha:		any*ch_arr."ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_"
+	misc:		any*ch_arr.":?+-"
+	l_paren:	any*ch_arr."("
+	r_paren:	any*ch_arr.")"
+	l_square:	any*ch_arr."["
+	r_square:	any*ch_arr."]"
+	l_curly:	any*ch_arr."{"
+	r_curly:	any*ch_arr."}"
+	l_angle:	any*ch_arr."<"
+	r_angle:	any*ch_arr.">"
+	quote:		any*ch_arr."\""
 	space:		any*ch_arr." \t\r\n"
 	Capture: class {
+		good:no
 		items: List.obj/ctor()
+		len:0
 		write(): {
 			s:""
 			items | ?(p){
@@ -40,7 +47,7 @@
 		fmt(s:""):{
 			items | ?(p){
 				p = CaptureStr:c ?+ {
-					print(cat[c/name "=" c/text])
+					#print(cat[c/name "=" c/text])
 					s := s/Replace(c/name c/text)
 				}
 			}
@@ -51,89 +58,103 @@
 		expr: no
 		text: str
 		name: str
+		len: 'text/Length
 	}
 	Matcher: class {
 		parts: List.obj/ctor()
-		read(other:StrDex):{
+		match(other:StrDex start:0):{
 			good:yes
-			ind_l:0
+			run:yes
+			ind_l:start
 			ind_r:0
 			result: Capture{}
 			matchAll: no
 			matchNode: CaptureStr
-			and[good lt(ind_l other/len)] ?% {
+			and[run lt(ind_l other/len)] ?% {
 				(other/src.ind_l() = space) ?+ {
-					print."SPACE"
+					#print."SPACE"
 					ind_l := other/getEnd.ind_l
 				} ?- {
-					p:parts.ind_r(),
-					(p = MatchStr:s) ?+ {
-						lhs:other/src/Substring(ind_l s/len)
-						print(cat["LHS    " lhs "\nEXPECT " s/src])
-						not(lhs/Equals(s/src)) ?+ {
-							matchAll ?+ {
-								term: other/getTerm.ind_l
-								matchNode/{
-									text := append(_ cat[" " term])
+					eq(ind_r parts/Count) ?+ {
+						run := no
+					} ?- {
+						p:parts.ind_r(),
+						(p = MatchStr:s) ?+ {
+							lhs:other/src/Substring(ind_l s/len)
+							#print(cat["LHS    " lhs "\nEXPECT " s/src])
+							not(lhs/Equals(s/src)) ?+ {
+								matchAll ?+ {
+									term: other/getTerm.ind_l
+									matchNode/{
+										text := append(_ cat[" " term])
+									}
+									ind_l := addi(_ term/Length)
+									#print(cat["capture more " lhs])
+								} ?- {
+									ind_l := 0
+									#print."NO MATCH"
+									good := no
+									run := no
 								}
-								ind_l := addi(_ term/Length)
-								print(cat["capture more " lhs])
 							} ?- {
-								ind_l := 0
-								print."NO MATCH"
+								#print."MATCH"
+								result/items/Add* CaptureStr {
+									name := lhs
+									text := lhs
+								}
+								ind_l := addi(_ s/len)
+								ind_r := addi(_ 1)
 							}
-						} ?- {
-							print."MATCH"
-							result/items/Add* CaptureStr {
-								name := lhs
+						} ?- (p = MatchExp:e) ?+ {
+							lhs:other/getTerm(ind_l)
+							#print(cat["MATCH LHS    " lhs "\nEXPECT " e/name])
+							item:CaptureStr{
+								expr := yes
 								text := lhs
+								name := e/name
+								#print(cat["capture " lhs])
 							}
-							ind_l := addi(_ s/len)
+							result/items/Add*item
+							e/{
+								matchAll := all
+								matchAll ?+ {
+									#print."capture more"
+									matchNode := item
+								}
+							}
+							ind_l := addi(_ lhs/Length)
 							ind_r := addi(_ 1)
-						}
-					} ?- (p = MatchExp:e) ?+ {
-						lhs:other/getTerm(ind_l)
-						print(cat["LHS    " lhs "\nEXPECT " e/name])
-						print."MATCH"
-						item:CaptureStr{
-							expr := yes
-							text := lhs
-							name := e/name
-							print(cat["capture " lhs])
-						}
-						result/items/Add*item
-						e/{
-							matchAll := all
-							matchAll ?+ {
-								print."capture more"
-								matchNode := item
-							}
-						}
-						ind_l := addi(_ lhs/Length)
-						ind_r := addi(_ 1)
+						}					
 					}
+
+
 				}
 			}
+
+			#print*ind_r
+
+			good := and[_ eq(ind_r parts/Count)]
+			result/{good := ^^good len := subi(ind_l start)}
 			^:result
 		}
 		parse(s:str): Matcher/new(Lexer/new(s)/read())
 		new(from:StrDex): Matcher {
 			i:0
-			inc: ?(){i := addi(_ 1)}
+			inc():{i := addi(_ 1)}
 			lt(i from/src/Length) ?% {
 				from/getChar.i ?{
 					space: {
 						i := from/getEnd.i
-						print."space"
+						#print."space"
 					}
 					any(l_paren r_paren l_square r_square l_curly r_curly): {
 						s_: from/src/Substring(i 1)
 						parts/Add*MatchStr{ src := s_ }
 						inc()
-						print._
+						#print._
 					}
 					l_angle: {
-						print."TERM"
+						#print."TERM"
 						parts/Add* MatchExp { all := yes name:= from/getTerm.i }
 						i := from/getEnd.i
 						#print._
@@ -142,7 +163,7 @@
 						term: from/getTerm.i
 						parts/Add*MatchStr{ src := term }
 						i := from/getEnd.i
-						print.term
+						#print.term
 					}
 				}
 			}
@@ -162,24 +183,68 @@
 		getEnd(i:i4): end.i()
 		getChar(i:i4): src.i()
 		getTerm(i:i4): src/Substring(i subi(getEnd.i i))
+
 		len: 'src/Length
 	}
 	print:Console/WriteLine
 	main:?(){
+		matchers: dict | ?(from to) (Matcher/parse*from to)
+		#m1: Lexer/lex("NEIGHBOR_Y: [subi(1) subi(1) subi(1) 0 0 1 1 1]")
+		m1: Lexer/lex("
+GRID_SIZE_X: val*divi(500 1727)
+GRID_SIZE_Y: val*divi(300 839)
+NEIGHBOR_X: [subi(1) 0 1 subi(1) 1 subi(1) 0 1]
+NEIGHBOR_Y: [subi(1) subi(1) subi(1) 0 0 1 1 1]
+		")
+
+		result:""
+
+		ind:0
+		run():{
+			bestLen:0
+			bestCap:Capture
+			bestFmt:str
+			matchers | ?(from to) {
+				cap: from/match(m1 ind)
+				cap/good ?+ {
+					#print*cap/fmt(to)
+					gt(cap/len bestLen) ?+ {
+						bestLen := cap/len
+						bestCap := cap
+						bestFmt := to
+					}
+				}
+			}
+			not(eq(bestLen 0)) ?+ {
+				ind := addi(_ bestLen)
+				re:bestCap/fmt(bestFmt)
+				result := cat[_ " " re]
+			} ?- lt(ind m1/src/Length) ?+ {
+				c:m1/src/Substring(ind 1)
+				#print.c
+				result := cat[_ c]
+				ind := addi(_ 1)
+			}
+		}
+		run()
+		run()
+		run()
+		run()
+		print.result
+		/*
 		m1: Lexer/lex("divi(1 2)")
 		m2: Matcher/parse("divi(<lhs> <rhs>)")
-		cap: m2/read.m1
+		cap: m2/match.m1
 		print*cap/fmt("<lhs> // <rhs>")
 		
-		/*
 		m1: Lexer/lex("[1 2 3 4]")
 		m2: Matcher/parse("[<items>]")
-		cap: m2/read.m1
+		cap: m2/match.m1
 		print*cap/fmt("array(<items>)")
-
+		
 		m1: Lexer/lex("NEIGHBOR_Y: [subi(1) subi(1) subi(1) 0 0 1 1 1]")
 		m2: Matcher/parse("<name>:[<items>]")
-		cap: m2/read.m1
+		cap: m2/match.m1
 		print*cap/fmt("var <name> = [<items>]")
 		*/
 		
@@ -196,65 +261,74 @@
 			start:i inc(),
 			(good ?+ (cur=alpha) ?- no) ?% inc()
 			arr_set(end, [:i4 start], i),
-			print(cat["name " start " " i])
+			#print(cat["name " start " " i])
+		}
+		read_misc(): {
+			start:i inc(),
+			(good ?+ (cur=misc) ?- no) ?% inc()
+			arr_set(end, [:i4 start], i),
+			#print(cat["operator " start " " i])
 		}
 		read_paren(): {
 			start:i inc(),
 			(good ?+ not(cur=r_paren) ?- no) ?% step()
 			inc()
 			arr_set(end, [:i4 start], i),
-			print(cat["paren " start " " i])
+			#print(cat["paren " start " " i])
 		}
 		read_square(): {
 			start:i inc(),
 			(good ?+ not(cur=r_square) ?- no) ?% step()
 			inc()
 			arr_set(end, [:i4 start], i),
-			print(cat["square " start " " i])
+			#print(cat["square " start " " i])
 		}
 		read_curly(): {
 			start:i inc(),
 			(good ?+ not(cur=r_curly) ?- no) ?% step()
 			inc()
 			arr_set(end, [:i4 start], i),
-			print(cat["curly " start " " i])
+			#print(cat["curly " start " " i])
 		}
 		read_angle(): {
 			start:i inc(),
 			(good ?+ not(cur=r_angle) ?- no) ?% step()
 			inc()
 			arr_set(end, [:i4 start], i),
-			print(cat["angle " start " " i])
+			#print(cat["angle " start " " i])
 		}
 		read_quote(): {
 			start:i inc(),
 			(good ?+ not(cur=quote) ?- no) ?% step()
 			inc()
 			arr_set(end, [:i4 start], i),
-			print(cat["quote " start " " i])
+			#print(cat["quote " start " " i])
 		}
 		read_space(): {
 			start:i inc(),
 			(good ?+ (cur=space) ?- no) ?% step()
 			arr_set(end, [:i4 start], i)
-			print(cat["space " start " " i])
+			#print(cat["space " start " " i])
 		}
 		step():
 			cur ?{
 				alpha:		read_name()
-				colon:		inc()
 				l_paren:	read_paren()
 				l_square:	read_square()
 				l_curly:	read_curly()
 				l_angle:	read_angle()
 				quote:		read_quote()
 				space:		read_space()
-				default:	inc()
+				default:	{
+					start:i
+					inc()
+					arr_set(end, [:i4 start], i)
+				}
 			}
 		read():{
 			end := arr_mk(i4 src/Length)
 			good ?% step()
-			print."DONE"
+			#print."DONE"
 			^: StrDex{ (src end) := ^^^^/(src end) }
 		}
 

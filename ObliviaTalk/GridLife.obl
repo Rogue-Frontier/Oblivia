@@ -1,4 +1,4 @@
-{
+
 GRID_SIZE_X: val*divi(500 1727)
 GRID_SIZE_Y: val*divi(300 839)
 NEIGHBOR_X: [subi(1) 0 1 subi(1) 1 subi(1) 0 1]
@@ -50,5 +50,3 @@ UI/run*?(){
 }
 
 ^: 0
-
-}

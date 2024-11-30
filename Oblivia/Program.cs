@@ -171,6 +171,16 @@ namespace Oblivia {
                     ["magic"] = ValKeyword.MAGIC,
                     ["label"] = ValKeyword.LABEL,
                     ["go"] = ValKeyword.GO,
+
+                    ["pub"] = ValKeyword.PUB,
+                    ["priv"] = ValKeyword.PRIV,
+                    ["static"] = ValKeyword.STATIC,
+
+                    ["fmt"] = ValKeyword.FMT,
+                    ["leaf"] = ValKeyword.LEAF,
+                    ["xml"] = ValKeyword.XML,
+                    ["json"] = ValKeyword.JSON,
+                    ["math"] = ValKeyword.MATH,
 				}
 			};
 		}
@@ -249,7 +259,6 @@ namespace Oblivia {
         STAGE,
         ANY,ALL,
         TYPE,
-        FMT,REGEX,
         FN,
         MAKE,
         PUB, PRIV, STATIC, MACRO, TEMPLATE,
@@ -258,7 +267,6 @@ namespace Oblivia {
         FIELDS_OF,METHODS_OF,MEMBERS_OF,
         ATTR,
         MARK,
-        XML,JSON,
 
         PREV_ITER,SEEK_ITER, WAIT_ITER,
 
@@ -294,6 +302,13 @@ namespace Oblivia {
         DECONSTRUCT,
         //Gets all keys from the target for deconstruct-assign
         STRUCT_KEYS,
+
+		XML,
+        JSON,
+		REGEX,
+		MATH,
+        FMT,
+        LEAF
     }
     public class ValMultiPattern {
         public object[] items;
@@ -388,6 +403,18 @@ namespace Oblivia {
             throw new Exception();
         }
 	}
+    public record ExprPointer:INode {
+        public INode expr;
+        public object Eval (IScope ctx) {
+            var val = expr.Eval(ctx);
+            return new ValPointer { value = val };
+		}
+    }
+    public record ValPointer {
+
+        public object type;
+        public object value;
+    }
     public record ExprAlias:INode {
         public INode expr;
         public object Eval (IScope ctx) => new ValAlias { ctx = ctx, expr = expr };
@@ -872,14 +899,40 @@ namespace Oblivia {
 				case TokenType.COLON:
                     inc();
                     switch(lhs) {
-
+                        case ExprBlock eb:
+                            switch(tokenType) {
+                                case TokenType.EQUAL: {
+                                        inc();
+                                        List<ExprSymbol> symbols = [];
+                                        foreach(var item in eb.statements) {
+                                            if(item is ExprSymbol s) {
+                                                symbols.Add(s);
+                                            } else {
+                                                throw new Exception();
+                                            }
+                                        }
+                                        return new StmtAssignTuple { symbols = symbols.ToArray(), value = NextExpression(), deconstruct = true };
+                                    }
+                                default: {
+                                        inc();
+                                        List<string> symbols = [];
+                                        foreach(var item in eb.statements) {
+                                            if(item is ExprSymbol s) {
+                                                symbols.Add(s.key);
+                                            } else {
+                                                throw new Exception();
+                                            }
+                                        }
+                                        return new StmtDefTuple { lhs = symbols.ToArray(), rhs = NextExpression(), deconstruct = true };
+                                    }
+                            }
                         case ExprTuple et:
                             switch(tokenType) {
                                 case TokenType.EQUAL: {
                                         inc();
                                         List<ExprSymbol> symbols = [];
-                                        foreach(var item in et.items) {
-                                            if(item.value is ExprSymbol s) {
+                                        foreach(var item in et.vals) {
+                                            if(item is ExprSymbol s) {
                                                 symbols.Add(s);
                                             } else {
                                                 throw new Exception();
@@ -889,8 +942,8 @@ namespace Oblivia {
                                     }
                                 default: {
                                         List<string> symbols = [];
-                                        foreach(var item in et.items) {
-                                            if(item.value is ExprSymbol { key: { } key, up: -1 or 1 }) {
+                                        foreach(var item in et.vals) {
+                                            if(item is ExprSymbol { key: { } key, up: -1 or 1 }) {
                                                 symbols.Add(key);
                                             } else {
                                                 throw new Exception();
@@ -899,8 +952,6 @@ namespace Oblivia {
                                         return new StmtDefTuple { lhs = symbols.ToArray(), rhs = NextExpression() };
                                     }
                             }
-
-
                         case ExprSymbol { up: { } up } es:
                             switch(tokenType) {
                                 case TokenType.EQUAL:
@@ -955,20 +1006,6 @@ namespace Oblivia {
 								pars = et,
 								value = NextExpression()
 							};
-                        case ExprBlock eb:
-                            switch(tokenType) {
-                                case TokenType.EQUAL:
-
-                                    break;
-                                default:
-									var rhs = NextExpression();
-                                    return new StmtDefTuple {
-                                        lhs = eb.statements.Select(st => st is ExprSymbol { key: { } k, up: -1 } es ? es.key : throw new Exception()).ToArray(),
-                                        rhs = rhs,
-                                        structural = true
-                                    };
-                            }
-                            throw new Exception("impl destructuring");
 						default:
 							switch(tokenType) {
 								case TokenType.EQUAL: {
@@ -1001,6 +1038,8 @@ namespace Oblivia {
                 case TokenType.PIPE: {
                         inc();
                         switch(tokenType) {
+
+
                             case TokenType.SPARK:
                                 inc();
                                 return NextExpression(new ExprMap { src = lhs, map = new ExprInvoke { expr = new ExprSelf { up = 1 }, args = ExprTuple.SingleExpr(NextExpression())  } , expr = true});
@@ -1302,7 +1341,13 @@ namespace Oblivia {
         INode NextTerm () {
             Read:
             switch(tokenType) {
-                case TokenType.L_SQUARE:
+
+
+				case TokenType.SWIRL:
+					inc();
+					return new ExprPointer { dest = NextTerm() };
+
+				case TokenType.L_SQUARE:
                     return NextArray();
                 case TokenType.QUERY:
                     return NextLambda();
@@ -2007,10 +2052,17 @@ namespace Oblivia {
                         }
                         throw new Exception();
                     }
-                case ValIndex vi:
-                    return vi.Get();
+                case ValIndex vi: {
+						var args = evalArgs();
+						if(args.Length == 0) {
+							return vi.Get();
+						} else {
+							var val = args.vals[0];
+							vi.Set(val);
+							return val;
+						}
+					}
                 case ExtendObject ext:
-                    
                     throw new Exception();
                 case ValFuncScope vfs: {
 						return vfs.func.CallFunc(ctx, evalArgs);
@@ -2145,6 +2197,14 @@ namespace Oblivia {
 			object r = ValEmpty.VALUE;
 			foreach(var s in statements) {
 				r = s.Eval(f);
+				switch(s) {
+					case ExprGet { key: { } key } eg:
+						ctx.SetLocal(key, r);
+						break;
+					case ExprSymbol { key: { } key } es:
+						ctx.SetLocal(key, r);
+						break;
+				}
 				switch(r) {
 					case ValReturn vr:  return vr.Up();
                     case ValYield vy:   throw new Exception();
@@ -2161,7 +2221,16 @@ namespace Oblivia {
                 }
                 */
                 r = s.Eval(f);
-                switch(r) {
+
+				switch(s) {
+					case ExprGet { key: { } key } eg:
+						f.SetLocal(key, r);
+						break;
+					case ExprSymbol { key: { } key } es:
+						f.SetLocal(key, r);
+						break;
+				}
+				switch(r) {
                     case ValReturn vr:  return vr.Up();
                 }
             }
@@ -2219,6 +2288,15 @@ namespace Oblivia {
 						break;
 					default:
 						r = s.Eval(f);
+						break;
+				}
+
+                switch(s) {
+					case ExprGet { key: { } key } eg:
+						f.locals[key] = r;
+						break;
+					case ExprSymbol { key: { } key } es:
+						f.locals[key] = r;
 						break;
 				}
 				switch(r) {
@@ -2607,6 +2685,8 @@ namespace Oblivia {
     }
     public class ExprTuple : INode {
         public (string key, INode value)[] items;
+
+        public IEnumerable<INode> vals => items.Select(i => i.value);
         public static ExprTuple Empty => new ExprTuple { items = [] };
 		public static ExprTuple SingleExpr (INode v) => new ExprTuple { items = [(null, v)] };
 		public static ExprTuple SingleVal (object v) => SingleExpr(new ExprVal { value = v });
@@ -2744,12 +2824,12 @@ namespace Oblivia {
     public class StmtDefTuple : INode {
         public string[] lhs;
         public INode rhs;
-        public bool structural = false;
+        public bool deconstruct = false;
         public object Eval (IScope ctx) {
             var val = rhs.Eval(ctx);
             switch(val) {
                 case ValTuple vt:
-                    if(structural) {
+                    if(deconstruct) {
 						foreach(var sym in lhs) {
 							StmtDefKey.Init(ctx, sym, vt.items.Where(pair => pair.key == sym).Single());
 						}
@@ -2763,7 +2843,7 @@ namespace Oblivia {
                         throw new Exception("illegal");
                     }
                 case IScope sc:
-                    if(structural) {
+                    if(deconstruct) {
                         foreach(var sym in lhs) {
                             StmtDefKey.InitFrom(ctx, sym, sc);
                         }
@@ -2776,6 +2856,7 @@ namespace Oblivia {
         }
     }
     public class StmtAssignTuple : INode {
+        public bool deconstruct;
         public ExprSymbol[] symbols;
         public INode value;
         public object Eval (IScope ctx) {

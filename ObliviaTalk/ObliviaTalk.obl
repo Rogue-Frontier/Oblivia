@@ -1,26 +1,26 @@
 {
 	dict:[
+		
 		"addi(<lhs> <rhs>)"								:	"<lhs> + <rhs>"
 		"subi(<lhs> <rhs>)"								:	"<lhs> - <rhs>"
 		"divi(<lhs> <rhs>)"								:	"<lhs> // <rhs>"
 		"divf(<lhs> <rhs>)"								:	"<lhs> / <rhs>"
 		"muli(<lhs> <rhs>)"								:	"<lhs> * <rhs>"
+		"subi(0 <lhs>)"									:	"-<lhs>"
 		"<name>: var"									:	"var <name>"
 		"<name>: const(<val>)"							:	"def <name> = <val>"
 		"<name>:[<items>]"								:	"var <name> = [<items>]"
 		"<name>:Grid(<type> <width> <height>)"			:	"var <name>[<width> <height>] of <type>"
-		"for(<name> <width> <height>) { <body> }"		:	"for <name>:Int32 = <start> to <end> do <body> end"
+		"for(<name> <start> <end>) { <body> }"		:	"for <name>:Int32 = <start> to <end> do <body> end"
 		"<name>: ?(<par>) <body>"						:   "function <name>(<arg>) do <body> end"
 		"<cond> ?+ <yes> ?- <cond2> ?+ <yes> ?- <no>"	:	"if <cond> do <yes> else if <cond2> do <yes> else <no>"
 		"<cond> ?+ <yes> ?- <no>"						:	"if <cond> do <yes> else do <no> end"
 		"<cond> ?+ <yes>"								:	"if <cond> do <yes> end"
 		"i4"											:	"Int32"
-
-		"<name>: val*<body>"							:	"const <name> = <body>"
-		"<name>:[<items>]":"var <name> = [<items>]"
-
+		"<name>: val(<body>)"							:	"const <name> = <body>"
+		"<name>: [<items>]"								:	"var <name> = [<items>]"
+		#"<name>: <body>"								:	"var <name> = <body>"
 	]
-	
 	alpha:		any*ch_arr."ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_"
 	misc:		any*ch_arr.":?+-"
 	l_paren:	any*ch_arr."("
@@ -126,13 +126,9 @@
 							ind_r := addi(_ 1)
 						}					
 					}
-
-
 				}
 			}
-
 			#print*ind_r
-
 			good := and[_ eq(ind_r parts/Count)]
 			result/{good := ^^good len := subi(ind_l start)}
 			^:result
@@ -148,8 +144,7 @@
 						#print."space"
 					}
 					any(l_paren r_paren l_square r_square l_curly r_curly): {
-						s_: from/src/Substring(i 1)
-						parts/Add*MatchStr{ src := s_ }
+						parts/Add*MatchStr{ src := from/src/Substring(i 1) }
 						inc()
 						#print._
 					}
@@ -183,7 +178,6 @@
 		getEnd(i:i4): end.i()
 		getChar(i:i4): src.i()
 		getTerm(i:i4): src/Substring(i subi(getEnd.i i))
-
 		len: 'src/Length
 	}
 	print:Console/WriteLine
@@ -191,24 +185,42 @@
 		matchers: dict | ?(from to) (Matcher/parse*from to)
 		#m1: Lexer/lex("NEIGHBOR_Y: [subi(1) subi(1) subi(1) 0 0 1 1 1]")
 		m1: Lexer/lex("
-GRID_SIZE_X: val*divi(500 1727)
-GRID_SIZE_Y: val*divi(300 839)
+GRID_SIZE_X: val(divi(500 1727))
+GRID_SIZE_Y: val(divi(300 839))
 NEIGHBOR_X: [subi(1) 0 1 subi(1) 1 subi(1) 0 1]
 NEIGHBOR_Y: [subi(1) subi(1) subi(1) 0 0 1 1 1]
-		")
+gridData: Grid(i4 GRID_SIZE_X GRID_SIZE_Y)
 
+for(x 0 subi(GRID_SIZE_X 1)) {
+	for(y 0 subi(GRID_SIZE_Y 1)) {
+		gridData(x y) = random(0 1)
+	}
+}
+
+
+gridCtrl: UI/create(\"canvasGrid\", {
+	color:\"#00cc58\"
+	background: \"Neutral_Paper\",
+	data: gridData
+})
+
+		")
 		result:""
 
 		ind:0
 		run():{
-			bestLen:0
+			bestLen:i4/MaxValue
 			bestCap:Capture
 			bestFmt:str
 			matchers | ?(from to) {
 				cap: from/match(m1 ind)
 				cap/good ?+ {
 					#print*cap/fmt(to)
-					gt(cap/len bestLen) ?+ {
+					lt(cap/len bestLen)
+					
+					#(bestLen = i4/MaxValue)
+					
+					?+ {
 						bestLen := cap/len
 						bestCap := cap
 						bestFmt := to
@@ -217,26 +229,23 @@ NEIGHBOR_Y: [subi(1) subi(1) subi(1) 0 0 1 1 1]
 			}
 			not(eq(bestLen 0)) ?+ {
 				ind := addi(_ bestLen)
-				re:bestCap/fmt(bestFmt)
-				result := cat[_ " " re]
+				result := cat[_ "\n" bestCap/fmt(bestFmt)]
 			} ?- lt(ind m1/src/Length) ?+ {
 				c:m1/src/Substring(ind 1)
 				#print.c
 				result := cat[_ c]
 				ind := addi(_ 1)
 			}
+			print*result
 		}
-		run()
-		run()
-		run()
-		run()
+		range(0 7) | ?(i) run()
 		print.result
 		/*
 		m1: Lexer/lex("divi(1 2)")
 		m2: Matcher/parse("divi(<lhs> <rhs>)")
 		cap: m2/match.m1
 		print*cap/fmt("<lhs> // <rhs>")
-		
+
 		m1: Lexer/lex("[1 2 3 4]")
 		m2: Matcher/parse("[<items>]")
 		cap: m2/match.m1
@@ -247,8 +256,6 @@ NEIGHBOR_Y: [subi(1) subi(1) subi(1) 0 0 1 1 1]
 		cap: m2/match.m1
 		print*cap/fmt("var <name> = [<items>]")
 		*/
-		
-		
 	}
 	Lexer: class {
 		src:str
@@ -259,15 +266,12 @@ NEIGHBOR_Y: [subi(1) subi(1) subi(1) 0 0 1 1 1]
 		end:	Array(i4 1)
 		read_name(): {
 			start:i inc(),
-			(good ?+ (cur=alpha) ?- no) ?% inc()
+			(good ?+ (cur=alpha) ?- no) ?% {
+				arr_set(end, [:i4 start], i)
+				inc()
+			}
 			arr_set(end, [:i4 start], i),
 			#print(cat["name " start " " i])
-		}
-		read_misc(): {
-			start:i inc(),
-			(good ?+ (cur=misc) ?- no) ?% inc()
-			arr_set(end, [:i4 start], i),
-			#print(cat["operator " start " " i])
 		}
 		read_paren(): {
 			start:i inc(),
@@ -306,7 +310,10 @@ NEIGHBOR_Y: [subi(1) subi(1) subi(1) 0 0 1 1 1]
 		}
 		read_space(): {
 			start:i inc(),
-			(good ?+ (cur=space) ?- no) ?% step()
+			(good ?+ (cur=space) ?- no) ?% {
+				arr_set(end, [:i4 start], i)
+				inc()
+			}
 			arr_set(end, [:i4 start], i)
 			#print(cat["space " start " " i])
 		}

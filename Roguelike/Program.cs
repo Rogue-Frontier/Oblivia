@@ -11,7 +11,7 @@ var tokenizer = new Tokenizer(File.ReadAllText("Mainframe.obl"));
 var parser = new Parser(tokenizer.GetAllTokens());
 var block = parser.NextBlock();
 T _<T> (T t) => t;
-var global = new ValDictScope {
+var global = new VDictScope {
 	locals = new() {
 
 		["_0x8080U"] = 0x8080U,
@@ -63,7 +63,7 @@ var global = new ValDictScope {
 		["b1"] = true,
 		["b0"] = false,
 
-		["empty"] = ValEmpty.VALUE,
+		["empty"] = VEmpty.VALUE,
 
 		["default"] = _((Type t) => t.IsValueType ? Activator.CreateInstance(t) :null),
 
@@ -149,7 +149,7 @@ var global = new ValDictScope {
 		["Dictionary"] = _((Type key, Type val) => typeof(Dictionary<,>).MakeGenericType(key, val)),
 		["ConcurrentDictionary"] = _((Type key, Type val) => typeof(ConcurrentDictionary<,>).MakeGenericType(key, val)),
 		["StringBuilder"] = typeof(StringBuilder),
-		["ValFunc"] = typeof(ValFunc),
+		["ValFunc"] = typeof(VFn),
 		["Common"] = typeof(Main),
 		["PQ"] = _((object a, object b) => MakeGeneric(typeof(PriorityQueue<,>), a, b)),
 		["class"] = ValKeyword.CLASS,
@@ -180,7 +180,7 @@ var global = new ValDictScope {
 };
 PriorityQueue<object, int> a = new();
 Type MakeGeneric (Type gen, params object[] item) => gen.MakeGenericType(item.Select(i => i switch { Type t => t, _ => typeof(object) }).ToArray());
-var result = (ValDictScope)block.StagedEval(global);
+var result = (VDictScope)block.StagedEval(global);
 Runner.Run("Assets/font/IBMCGA+_8x8.font", r => {
 	r.Go(new Mainframe(result));
 });
@@ -191,19 +191,19 @@ class Mainframe :IScene {
 	public Tf FONT_8x8 = new Tf(File.ReadAllBytes($"Assets/font/IBMCGA+_8x8.png"), "IBMCGA+_8x8", 8, 8, 256 / 8, 256 / 8, 219);
 	public Tf FONT_6x8 = new Tf(File.ReadAllBytes($"Assets/font/IBMCGA+_6x8.png"), "IBMCGA+_6x8", 6, 8, 192 / 6, 128 / 8, 219);
 
-	ValDictScope ctx;
-	public Mainframe (ValDictScope ctx) {
+	VDictScope ctx;
+	public Mainframe (VDictScope ctx) {
 		this.ctx = ctx;
 		ctx.locals["scene"] = this;
 		
-		var VF = (string s) => (ValFunc)ctx.locals[s];
+		var VF = (string s) => (VFn)ctx.locals[s];
 		VF("init").CallData(ctx, []);
 		update = VF("update");
 		render = VF("render");
 		handle_key = VF("handle_key");
 		handle_mouse = VF("handle_mouse");
 	}
-	ValFunc update, render, handle_key, handle_mouse;
+	VFn update, render, handle_key, handle_mouse;
 	void IScene.Update(System.TimeSpan delta) {
 		update.CallData(ctx, [delta]);
 	}

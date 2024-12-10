@@ -238,7 +238,14 @@ gridCtrl: UI/create(\"canvasGrid\", {
 			}
 			print*result
 		}
-		range(0 7) | ?(i) run()
+
+
+		fff: (+:1 2)
+		print.fff
+		^:fff
+
+
+		range(0 6) | ?(i) run()
 		print.result
 		/*
 		m1: Lexer/lex("divi(1 2)")

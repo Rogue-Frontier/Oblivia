@@ -23,7 +23,7 @@ while(tokenizer.Next() is { type: not TokenType.EOF } t) {
 var parser = new Parser(tokens);
 var scope = parser.NextBlock();
 T Val<T> (T t) => t;
-var global = new ValDictScope();
+var global = new VDictScope();
 
 global.locals = new() {
 	["class"] = ValKeyword.CLASS,
@@ -95,6 +95,6 @@ global.locals = new() {
 	["Dictionary"] = Val((Type key, Type val) => typeof(Dictionary<,>).MakeGenericType(key, val)),
 	["StringBuilder"] = typeof(StringBuilder)
 };
-var result = (ValDictScope)scope.StagedApply(global);
-var r = (result.locals["main"] as ValFunc).CallData(result, ["program"]);
+var result = (VDictScope)scope.StagedApply(global);
+var r = (result.locals["main"] as VFn).CallData(result, ["program"]);
 return;

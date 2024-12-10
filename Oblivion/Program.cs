@@ -1,7 +1,7 @@
 ﻿using Oblivia;
 var parser = Parser.FromFile("Program.obl");
-var result = (ValDictScope)parser.StagedEval(Std.std);
-var r = (result.locals["main"] as ValFunc).CallVoid(result);
+var result = (VDictScope)parser.StagedEval(Std.std);
+var r = (result.locals["main"] as VFn).CallVoid(result);
 
 Console.WriteLine();
 /*

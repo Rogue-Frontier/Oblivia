@@ -75,25 +75,25 @@ The following code implements a Conway's Game of Life and updates until the coun
 ## Syntax
 
 ### Arithmetic
-Lisp-like arithmetic allows you to spread operands. Operators are converted to reductions e.g. `(+: a b c) = a/"+".b/"+".c = reduce([a b c] ?(a b) a/"+"(b))`
-- `(+: a b c)`
-- `(-: a b)`
-- `(*: a b)`
-- `(**: a b)`
-- `(/: a b)`
-- `(//: a b)`
-- `(^: a b)`
-- `(%: a b)`
-- `(=: a b)`
-- `(>: a b)`
-- `(<: a b)`
-- `(~: a b)`
-- `(>>: a b)`
-- `(<<: a b)`
-- `(&: a b)`
-- `(|: a b)`
-- `(&&: a b)`
-- `(||: a b)`
+Lisp-like arithmetic allows you to spread operands. Operators are converted to reductions e.g. `[+: a b c] = a/"+".b/"+".c = reduce([a b c] ?(a b) a/"+"(b))`
+- `[+: a b]`
+- `[-: a b]`
+- `[*: a b]`
+- `[**: a b]`
+- `[/: a b]`
+- `[//: a b]`
+- `[^: a b]`
+- `[%: a b]`
+- `[=: a b]`
+- `[>: a b]`
+- `[<: a b]`
+- `[~: a b]`
+- `[>>: a b]`
+- `[<<: a b]`
+- `[&: a b]`
+- `[|: a b]`
+- `[&&: a b]`
+- `[||: a b]`
 
 ### Define
 - `A:B`: field A has value B. If `B` is a type, then the value is a *placeholder*

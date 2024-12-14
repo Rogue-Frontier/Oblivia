@@ -154,6 +154,7 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `A =- B`: Returns true if `A` does not equal `B`
 - `A = B`: Returns true if `A` matches pattern `B`
 - `A = B:C`: Returns true if `A` matches pattern `B` and assigns the value to `C`
+- `A =: B`: Returns true if `A = typeof(B)`
 
 ## Design philosophy
 - Whitespace is the simplest operator.

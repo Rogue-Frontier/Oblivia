@@ -1,8 +1,7 @@
 # Oblivia
 Oblivia is an experimental programming language that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
-- **Scopes are objects.** The syntax you use to create objects in JavaScript is now the syntax you use to create blocks in Oblivia. A block with no explicit return simply returns itself as an object (if it has keys) or the last expression (if there are no keys).
-- **Hyper-terse infix-based syntax.** A small set of primitive operations are given the most terse syntax. Casting values is as easy as `A(B)` with type `A` and value `B`. Defining variables is simply `A:B(C)` with variable name `A`, type `B`, and value `C`.
-- **No keywords.** In Oblivia, a keyword is simply a function or value.
+- **Scopes = Objects.** In Oblivia, scopes have the power of objects. Pass a scope to a function. Name a variable or a member and it automatically becomes a key in the scope. A block with no explicit return simply returns itself as an object (if it has keys) or the last expression (if there are no keys).
+- **Terse infix syntax.** A small set of primitive operations are given the most terse syntax. Casting values is as easy as `A(B)` with type `A` and value `B`. Defining variables is simply `A:B(C)` with variable name `A`, type `B`, and value `C`.
 
 ## Example
 The following code implements a Conway's Game of Life and updates until the count of active cells becomes unchanging
@@ -74,7 +73,27 @@ The following code implements a Conway's Game of Life and updates until the coun
 }
 ```
 ## Syntax
-There are no arithmetic operators. See global function table for arithmetic functions.
+
+### Arithmetic
+Lisp-like arithmetic allows you to spread operands. Operators are converted to reductions e.g. `(+: a b c) = a/_add.b/_add.c = reduce([a b c] ?(a b) a/add(b))`
+- `(+: a b c)`
+- `(-: a b)`
+- `(*: a b)`
+- `(**: a b)`
+- `(/: a b)`
+- `(//: a b)`
+- `(^: a b)`
+- `(%: a b)`
+- `(=: a b)`
+- `(>: a b)`
+- `(<: a b)`
+- `(~: a b)`
+- `(>>: a b)`
+- `(<<: a b)`
+- `(&: a b)`
+- `(|: a b)`
+- `(&&: a b)`
+- `(||: a b)`
 
 ### Define
 - `A:B`: field A has value B. If `B` is a type, then the value is a *placeholder*

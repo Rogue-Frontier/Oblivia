@@ -75,7 +75,7 @@ The following code implements a Conway's Game of Life and updates until the coun
 ## Syntax
 
 ### Arithmetic
-Lisp-like arithmetic allows you to spread operands. Operators are converted to reductions e.g. `(+: a b c) = a/_add.b/_add.c = reduce([a b c] ?(a b) a/add(b))`
+Lisp-like arithmetic allows you to spread operands. Operators are converted to reductions e.g. `(+: a b c) = a/"+".b/"+".c = reduce([a b c] ?(a b) a/"+"(b))`
 - `(+: a b c)`
 - `(-: a b)`
 - `(*: a b)`

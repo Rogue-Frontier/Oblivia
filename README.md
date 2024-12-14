@@ -131,6 +131,7 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `A *| B`: Call `A` with every item from *expression* `B` (spread if tuple)
 - `A .| B`: Call `A` with every item from *term* `B` (no spread)
 - `[A B C]`: Make an object array
+- `[A:B C:D] = [(A B), (C D)]`
 - `[:type A B C]`: Make an array of `type`
 - `A { B }`: Call `A` with the result of `{ B }`
   - If `A` is a class, then constructs an instance of `A` and applies the statements `B` to it.

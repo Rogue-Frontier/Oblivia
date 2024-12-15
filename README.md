@@ -1,6 +1,6 @@
 # Oblivia
 Oblivia is an experimental programming language that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
-- **Scopes = Objects.** In Oblivia, scopes have the power of objects. Pass a scope to a function. Name a variable or a member and it automatically becomes a key in the scope. A block with no explicit return simply returns itself as an object (if it has keys) or the last expression (if there are no keys).
+- **Scopes = Objects.** In Oblivia, scopes have the power of objects. Pass a scope to a function. Name a variable or a member and it automatically becomes a key in the scope. A block with no explicit return simply returns itself as an object (if it has keys) or the last expression (if there are no keys). Every expression counts!
 - **Terse infix syntax.** A small set of primitive operations are given the most terse syntax. Casting values is as easy as `A(B)` with type `A` and value `B`. Defining variables is simply `A:B(C)` with variable name `A`, type `B`, and value `C`.
 
 ## Example

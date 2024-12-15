@@ -158,7 +158,7 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 
 ## Design philosophy
 - Whitespace is the simplest operator.
-  - `A B` simply means that `A` occurs before `B` in a sequence.
+  - Two adjacent identifiers `A B` simply means that `A` occurs before `B` in a sequence. Identifiers are never grouped together outside of tuples and arrays. `{ A B:C D } = { A:A, B:C, D:D }`, `{ (A B):(C D) } = { A:C, B:D }` 
   - There is *never* a statement of the form `A B` such that `A`,`B` are identifiers and `A` performs some operation on `B`, other than occurring earlier in a sequence.
 - Function calls with 0/1 arguments are allowed alternate syntax to save pixels
   - Calls with n>1 arguments always require enclosing delimiters `A(B C)`

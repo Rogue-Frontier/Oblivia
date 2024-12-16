@@ -14,7 +14,7 @@ fib(i:i4): {
 }
 ```
 
-# Tuple and structure assignments.
+# Tuple, structure, memberwise assignments.
 In an assignment, the lhs is a DESTINATION and the rhs is the SOURCE.
 
 1. Evaluate the dest values and verify that they are mutable
@@ -25,6 +25,14 @@ In a tuple assignment, the destination values must be LOCATABLE (they represent 
 
 In a structural assignment, the destination values must qualify as LOCATABLE (they represent a destination), MUTABLE (this location can be assigned to), and KEYABLE (we know what name to retrieve). They are assigned from left to right by name. The RHS must have keys (tuple with implicit keys are allowed).
 
+
+
+```
+w: {a:2 b:3}
+x: w
+%x := {a:5 b:6}
+w = {a:5 b:6}
+```
 
 
 # Locatable values 

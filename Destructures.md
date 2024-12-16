@@ -1,8 +1,18 @@
 # pipe
-1. Evaluate LHS once
+1. Evaluate LHS once (generators allowed)
 2. Evaluate RHS once (for repeated eval, use alias). 
 
 `[1 2 3]|?{1:{a:_} 2:{b:_} 3:{c:_} }|combine = {a:1 b:2 c:3}`
+
+`
+
+fibs(10) | print
+
+@{ memo:List.i4/ctor() }
+fib(i:i4): {
+  gt(memo/Length i) ?+ memo.i ?- yield.i
+}
+` 
 
 # Tuple and structure assignments.
 In an assignment, the lhs is a DESTINATION and the rhs is the SOURCE.

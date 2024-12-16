@@ -1,3 +1,7 @@
+# pipe
+1. Evaluate LHS once
+2. Evaluate RHS once (for repeated eval, use alias). 
+
 `[1 2 3]|?{1:{a:_} 2:{b:_} 3:{c:_} }|combine = {a:1 b:2 c:3}`
 
 # Tuple and structure assignments.

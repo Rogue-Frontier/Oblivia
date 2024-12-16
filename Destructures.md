@@ -16,7 +16,7 @@ fib(i:i4): {
 }
 ```
 
-# Tuple, structure, memberwise assignments.
+# Assignments: Tuple, structure, memberwise, pipe.
 In an assignment, the lhs is a DESTINATION and the rhs is the SOURCE.
 
 1. Evaluate the dest values and verify that they are mutable
@@ -27,32 +27,40 @@ In a tuple assignment, the destination values must be LOCATABLE (they represent 
 
 In a structural assignment, the destination values must qualify as LOCATABLE (they represent a destination), MUTABLE (this location can be assigned to), and KEYABLE (we know what name to retrieve). They are assigned from left to right by name. The RHS must have keys (tuple with implicit keys are allowed).
 
-
-
+A memberspread assignment implicitly converts to a tuple/structural assignment.
 ```
 w: {a:2 b:3}
 x: w
+%x = { %x }
 %x := {a:5 b:6}
 w = {a:5 b:6}
 ```
 
+A pipe assignment implicitly converts to a tuple assignment.
+```
+w:[{a:5}, {a:6}, {a:7}, {a:8}]
+w|/a := [10 11 12 13]
+w = [{a:10}, {a:11}, {a:12}, {a:13}]
+
+w|/{ a := 10 }
+w = [{a:10}, {a:10}, {a:10}, {a:10}]
+```
 
 # Locatable values 
-Thing that can possibly be assigned to.
+Thing that represent a destination.
 - Variable name `a`
-- Variable tuple `(a b c)`: assigned positionally
-- Variable struct `{ a b c }`: assigned by ke
+- Variable tuple `(a b c)`
+- Variable struct `{ a b c }`
 - Member access `a/b`
 - Function call `a/b()`
 - Alias of Locator
-
 A literal `7` is NOT a locator.
 
 # Mutable values
+Things that can be assigned to
 - Setter `set { }`
 - Var 
 - Alias of Mutable
-
 
 # Keyable values
 Things for which we can implicitly generate a key

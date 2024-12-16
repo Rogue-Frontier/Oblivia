@@ -1,4 +1,6 @@
-# pipe
+`import(module("misc.obl"))`
+
+# Pipe
 1. Evaluate LHS once (generators allowed)
 2. Evaluate RHS once (for repeated eval, use alias). 
 

@@ -4,7 +4,7 @@
 
 `[1 2 3]|?{1:{a:_} 2:{b:_} 3:{c:_} }|combine = {a:1 b:2 c:3}`
 
-`
+```
 
 fibs(10) | print
 
@@ -12,7 +12,7 @@ fibs(10) | print
 fib(i:i4): {
   gt(memo/Length i) ?+ memo.i ?- yield.i
 }
-` 
+```
 
 # Tuple and structure assignments.
 In an assignment, the lhs is a DESTINATION and the rhs is the SOURCE.

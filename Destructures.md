@@ -47,14 +47,15 @@ w = [{a:10}, {a:10}, {a:10}, {a:10}]
 ```
 
 # Locatable values 
-Thing that represent a destination.
+Things that represent a location.
 - Variable name `a`
 - Variable tuple `(a b c)`
 - Variable struct `{ a b c }`
 - Member access `a/b`
 - Function call `a/b()`
 - Alias of Locator
-A literal `7` is NOT a locator.
+
+A literal such as `7` is not a locator.
 
 # Mutable values
 Things that can be assigned to
@@ -64,15 +65,15 @@ Things that can be assigned to
 
 # Keyable values
 Things for which we can implicitly generate a key
-- Variable name `a = a:a`, `'a = a:'a`
-- Tuple of keys `(a b c) = a:a b:b c:c`, `('a 'b 'c) = a:'a b:'b c:'c`
-- Struct of keys `{ a b c } = a:a b:b c:c`, `{ 'a 'b 'c } = a:'a b:'b c:'c`
-- Member access `a/b = b: a/b`, `'a/b = b: 'a/b`
+- Variable name `{a} = {a:a}`, `{'a} = {a:'a}`
+- Tuple of keys `{(a b c)} = {a:a b:b c:c}`, `{('a 'b 'c)} = {a:'a b:'b c:'c}` (maybe require spread?)
+- Struct of keys `{{a b c}} = {a:a b:b c:c}`, `{{'a 'b 'c}} = {a:'a b:'b c:'c}` (maybe require spread?)
+- Member access `{a/b} = {b:a/b}`, `{'a/b} = {b:'a/b}`
 - Alias of keyable
-  - `{ 'a } = { a:'a }`
-  - `{ ('a 'b 'c) } = { a:'a b:'b c:'c }`
-  - `{ 'a/b } = { b: 'a/b }`
-  - `{ a/'b } = { b: a/'b }`
-  - `{ a/(b c) } = { b:a/b c:a/c }`
-  - `{ a/('b 'c) } = { b:'a/b c:'a/c }`
+  - `{'a} = {a:'a}`
+  - `{('a 'b 'c)} = {a:'a b:'b c:'c}`
+  - `{'a/b} = {b:'a/b}`
+  - `{a/'b} = {b:a/'b}`
+  - `{a/(b c)} = {b:a/b c:a/c}`
+  - `{a/('b 'c)} = {b:'a/b c:'a/c}`
 - ~~Function call if it returns an alias~~ we automatically discard function returns unless the user specificially wants them

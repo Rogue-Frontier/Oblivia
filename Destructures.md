@@ -1,3 +1,5 @@
+`[1 2 3]|?{1:{a:_} 2:{b:_} 3:{c:_} }|combine = {a:1 b:2 c:3}`
+
 # Tuple and structure assignments.
 In an assignment, the lhs is a DESTINATION and the rhs is the SOURCE.
 
@@ -20,11 +22,12 @@ Thing that can possibly be assigned to.
 - Function call `a/b()`
 - Alias of Locator
 
-A literal `7` is NOT a locator
+A literal `7` is NOT a locator.
 
 # Mutable values
 - Setter `set { }`
-- Variable
+- Var 
+- Alias of Mutable
 
 
 # Keyable values
@@ -33,7 +36,7 @@ Things for which we can implicitly generate a key
 - Tuple of keys `(a b c) = a:a b:b c:c`, `('a 'b 'c) = a:'a b:'b c:'c`
 - Struct of keys `{ a b c } = a:a b:b c:c`, `{ 'a 'b 'c } = a:'a b:'b c:'c`
 - Member access `a/b = b: a/b`, `'a/b = b: 'a/b`
-- Alias of key
+- Alias of keyable
   - `{ 'a } = { a:'a }`
   - `{ ('a 'b 'c) } = { a:'a b:'b c:'c }`
   - `{ 'a/b } = { b: 'a/b }`

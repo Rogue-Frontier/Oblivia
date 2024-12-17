@@ -12,27 +12,28 @@ import*module("misc.obl")/{ foo:bar }
 
 # Operators
 ```
-@+(a:i4 b:i4): {}
-@-(b:i4 c:i4): {}
+# arithmetic overload
 \+(i:i4):{}
 \-(i:i4):{}
 
-
-# implicit to
+# implicit cast to other
 _impl(d:out*f4):{}
 _impl(i:out*i4):{}
 
-# implicit from
+# implicit cast from other
 _impl(i:i4): {}
 _impl(f:f4): {}
 
+# explicit cast to other
 _expl(i:out*i4): {}
 _expl(f:out*f4): {}
+
+# explicit cast from other
 _expl(i:i4): {}
 _expl(f:f4): {}
 ```
 
-# Var vs Type object
+# Var and Type
 - Initializing a key with a type makes a mutable var with the type.
 - Initializing a key with a value makes a mutable var with the value's type.
 - To store a type itself in a var, call `val(type)`
@@ -46,6 +47,11 @@ a:val(int) = a:int
 - `var` converts a type into a typed var.
 - Functions can return `var` objects which are used to create keys.
 - 
+
+```
+d:Dict(string var)
+d."foo": int
+```
 
 # Match
 - class/trait names match any object that implements them

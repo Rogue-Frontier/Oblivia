@@ -10,11 +10,28 @@ Any code snippets presented are to be fully supported by Oblivia.
 import*module("misc.obl")/{ foo:bar }
 ```
 
+# Control flow
+
+- Labeled break
+- Labeled continue
+- Labeled defer
+
+- Recursive return
+- Recursive yield
+- Labeled goto
+
 # Operators
 ```
 # arithmetic overload
 \+(i:i4):{}
 \-(i:i4):{}
+\*(i:i4):{}
+\/(i:i4):{}
+\+\+(i:i4):{}
+\-\-(i:i4):{}
+\*\*(i:i4):{}
+\/\/(i:i4):{}
+
 
 # implicit cast to other
 _impl(d:out*f4):{}

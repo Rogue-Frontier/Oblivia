@@ -50,6 +50,11 @@ _expl(i:i4): {}
 _expl(f:f4): {}
 ```
 
+# `out` parameter
+- Returned at end of function
+- Overrides result of body
+- Declare in block to designate return value
+
 # Var and Type
 - Initializing a key with a type makes a mutable var with the type.
 - Initializing a key with a value makes a mutable var with the value's type.

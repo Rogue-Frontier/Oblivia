@@ -150,6 +150,11 @@ w|/{ a := 10 }
 w = [{a:10}, {a:10}, {a:10}, {a:10}]
 ```
 
+## Binding and default
+```
+{ foo -> int: bar := 5 } := thing
+```
+
 # Locatable values 
 Things that represent a location.
 - Variable name `a`

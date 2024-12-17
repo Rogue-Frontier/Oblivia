@@ -96,6 +96,10 @@ Sequence to object:
 [1 2 3]|?{1:{a:_} 2:{b:_} 3:{c:_} }|combine = {a:1 b:2 c:3}
 ```
 
+```
+[1 2 3] ?| ?(a) a = 3
+```
+
 # Function-state locals
 State variables that are only used by one function can be placed in a secret scope only known by that function. The defined function is then implemented via a callable object.
 

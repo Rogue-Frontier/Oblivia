@@ -105,8 +105,8 @@ Sequence to object:
 [1 2 3] ?| ?(a) a = 3
 ```
 
-# Function-state locals
-State variables that are only used by one function can be placed in a secret scope only known by that function. The defined function is then implemented via a callable object.
+# Function locals
+State variables that are only used by one function can be placed in a scope only known by that function. The defined function is then converted to an object.
 
 ```
 fibs(10) | print

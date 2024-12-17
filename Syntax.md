@@ -10,6 +10,21 @@ Any code snippets presented are to be fully supported by Oblivia.
 import*module("misc.obl")/{ foo:bar }
 ```
 
+# Var vs Type object
+- Initializing a key with a type makes a mutable var with the type.
+- Initializing a key with a value makes a mutable var with the value's type.
+- To store a type itself in a var, call `val(type)`
+- `val(a)` makes an immutable variable with the value's type.
+- `auto` declares a variable that will be assigned later (possibly in an inner scope)
+```
+a:int = a:var(int)
+a:foo = a:var(typeof(foo) 5)
+a:val(int) = a:int
+```
+- `var` converts a type into a typed var.
+- Functions can return `var` objects which are used to create keys.
+- 
+
 # Match
 - class/trait names match any object that implements them
 - `gt(a), geq(a), lt(a), leq(a)` are objects that match numbers

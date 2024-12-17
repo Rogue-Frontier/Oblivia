@@ -1,21 +1,53 @@
-# Notes on Destructuring 
+# Notes on Syntax
+Any code snippets presented are to be fully supported by Oblivia.
 
 # Modules
-`import(module("misc.obl"))`
+- You can import an entire module or parts of it
+- `module(path)` gets the module object.
+- `import(module)` embeds the object into the current scope.
+```
+# From misc, import bar as foo
+import*module("misc.obl")/{ foo:bar }
+```
+
+# Match
+- class/trait names match any object that implements them
+- `gt(a), geq(a), lt(a), leq(a)` are objects that match numbers
+- `all(a b c)` matches object that match ALL at once.
+- `any(a b c)` matches object that match any of them.
+- `one(a b c)` matches object that match exactly one.
+- Use `eq(a)` to match only things that exactly equal `a`
+```
+# Creates a match object. Can be converted to a dictionary
+foo: ?{ 1:print 2:print }
+```
 
 # Pipe
 1. Evaluate LHS once (generators allowed)
 2. Evaluate RHS once (for repeated eval, use alias). 
 
-`[1 2 3]|?{1:{a:_} 2:{b:_} 3:{c:_} }|combine = {a:1 b:2 c:3}`
+- If the RHS calls `ret`, then the result is the last item
+- If the RHS calls `yield`, then the result is all yielded items
 
+- `combine` summons a callable object that returns the combined object.
+
+Sequence to object:
+```
+[1 2 3]|?{1:{a:_} 2:{b:_} 3:{c:_} }|combine = {a:1 b:2 c:3}
 ```
 
+# Function-state locals
+State variables that are only used by one function can be placed in a secret scope only known by that function. The defined function is then implemented via a callable object.
+
+```
 fibs(10) | print
 
 @{ memo:List.i4/ctor() }
 fib(i:i4): {
-  gt(memo/Length i) ?+ memo.i ?- yield.i
+  gt(memo/Length i) ?+ memo.i ?- yield * fib.i
+}
+fibs(i:i4): seq.i4 {
+  yield *| range(i) | fib
 }
 ```
 

@@ -10,6 +10,28 @@ Any code snippets presented are to be fully supported by Oblivia.
 import*module("misc.obl")/{ foo:bar }
 ```
 
+# Operators
+```
+@+(a:i4 b:i4): {}
+@-(b:i4 c:i4): {}
+\+(i:i4):{}
+\-(i:i4):{}
+
+
+# implicit to
+_impl(d:out*f4):{}
+_impl(i:out*i4):{}
+
+# implicit from
+_impl(i:i4): {}
+_impl(f:f4): {}
+
+_expl(i:out*i4): {}
+_expl(f:out*f4): {}
+_expl(i:i4): {}
+_expl(f:f4): {}
+```
+
 # Var vs Type object
 - Initializing a key with a type makes a mutable var with the type.
 - Initializing a key with a value makes a mutable var with the value's type.

@@ -1,9 +1,15 @@
 # Oblivia
-Oblivia is an experimental programming language that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
-- **Scopes = Objects.** In Oblivia, scopes have the power of objects. Pass a scope to a function. Name a variable or a member and it automatically becomes a key in the scope. A block with no explicit return simply returns itself as an object (if it has keys) or the last expression (if there are no keys). Every expression counts!
-- **Anything can have a function**: Any object can define a function call operator. There is no subscript operator; `A[] = A([])` 
-- **Same syntax everywhere**: `A(B)` means call `A` with arg `(B)`.  `A{B}` means call `A` with arg `{B}`. `A[B]` means call `A` with arg `[B]`. 
-- **Terse infix syntax.** A small set of primitive operations are given the most terse syntax. Casting values is as easy as `A(B)` with type `A` and value `B`. Defining variables is simply `A:B(C)` with variable name `A`, type `B`, and value `C`.
+Oblivia is an experimental programming language that aims to do with objects what Lisp does with lists. Inspired by JavaScript, Oblivia takes the power of objects to the next level. Oblivia follows these ideas:
+- **Scopes = Objects**: In Oblivia, scopes have the power of objects.
+  - Pass a scope to a function.
+  - Name a variable or a member and it automatically becomes a key of the scope.
+  - A scope with no explicit return simply returns itself as an object (if it has keys) or the last expression (no keys).
+- **Objects = Functions**: In Oblivia, any object can define the `(), [], {}` operators.
+- **Same syntax everywhere**: `A(B), A[B], A{C}` all translate to a function call (note that `A{C}` may have special functionality).
+- **Terse infix syntax.** A small set of primitive operations are given the most terse syntax.
+  - Casting values is as easy as `A(B)` with type `A` and value `B`.
+  - Defining variables is simply `A:B(C)` with variable name `A`, type `B`, and value `C`.
+- **Classes are objects too**: Classes can have a static `companion` (or not) that implements interfaces and behaves just like regular singleton objects.
 
 ## Example
 The following code implements a Conway's Game of Life and updates until the count of active cells becomes unchanging

@@ -10,6 +10,9 @@ Any code snippets presented are to be fully supported by Oblivia.
 import*module("misc.obl")/{ foo:bar }
 ```
 
+# Names
+`(Fore Back)-ground -> (Foreground Background)`
+
 # Control flow
 
 - Labeled break
@@ -81,7 +84,7 @@ d."foo": int
 - `all(a b c)` matches object that match ALL at once.
 - `any(a b c)` matches object that match any of them.
 - `one(a b c)` matches object that match exactly one.
-- Use `eq(a)` to match only things that exactly equal `a`
+- `eq(a)` match only things that exactly equal `a`
 ```
 # Creates a match object. Can be converted to a dictionary
 foo: ?{ 1:print 2:print }
@@ -91,8 +94,9 @@ foo: ?{ 1:print 2:print }
 1. Evaluate LHS once (generators allowed)
 2. Evaluate RHS once (for repeated eval, use alias). 
 
-- If the RHS calls `ret`, then the result is the last item
-- If the RHS calls `yield`, then the result is all yielded items
+- If the RHS calls `loop/ret`, then the result is the last item
+- If the RHS calls `loop/yield`, then the result is all yielded items
+- `_map/break`, `_map/ret`, `_map/continue`
 
 - `combine` summons a callable object that returns the combined object.
 

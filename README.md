@@ -1,5 +1,5 @@
 # Oblivia
-Oblivia is an experimental programming language that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
+Oblivia is an esolang that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
 - **Scopes = Objects**: In Oblivia, scopes have the power of objects.
   - Pass a scope to a function.
   - Name a variable or a member and it automatically becomes a key of the scope.
@@ -13,6 +13,12 @@ Oblivia is an experimental programming language that aims to do with objects wha
   - Casting values is as easy as `A(B)` with type `A` and value `B`.
   - Defining variables is simply `A:B(C)` with variable name `A`, type `B`, and value `C`.
 - **Classes are objects too**: Classes can have a static `companion` (or not) that implements interfaces and behaves just like regular singleton objects.
+
+## Inspiration
+
+- JavaScript: Destructuring
+- CSharp: Tuples
+- APL: short-left, long-right precedence
 
 ## Example
 The following code implements a Conway's Game of Life and updates until the count of active cells becomes unchanging

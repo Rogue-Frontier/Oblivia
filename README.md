@@ -1,5 +1,10 @@
 # Oblivia
-Oblivia is an esolang that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
+Oblivia (a.k.a. OBL) is an esolang that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
+
+- **Terse syntax**:
+  - A small set of primitive operations are given the most terse syntax.
+  - Casting values is as easy as `A(B)` with type `A` and value `B`.
+  - Defining variables is simply `A:B(C)` with variable name `A`, type `B`, and value `C`.
 - **Scopes = Objects**: In Oblivia, scopes have the power of objects.
   - Pass a scope to a function.
   - Name a variable or a member and it automatically becomes a key of the scope.
@@ -9,9 +14,6 @@ Oblivia is an esolang that aims to do with objects what Lisp does with lists. Ob
   - `:` is the define operator
   - `A(B), A[B], A{C}` is a function call.
   - Patterns can be stored in objects
-- **Terse syntax.** A small set of primitive operations are given the most terse syntax.
-  - Casting values is as easy as `A(B)` with type `A` and value `B`.
-  - Defining variables is simply `A:B(C)` with variable name `A`, type `B`, and value `C`.
 - **Classes are objects too**: Classes can have a static `companion` (or not) that implements interfaces and behaves just like regular singleton objects.
 
 ## Inspiration
@@ -184,3 +186,12 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - Function calls with 0/1 arguments are allowed alternate syntax to save pixels
   - Calls with n>1 arguments always require enclosing delimiters `A(B C)`
   - Calls with 0, 1 arguments are allowed single-ended operators `A!`, `A*B`, `A.B`
+
+## Rejected features.
+OBL emphasizes **generality** and **terseness**, rejecting features that are not versatile enough to justify the syntax cost. We consider the following features to be flaws.
+- Infix arithmetic: Fails when you need to reduce an array, making the procedure unnecessarily verbose.
+  - `(+: a b)` Lisp-like arithmetic solves this by making arithmetic spreadable.
+- Partial application / *whatever-priming* (Raku): Scope-constrained to simple expressions. Cannot control argument order.
+  - `?(<par>) <expr>` Lambdas solve this problem by forward declaring arguments and allowing any size scope.
+- `=`-based assignment: A function that frequently accompanies the aforementioned functions. Often confused for boolean functions.
+  - OBL uses `:=`, where `:` makes it clear that this function is not conditional. `=` is a pattern match function.

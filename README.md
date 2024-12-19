@@ -90,6 +90,10 @@ The following code implements a Conway's Game of Life and updates until the coun
 }
 ```
 ## Syntax
+Oblivia has 3 basic structures.
+- Array: Contains a sequence of items and nothing more.
+- Tuple: Contains a sequence of items, some with string keys.
+- Block: Contains a set of variables with string keys. Supports advanced operations such as `ret`
 
 ### Arithmetic
 Lisp-like arithmetic allows you to spread operands. Operators are converted to reductions e.g. `[+: a b c] = a/"+".b/"+".c = reduce([a b c] ?(a b) a/"+"(b))`

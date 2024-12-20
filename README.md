@@ -1,5 +1,5 @@
-# Oblivia
-Oblivia (a.k.a. OBL) is an esolang that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
+# Oblivia: Object-Based Language Intended for Very Inscrutable Applications
+Oblivia (OBL) is an esolang that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
 
 - **Terse syntax**:
   - A small set of primitive operations are given the most terse syntax.

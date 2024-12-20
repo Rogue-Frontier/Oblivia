@@ -1,4 +1,4 @@
-# Oblivia: Object-Based Language Intended for Very Inscrutable Applications
+# Oblivia: Object-Based Language Intended for Very Idiosyncratic Articulations
 Oblivia (OBL) is an esolang that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
 
 - **Terse syntax**:
@@ -10,6 +10,7 @@ Oblivia (OBL) is an esolang that aims to do with objects what Lisp does with lis
   - Name a variable or a member and it automatically becomes a key of the scope.
   - A scope with no explicit return simply returns itself as an object (if it has keys) or the last expression (no keys).
 - **Objects = Functions**: In Oblivia, any object can define the `(), [], {}` operators.
+- **Variables of any name**: Variable names are not restricted by those already defined in the outer scope. To access variables of an outer scope, Oblivia introduces the `^` "up" function
 - **Same syntax everywhere**:
   - `:` is the define operator
   - `A(B), A[B], A{C}` is a function call.

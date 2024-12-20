@@ -1,4 +1,4 @@
-# Oblivia: Object-Based Language Intended for Very Idiosyncratic Articulations
+# Oblivia: Object-Building Language Intended for Very Idiosyncratic Articulations
 Oblivia (OBL) is an esolang that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
 
 - **Terse syntax**:

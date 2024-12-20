@@ -189,7 +189,7 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
   - Calls with 0, 1 arguments are allowed single-ended operators `A!`, `A*B`, `A.B`
 
 ## Rejected features.
-OBL emphasizes **generality** and **terseness**, rejecting features that are not versatile enough to justify the syntax cost. We consider the following features to be flaws.
+OBL emphasizes **generality** and **terseness**, rejecting features that are not versatile enough to justify the syntax cost.
 - Infix arithmetic: Fails when you need to reduce an array, making the procedure unnecessarily verbose.
   - `(+: a b)` Lisp-like arithmetic solves this by making arithmetic spreadable.
 - Partial application / *whatever-priming* (Raku): Scope-constrained to simple expressions. Cannot control argument order.

@@ -10,9 +10,6 @@ Any code snippets presented are to be fully supported by Oblivia.
 import*module("misc.obl")/{ foo:bar }
 ```
 
-# Names
-`(Fore Back)-ground -> (Foreground Background)`
-
 # Control flow
 
 - Labeled break
@@ -34,7 +31,6 @@ import*module("misc.obl")/{ foo:bar }
 \-\-(i:i4):{}
 \*\*(i:i4):{}
 \/\/(i:i4):{}
-
 
 # implicit cast to other
 _impl(d:out*f4):{}
@@ -71,8 +67,9 @@ a:val(int) = a:int
 ```
 - `var` converts a type into a typed var.
 - Functions can return `var` objects which are used to create keys.
-- 
 
+- DEFINE op `:` sets a key that does not exist
+- ASSIGN op `:=` sets a key that already exists. 
 ```
 d:Dict(string var)
 d."foo": int
@@ -85,6 +82,7 @@ d."foo": int
 - `any(a b c)` matches object that match any of them.
 - `one(a b c)` matches object that match exactly one.
 - `eq(a)` match only things that exactly equal `a`
+
 ```
 # Creates a match object. Can be converted to a dictionary
 foo: ?{ 1:print 2:print }
@@ -105,8 +103,10 @@ Sequence to object:
 [1 2 3]|?{1:{a:_} 2:{b:_} 3:{c:_} }|combine = {a:1 b:2 c:3}
 ```
 
+Filter sequence
 ```
 [1 2 3] ?| ?(a) a = 3
+[1 2 3] ?|= 3
 ```
 
 # Function locals
@@ -149,7 +149,9 @@ A pipe assignment implicitly converts to a tuple assignment.
 w:[{a:5}, {a:6}, {a:7}, {a:8}]
 w|/a := [10 11 12 13]
 w = [{a:10}, {a:11}, {a:12}, {a:13}]
+```
 
+```
 w|/{ a := 10 }
 w = [{a:10}, {a:10}, {a:10}, {a:10}]
 ```

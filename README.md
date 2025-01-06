@@ -150,6 +150,7 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `A/B`: In the scope of *expression* `A` evaluate *expression* B. Cannot access outer scopes.
 - `A/{B}`: In the scope of *expression* `A`, evaluate statements `B`. Can access outer scopes.
 - `A/ctor`: From .NET type `A` get the unnamed constructor.
+- `A/|B`: Same as `?() B(A)`
 - `A/|B(C)`: Same as `B(A C)`
 - `A*B`: Call `A` with arg *expression* `B` (spread if tuple)
 - `A.B`: Call `A` with arg *term* `B` (no spread)

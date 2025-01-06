@@ -99,7 +99,7 @@ Oblivia has 3 basic structures.
 - Block: Contains a set of variables with string keys. Supports advanced operations such as `ret`
 
 ### Arithmetic
-Lisp-like arithmetic allows you to spread operands. Operators are converted to reductions e.g. `[+: a b c] = a/"+".b/"+".c = reduce([a b c] ?(a b) a/"+"(b))`
+Lisp-like arithmetic allows you to spread operands. Operators are converted to reductions e.g. `[+: a b c] = a/\+(b)/\+(c) = reduce([a b c] ?(a b) a/\+(b))`
 - `[+: a b]`
 - `[-: a b]`
 - `[*: a b]`
@@ -150,9 +150,10 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `A/B`: In the scope of *expression* `A` evaluate *expression* B. Cannot access outer scopes.
 - `A/{B}`: In the scope of *expression* `A`, evaluate statements `B`. Can access outer scopes.
 - `A/ctor`: From .NET type `A` get the unnamed constructor.
+- `A/|B(C)`: Same as `B(A C)`
 - `A*B`: Call `A` with arg *expression* `B` (spread if tuple)
 - `A.B`: Call `A` with arg *term* `B` (no spread)
-- `A *| B`: Call `A` with every item from *expression* `B` (spread if tuple)
+- `A *| B(C)`: Call `A` with every item from *expression* `B(C)` (spread if tuple)
 - `A .| B`: Call `A` with every item from *term* `B` (no spread)
 - `[A B C]`: Make an object array
 - `[A:B C:D] = [(A B), (C D)]`
@@ -194,5 +195,5 @@ OBL emphasizes **generality** and **terseness**, rejecting features that are not
   - `(+: a b)` Lisp-like arithmetic solves this by making arithmetic spreadable.
 - Partial application / *whatever-priming* (Raku): Scope-constrained to simple expressions. Cannot control argument order.
   - `?(<par>) <expr>` Lambdas solve this problem by forward declaring arguments and allowing any size scope.
-- `=`-based assignment: A function that frequently accompanies the aforementioned functions. Often confused for boolean functions.
-  - OBL uses `:=`, where `:` makes it clear that this function is not conditional. `=` is a pattern match function.
+- `=`-based assignment: This function is often confused between assignments and boolean comparisons.
+  - OBL uses `:=`, where `:` makes it clear that this function is strictly assignment. `=` is a pattern match function.

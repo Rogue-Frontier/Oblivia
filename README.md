@@ -142,30 +142,33 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `^^A`: Get value of symbol `A` from the parent scope.
 - `^^^A`: Get value of symbol `A` from parent's parent scope.
 - `'A`: Alias of expression `A`. Assignments on variable `B:'A` will attempt to assign to `A`.
-- `A ?+ B ?- C`: If A then B else C.
-- `A | B`: Map array A by function B.
-- `A |/ B`: From every item in `A` get value of symbol `B`.
-- `A |* B`: From every item in `A` call with arg `B`
-- `A ?++ B`: While A, evaluate B.
-- `A/B`: In the scope of *expression* `A` evaluate *expression* B. Cannot access outer scopes.
-- `A/{B}`: In the scope of *expression* `A`, evaluate statements `B`. Can access outer scopes.
-- `A/ctor`: From .NET type `A` get the unnamed constructor.
-- `A/|B`: Same as `?() B(A)`
-- `A/|B(C)`: Same as `B(A C)`
-- `A||B`: `?(C) A | ?(a) B(a C)`
-- `A||B(C)`: `A | ?(a) B(a C)`
-- `A*B`: Call `A` with arg *expression* `B` (spread if tuple)
-- `A.B`: Call `A` with arg *term* `B` (no spread)
-- `A *| B(C)`: Call `A` with every item from *expression* `B(C)` (spread if tuple)
-- `A .| B`: Call `A` with every item from *term* `B` (no spread)
 - `[A B C]`: Make an object array
 - `[A:B C:D] = [(A B), (C D)]`
 - `[:type A B C]`: Make an array of `type`
-- `A { B }`: Call `A` with the result of `{ B }`
-  - If `A` is a class, then constructs an instance of `A` and applies the statements `B` to it.
 - `{ A }`: Creates an scope and applies the statements `A` to it. If the scope has no locals or returns, then the scope returns the result of the last statement (empty if no statements). Otherwise returns an object.
+- `A ?+ B ?- C`: If A then B else C.
+- `A ?++ B`: While A, evaluate B.
+- `A(B)`
+- `A[B]`: `A([B])`
+- `A{B}`: `A({B})` Call `A` with the result of `{B}`
+  - If `A` is a class, then constructs an instance of `A` and applies the statements `B` to it.
+- `A.B`: `A(B)` Call `A` with arg *term* `B` (no spread)
+- `A*B`: `A(B)` Call `A` with arg *expression* `B` (spread if tuple)
+- `A/B`: In the scope of *expression* `A` evaluate *expression* B. Cannot access outer scopes.
+- `A/{B}`: In the scope of *expression* `A`, evaluate statements `B`. Can access outer scopes.
+- `A/ctor`: From .NET type `A` get the unnamed constructor.
+- `A|B`: Map array A by function B.
 - `?(): A`: Creates a lambda with no arguments and output `A`
-- `?(A,B): C`: Creates a lambda with arguments A,B and output `C`
+- `?(A): B`: Creates a lambda with arguments `A` and output `B`
+- `A.|B`: `B|A` Call `A` with every item from *term* `B` (no spread)
+- `A*|B`: `B|A` Call `A` with every item from *expression* `B` (spread if tuple)
+- `A/|B`: `?(C) B(A C)`
+- `A/|B(C)`: `B(A C)`
+- `A|.B`: `A|?(a):a(B)` From every item in `A` call with arg term `B`
+- `A|*B`: `A|?(a):a(B)` From every item in `A` call with arg expression `B`
+- `A|/B`: `A | ?(a) a/B` From every item in `A` get value of symbol `B`.
+- `A||B`: `?(C) A | ?(a) B(a C)`
+- `A||B(C)`: `A | ?(a) B(a C)`
 - `A ?[
     B0:C0
     B1:C1
@@ -177,7 +180,11 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
     B1:C1
     B2:C2
     B3:C3
-}`: Match expression (naive): For each pair `B:C`, if `A = B`, then returns `C`.
+    D0
+    D1
+    D3
+}`: Match expression (naive): For each pair `B:C`, if `A = B`, then returns `C`. Can also accept lambda `D`
+- `?{ A0:B0 }`: Matcher function
 - `A =+ B`: Returns true if `A` equals `B`
 - `A =- B`: Returns true if `A` does not equal `B`
 - `A = B`: Returns true if `A` matches pattern `B`

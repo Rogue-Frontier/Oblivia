@@ -152,6 +152,9 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `A[B]`: `A([B])`
 - `A{B}`: `A({B})` Call `A` with the result of `{B}`
   - If `A` is a class, then constructs an instance of `A` and applies the statements `B` to it.
+- `A-B`: Range from A to B
+- `A->B`: Function type
+- `A..B`: Eval A, assign to _, then eval B
 - `A.B`: `A(B)` Call `A` with arg *term* `B` (no spread)
 - `A*B`: `A(B)` Call `A` with arg *expression* `B` (spread if tuple)
 - `A/B`: In the scope of *expression* `A` evaluate *expression* B. Cannot access outer scopes.

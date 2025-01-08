@@ -146,7 +146,7 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `A | B`: Map array A by function B.
 - `A |/ B`: From every item in `A` get value of symbol `B`.
 - `A |* B`: From every item in `A` call with arg `B`
-- `A ?% B`: While A, evaluate B.
+- `A ?++ B`: While A, evaluate B.
 - `A/B`: In the scope of *expression* `A` evaluate *expression* B. Cannot access outer scopes.
 - `A/{B}`: In the scope of *expression* `A`, evaluate statements `B`. Can access outer scopes.
 - `A/ctor`: From .NET type `A` get the unnamed constructor.

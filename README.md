@@ -152,6 +152,8 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `A/ctor`: From .NET type `A` get the unnamed constructor.
 - `A/|B`: Same as `?() B(A)`
 - `A/|B(C)`: Same as `B(A C)`
+- `A||B`: `?(C) A | ?(a) B(a C)`
+- `A||B(C)`: `A | ?(a) B(a C)`
 - `A*B`: Call `A` with arg *expression* `B` (spread if tuple)
 - `A.B`: Call `A` with arg *term* `B` (no spread)
 - `A *| B(C)`: Call `A` with every item from *expression* `B(C)` (spread if tuple)

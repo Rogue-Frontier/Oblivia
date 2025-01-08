@@ -147,7 +147,7 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `[:type A B C]`: Make an array of `type`
 - `{ A }`: Creates an scope and applies the statements `A` to it. If the scope has no locals or returns, then the scope returns the result of the last statement (empty if no statements). Otherwise returns an object.
 - `A ?+ B ?- C`: If A then B else C.
-- `A ?++ B`: While A, evaluate B.
+- `A ?++ B ?+- C ?-- D`: While A, evaluate B. If at least one iter, eval `C`. If no iter, eval `D`
 - `A(B)`
 - `A[B]`: `A([B])`
 - `A{B}`: `A({B})` Call `A` with the result of `{B}`

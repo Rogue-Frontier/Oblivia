@@ -123,6 +123,8 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `A:B`: field A has value B. If `B` is a type, then the value is a *placeholder*
 - `A!:B`: function A with no args has output B
 - `A(B, C): D`: function A with args B,C has output D
+- `A[B C]: D`
+- `A{B C}: D`
 ### Statement
 - `A := B`: reassign field A to B (same type). You can use `_` for the current value of `A`
 - `^: A`: Return `A` from the current scope.

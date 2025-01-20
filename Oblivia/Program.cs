@@ -1066,8 +1066,8 @@ namespace Oblivia {
                 case TokenType.MINUS:
                     inc();
                     switch(tokenType) {
-						//fn type
-						case TokenType.ANGLE_R:
+                        //fn type
+                        case TokenType.ANGLE_R:
                             inc();
                             switch(tokenType) {
                                 case TokenType.TUPLE_R:
@@ -1076,14 +1076,14 @@ namespace Oblivia {
                                 case TokenType.ANGLE_R:
                                     return new ExFnType { lhs = lhs };
                                 default: {
-										var rhs = NextExpr();
-										return CompoundExpr(new ExFnType { lhs = lhs, rhs = rhs });
-									}
-							}
+                                        var rhs = NextExpr();
+                                        return CompoundExpr(new ExFnType { lhs = lhs, rhs = rhs });
+                                    }
+                            }
                         default: {
-								var rhs = NextExpr();
-								return CompoundExpr(new ExRange { lhs = lhs, rhs = rhs });
-							}
+                                var rhs = NextExpr();
+                                return CompoundExpr(new ExRange { lhs = lhs, rhs = rhs });
+                            }
                     }
                     break;
                 case TokenType.BLOCK_L:
@@ -1093,13 +1093,13 @@ namespace Oblivia {
                         switch(tokenType) {
                             case TokenType.STAR:
                                 inc();
-                                return CompoundExpr(new ExMap { src = lhs, map = new ExInvoke { expr = new ExSelf { up = 1 }, args = ExTuple.Expr(NextExpr())  } , expr = true});
+                                return CompoundExpr(new ExMap { src = lhs, map = new ExInvoke { expr = new ExSelf { up = 1 }, args = ExTuple.Expr(NextExpr()) }, expr = true });
                             case TokenType.PERIOD:
-								inc();
-								return CompoundExpr(new ExMap { src = lhs, map = new ExInvoke { expr = new ExSelf { up = 1 }, args = ExTuple.Expr(NextTerm()) }, expr = true });
-							case TokenType.SLASH:
-								inc();
-								return CompoundExpr(new ExMap { src = lhs, map = NextExpr(), expr = true });
+                                inc();
+                                return CompoundExpr(new ExMap { src = lhs, map = new ExInvoke { expr = new ExSelf { up = 1 }, args = ExTuple.Expr(NextTerm()) }, expr = true });
+                            case TokenType.SLASH:
+                                inc();
+                                return CompoundExpr(new ExMap { src = lhs, map = NextExpr(), expr = true });
                             default: {
                                     var cond = default(INode);
                                     var type = default(INode);
@@ -1126,43 +1126,43 @@ namespace Oblivia {
                                     }
                                     return CompoundExpr(new ExMap { src = lhs, cond = cond, type = type, map = NextTerm() });
                                 }
-						}
+                        }
                     }
                 case TokenType.TUPLE_L: {
                         inc();
                         return CompoundExpr(new ExInvoke { expr = lhs, args = NextArgTuple() });
                     }
                 case TokenType.STAR: {
-						inc();
+                        inc();
                         switch(tokenType) {
                             case TokenType.PIPE:
                                 inc();
-								return CompoundExpr(new ExMap {
-									src = NextExpr(),
-									map = lhs,
-								});
+                                return CompoundExpr(new ExMap {
+                                    src = NextExpr(),
+                                    map = lhs,
+                                });
                             default:
-								return CompoundExpr(new ExInvoke {
-									expr = lhs,
-									args = ExTuple.SpreadExpr(NextExpr()),
-								});
-						}
-					}
+                                return CompoundExpr(new ExInvoke {
+                                    expr = lhs,
+                                    args = ExTuple.SpreadExpr(NextExpr()),
+                                });
+                        }
+                    }
                 case TokenType.PERIOD: {
                         inc();
                         switch(tokenType) {
                             case TokenType.PIPE:
                                 inc();
-								return CompoundExpr(new ExMap {
-									src = NextTerm(),
-									map = lhs,
-								});
+                                return CompoundExpr(new ExMap {
+                                    src = NextTerm(),
+                                    map = lhs,
+                                });
                             case TokenType.PERIOD:
-								inc();
-								return CompoundExpr(new ExTemp { lhs = lhs, rhs = NextExpr() });
-							default:
-								return CompoundExpr(new ExInvoke { expr = lhs, args = ExTuple.SpreadExpr(NextTerm()) });
-						}
+                                inc();
+                                return CompoundExpr(new ExTemp { lhs = lhs, rhs = NextExpr() });
+                            default:
+                                return CompoundExpr(new ExInvoke { expr = lhs, args = ExTuple.SpreadExpr(NextTerm()) });
+                        }
                     }
                 case TokenType.SHOUT: {
                         inc();
@@ -1176,10 +1176,10 @@ namespace Oblivia {
                                 return CompoundExpr(new ExSeqOp { fn = lhs, op = ExSeqOp.EOp.Reduce });
                             case TokenType.MINUS:
                                 //Sliding window
-                                return CompoundExpr(new ExSeqOp { fn=lhs, op = ExSeqOp.EOp.SlidingWindow });
+                                return CompoundExpr(new ExSeqOp { fn = lhs, op = ExSeqOp.EOp.SlidingWindow });
                             default:
-								return CompoundExpr(new ExSpread { value = lhs });
-						}
+                                return CompoundExpr(new ExSpread { value = lhs });
+                        }
                     }
                 case TokenType.EQUAL: {
                         inc();
@@ -1197,19 +1197,19 @@ namespace Oblivia {
                                     inc();
                                     return Eq(true);
                                 }
-                            case TokenType.ANGLE_R:{
-                                var rhs = NextExpr();
+                            case TokenType.ANGLE_R: {
+                                    var rhs = NextExpr();
                                     return CompoundExpr(new ExFn { pars = (ExTuple)lhs, result = rhs });
-								}
-							case TokenType.TUPLE_L: {
+                                }
+                            case TokenType.TUPLE_L: {
                                     var tup = NextTupleOrLisp();
-									throw new Exception("Impl tuple match");
-								}
+                                    throw new Exception("Impl tuple match");
+                                }
                             case TokenType.ARRAY_L: {
                                     var arr = NextArrayOrLisp();
-									throw new Exception("Impl array match");
-								}
-							case TokenType.BLOCK_L: {
+                                    throw new Exception("Impl array match");
+                                }
+                            case TokenType.BLOCK_L: {
                                     //Structure match
                                     var block = (ExBlock)NextExpr();
                                     foreach(var ex in block.statements) {
@@ -1231,16 +1231,16 @@ namespace Oblivia {
                                     var rhs = NextTerm();
                                     return CompoundExpr(new ExIsAssign { lhs = lhs, rhs = rhs });
                                 }
-                            default:{
-                                var pattern = NextExpr();
-                                switch(tokenType) {
-                                    case TokenType.COLON:
-                                        inc();
-                                        var symbol = NextSymbol();
-                                        return CompoundExpr( new ExIs { lhs = lhs, rhs = pattern, key = symbol.key });
-                                    default:
-                                        return CompoundExpr( new ExIs{ lhs = lhs, rhs = pattern, key = "_"});
-                                }
+                            default: {
+                                    var pattern = NextExpr();
+                                    switch(tokenType) {
+                                        case TokenType.COLON:
+                                            inc();
+                                            var symbol = NextSymbol();
+                                            return CompoundExpr(new ExIs { lhs = lhs, rhs = pattern, key = symbol.key });
+                                        default:
+                                            return CompoundExpr(new ExIs { lhs = lhs, rhs = pattern, key = "_" });
+                                    }
                                     throw new Exception();
                                 }
                         }
@@ -1265,11 +1265,11 @@ namespace Oblivia {
                                 return CompoundExpr(new ExAt { src = lhs, index = [NextTerm()] });
                             case TokenType.STAR:
                                 inc();
-								return CompoundExpr(new ExAt { src = lhs, index = [NextExpr()] });
-							case TokenType.PERIOD:
+                                return CompoundExpr(new ExAt { src = lhs, index = [NextExpr()] });
+                            case TokenType.PERIOD:
                                 inc();
-								return CompoundExpr(new ExAt { src = lhs, index = [NextTerm()] });
-							case TokenType.NAME:
+                                return CompoundExpr(new ExAt { src = lhs, index = [NextTerm()] });
+                            case TokenType.NAME:
                                 var name = currToken.str;
                                 inc();
                                 return CompoundExpr(new ExMemberKey { src = lhs, key = name });
@@ -1291,17 +1291,17 @@ namespace Oblivia {
                 case TokenType.AT: {
                         inc();
                         var term = NextTerm();
-                        return CompoundExpr(new ExCompose { items = (ExTuple)NextTupleOrLisp()});
+                        return CompoundExpr(new ExCompose { items = (ExTuple)NextTupleOrLisp() });
                     }
-				case TokenType.QUESTION: {
+                case TokenType.QUESTION: {
                         inc();
                         switch(tokenType) {
                             case TokenType.PIPE:
                                 var rhs = NextExpr();
                                 return CompoundExpr(new ExFilter { lhs = lhs, rhs = rhs });
                             case TokenType.PERCENT: {
-									inc();
-									return CompoundExpr(new ExLoop { condition = lhs, positive = NextExpr() });
+                                    inc();
+                                    return CompoundExpr(new ExLoop { condition = lhs, positive = NextExpr() });
                                 }
                             case TokenType.COLON: {
                                     inc();
@@ -1382,41 +1382,41 @@ namespace Oblivia {
                                         case TokenType.PLUS:
                                             inc();
                                             return CompoundExpr(new ExLoop { condition = lhs, positive = NextExpr() });
-                                            /*
-                                        case TokenType.MINUS:
-                                            inc();
+                                        /*
+                                    case TokenType.MINUS:
+                                        inc();
+                                        return CompoundExpr(new ExBranch {
+                                            condition = lhs,
+                                            positive = NextExpr(),
+                                            negative = NextExpr()
+                                        });
+                                        */
+                                        default:
+                                            var positive = NextStatement();
+                                            var negative = default(INode);
+                                            switch(tokenType) {
+                                                case TokenType.QUESTION: {
+                                                        inc();
+                                                        switch(tokenType) {
+                                                            case TokenType.MINUS: {
+                                                                    inc();
+                                                                    negative = NextStatement();
+                                                                    break;
+                                                                }
+                                                            default: {
+                                                                    dec();
+                                                                    break;
+                                                                }
+                                                        }
+                                                    }
+                                                    break;
+                                            }
                                             return CompoundExpr(new ExBranch {
                                                 condition = lhs,
-                                                positive = NextExpr(),
-                                                negative = NextExpr()
+                                                positive = positive,
+                                                negative = negative
                                             });
-                                            */
-                                        default:
-											var positive = NextStatement();
-											var negative = default(INode);
-											switch(tokenType) {
-												case TokenType.QUESTION: {
-														inc();
-														switch(tokenType) {
-															case TokenType.MINUS: {
-																	inc();
-																	negative = NextStatement();
-																	break;
-																}
-															default: {
-																	dec();
-																	break;
-																}
-														}
-													}
-													break;
-											}
-											return CompoundExpr(new ExBranch {
-												condition = lhs,
-												positive = positive,
-												negative = negative
-											});
-									}
+                                    }
                                 }
                             default:
                                 dec();
@@ -1424,37 +1424,35 @@ namespace Oblivia {
                         }
                         break;
                     }
-				case TokenType.AND: {
-                        inc();
-						var rhs = NextTerm();
-						return new ExDyadic { lhs = lhs, rhs = rhs, fn = ExDyadic.EFn.AND };
-					}
-				case TokenType.OR: {
-                        inc();
-						var rhs = NextTerm();
-						return new ExDyadic { lhs = lhs, rhs = rhs, fn = ExDyadic.EFn.OR };
-					}
-                case TokenType.XOR: {
-                        inc();
-						var rhs = NextTerm();
-						return new ExDyadic { lhs = lhs, rhs = rhs, fn = ExDyadic.EFn.XOR };
-					}
+                case TokenType.AND: return Dyadic(ExDyadic.EFn.AND);
+				case TokenType.OR: return Dyadic(ExDyadic.EFn.OR);
+				case TokenType.XOR: return Dyadic(ExDyadic.EFn.XOR);
+                case TokenType.CEIL: return Dyadic(ExDyadic.EFn.MAX);
+                case TokenType.FLOOR: return Dyadic(ExDyadic.EFn.MIN);
+            }
+            ExDyadic Dyadic (ExDyadic.EFn fn) {
+                inc();
+				return new ExDyadic { fn = fn, lhs = lhs, rhs = NextTerm() };
 			}
+
             return lhs;
         }
         INode NextTerm () {
-            Read:
+			ExMonadic Monadic(ExMonadic.EFn fn) {
+				inc();
+				return new ExMonadic { fn = fn, rhs = NextTerm() };
+			}
+			Read:
             switch(tokenType) {
 				/*
 				case TokenType.SWIRL:
 					inc();
 					return new ExPointer { dest = NextTerm() };
                 */
-
-				case TokenType.IOTA:
-                    inc();
-                    return (ExInvoke.Fn($"{(char)TokenType.IOTA}", NextTerm()));
-
+				case TokenType.IOTA:    return Monadic(ExMonadic.EFn.IOTA);
+				case TokenType.NOT:     return Monadic(ExMonadic.EFn.NOT);
+                case TokenType.FLOOR:   return Monadic(ExMonadic.EFn.FLOOR);
+				case TokenType.CEIL:    return Monadic(ExMonadic.EFn.CEIL);
 				case TokenType.MINUS:{
 					inc();
                         switch(tokenType) {
@@ -3188,8 +3186,28 @@ namespace Oblivia {
             }
         }
     }
-    public class ExMonadic {
+    public class ExMonadic :INode {
         public INode rhs;
+        public EFn fn;
+		public object Eval (IScope ctx) {
+            var r = rhs.Eval(ctx);
+
+            switch(fn) {
+                case EFn.IOTA:
+                    return Enumerable.Range(0, (int)r);
+                case EFn.NOT:
+                    return !(bool)r;
+                default:throw new Exception();
+            }
+		}
+
+		public enum EFn {
+            ERR,
+            IOTA,
+            NOT,
+            FLOOR,
+            CEIL
+        }
     }
     public class ExDyadic : INode {
         public INode lhs;
@@ -3241,6 +3259,11 @@ namespace Oblivia {
             AND,
             OR,
             XOR,
+
+            MAX,
+            MIN,
+            FRONT,
+            BACK
 
             };
     }
@@ -3761,18 +3784,21 @@ namespace Oblivia {
         PERCENT = '%',
         HASH = '#',
         REPEAT = '¨',
-		FLOOR = '⌊',
 		TIMES = '×',
 		IOTA = 'ɩ',
         DIVIDE = '÷',
 
-        NOT= '¬',
-        INV_QUESTION = '¿',
+        DIVIDES = '∣',
+        CEIL = '⌈',
+		FLOOR = '⌊',
+
+
+
+		INV_QUESTION = '¿',
 
 		NOT_EQUAL = '≠',
         APPROX_EQUAL = '≈',
-        EQUIV = '≡',
-        NOT_EQUIV = '≢',
+        EQUIV = '≡', NOT_EQUIV = '≢',
         INF = '∞',
         INTERSECT = '∩',
         INTEGRAL = '∫',
@@ -3822,6 +3848,7 @@ namespace Oblivia {
 
         DELTA = 'Δ',
 
+        NOT = '¬',
 		OR = '∨',
 		AND = '∧',
 		XOR = '⊻',

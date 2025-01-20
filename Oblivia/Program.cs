@@ -1682,6 +1682,12 @@ namespace Oblivia {
             inc();
             var t = tokenType;
             switch(t) {
+
+                case TokenType.QUESTION:
+                    inc();
+                    var branches = NextTerm();
+                    throw new Exception();
+
                 case TokenType.SHOUT: {
                         inc();
                         var result = NextExpr();

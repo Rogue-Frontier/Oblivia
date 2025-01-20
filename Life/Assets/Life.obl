@@ -2,14 +2,10 @@
     print:Console/WriteLine
     Life:class {
         width:i4 height:i4 grid:Grid.bit
-        mod(n:i4 max:i4):
-            (%: (<: n 0) ?+ (+:n max) ?- n max)
-        at(x:i4 y:i4):
-            grid(mod .| [x:width y:height] | i4)
-        get(x:i4 y:i4):
-            at(x y)/Get()
-        set(x:i4 y:i4 b:bit):
-            at(x y)/Set.b
+        mod(n:i4 max:i4):       (%: (<: n 0) ?+ (+:n max) ?- n max)
+        at(x:i4 y:i4):          grid(mod .| [x:width y:height] | i4)
+        get(x:i4 y:i4):         at(x y)/Get()
+        set(x:i4 y:i4 b:bit):   at(x y)/Set(b)
         new(width:i4 height:i4): Life {
             {width height} := ^^,
             grid := Grid.bit/ctor(width height)
@@ -17,8 +13,7 @@
         }
         debug(): {
             print *| cat *| [
-                ["width: " width],
-                ["height: " height]
+                ["width: " width], ["height: " height]
             ]
         }
         activeCount:0
@@ -37,18 +32,18 @@
                     ] yes)
                     active:
                         g(x y) ..
-                        _??((<:c 2)∨(>:c 3)??(no _), (=:c 3)??(yes _))
-                    #   _ ?+
-                    #       (<:c 2)∨(>:c 3) ?+ no ?- _ ?-
-                    #       (=:c 3) ?+ yes ?- _
-                    set(x y active)
-                    activeCount := active??((+:_ 1) _)
-                    str_append(txt active??("+" "-"))
-                }
+                        _ ?+
+                            (<:c 2)∨(>:c 3) ?+ no ?- _ ?-
+                            (=:c 3) ?+ yes ?- _
+                    
+                    #   _??((<:c 2)∨(>:c 3)??(no _), (=:c 3)??(yes _))
 
+                    set(x y active)
+                    activeCount := active ?+ (+:_ 1) ?- _
+                    str_append(txt active ?+ "+" ?- "-")
+                }
                 # active ?+ "+" ?- "-"
                 # active ??("+" "-")
-
                 str_append(txt newline)
             }
             print*cat["active: " activeCount]

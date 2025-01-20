@@ -30,14 +30,8 @@
                         w:y     e:y 
                         w:s x:s e:s 
                     ] yes)
-                    active:
-                        g(x y) ..
-                        _ ?+
-                            (<:c 2)∨(>:c 3) ?+ no ?- _ ?-
-                            (=:c 3) ?+ yes ?- _
-                    
-                    #   _??((<:c 2)∨(>:c 3)??(no _), (=:c 3)??(yes _))
-
+                    active:g(x y).._?+(<:c 2)∨(>:c 3)?+no?-_?-(=:c 3)?+yes?-_
+                    #   _??((<:c 2)∨(>:c 3)??(no _),(=:c 3)??(yes _))
                     set(x y active)
                     activeCount := active ?+ (+:_ 1) ?- _
                     str_append(txt active ?+ "+" ?- "-")

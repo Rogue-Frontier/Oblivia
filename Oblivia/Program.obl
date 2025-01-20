@@ -1,30 +1,29 @@
 {
+	
 	ValError: class {
 		msg: str
-		new: ?(msg:str): _class {
-			msg := ^^msg
-		}
 	}
 	ValRef: class {
 	
 	}
-
-	ValConstructor: rec(t:Type)
-	ValInstanceMethod: rec(src:obj key:str) {
-		Call: ?(data:Row.obj): obj*{
+	ValConstructor: class {
+		t:Type
+	}
+	ValInstanceMethod: class {
+		src:obj key:str
+		Call(data:Row.obj): obj*{
 			
 		}
 	}
-	ValStaticMethod: rec(src:Type key:str){
-		
+	ValStaticMethod: class {
+		src:Type key:str
 	}
-
-	ValReturn: rec(data:obj up:i8) {
-		Up: ?(): up = 1 ?+ data ?- copy.ValReturn { up: subi(up 1) }
+	ValReturn: class {
+		data:obj up:i8
+		Up(): up = 1 ?+ data ?- copy.ValReturn { up: subi(up 1) }
 	}
-	ValYield: rec(data:obj)
-
-	ValKeyword: enum(
+	ValYield: class{data:obj}
+	ValKeyword: enum{
 		CLASS INTERFACE ENUM
 		GET SET PROP
 		MIMIC IMPLEMENT INHERIT
@@ -51,6 +50,5 @@
 		FN
 		NAME
 		PUB PRIV STATIC MACRO
-	
-	)
+	}
 }

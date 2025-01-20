@@ -240,12 +240,24 @@ gridCtrl: UI/create(\"canvasGrid\", {
 		}
 
 
-		fff: (+:1 2)
+		fff: (+:1 2 3)
 		print.fff
 		^:fff
 
 
 		range(0 6) | ?(i) run()
+
+		0-6
+
+		
+		#0 >< 6
+		
+
+		foo(bar:out(int)): {
+			bar := 2
+		}
+
+
 		print.result
 		/*
 		m1: Lexer/lex("divi(1 2)")
@@ -343,12 +355,17 @@ gridCtrl: UI/create(\"canvasGrid\", {
 			end := arr_mk(i4 src/Length)
 			good ?% step()
 			#print."DONE"
-			^: StrDex{ (src end) := ^^^^/(src end) }
+			^: StrDex{ {src end} := ^^^^ }
 		}
-
 		new(s:str): Lexer { src := s }
-
 		lex(s:str): Lexer/new(s)/read()
-
+	}
+	Option(T): enum {
+		Some(T)
+		None
+	}
+	Either(L R): enum {
+		Left(L)
+		Right(R)
 	}
 }

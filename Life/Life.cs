@@ -95,6 +95,6 @@ global.locals = new() {
 	["Dictionary"] = Val((Type key, Type val) => typeof(Dictionary<,>).MakeGenericType(key, val)),
 	["StringBuilder"] = typeof(StringBuilder)
 };
-var result = (VDictScope)scope.StagedApply(global);
-var r = (result.locals["main"] as VFn).CallData(result, ["program"]);
+var result = (VDictScope)scope.StagedApply(Std.std);
+var r = (result.locals["main"] as VFn).CallPars(result, ExTuple.Val("program"));
 return;

@@ -8,6 +8,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Net.WebSockets;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -19,155 +20,154 @@ using static System.Formats.Asn1.AsnWriter;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 //TODO: Remove '@' Indexer
 namespace Oblivia {
-
 	public class Std {
         public static VDictScope std;
 		static Std () {
 			T _<T> (T t) => t;
 			Type MakeGeneric (Type gen, params object[] item) => gen.MakeGenericType(item.Select(i => i switch { Type t => t, _ => typeof(object) }).ToArray());
-			std = new VDictScope {
-				locals = new() {
-					["File"] = typeof(File),
-					["Console"] = typeof(Console),
+            std = new VDictScope {
+                locals = new() {
+                    ["File"] = typeof(File),
+                    ["Console"] = typeof(Console),
 
                     ["char"] = typeof(char),
 
-					["Pt"] = typeof((int, int)),
+                    ["Pt"] = typeof((int, int)),
 
-					["i4x2"] = _((int a, int b) => (a, b)),
+                    ["i4x2"] = _((int a, int b) => (a, b)),
 
-					["i4_f8"] = _((int i) => (double)i),
-					["f8_i4"] = _((double d) => (int)d),
-					["i4_u4"] = _((int i) => (uint)i),
-					["i4_ch"] = _((int i) => (char)i),
-					["i4_u1"] = _((int i) => (byte)i),
+                    ["i4_f8"] = _((int i) => (double)i),
+                    ["f8_i4"] = _((double d) => (int)d),
+                    ["i4_u4"] = _((int i) => (uint)i),
+                    ["i4_ch"] = _((int i) => (char)i),
+                    ["i4_u1"] = _((int i) => (byte)i),
 
-					["void"] = typeof(void),
-					["char"] = typeof(char),
-					["bit"] = typeof(bool),
+                    ["void"] = typeof(void),
+                    ["char"] = typeof(char),
+                    ["bit"] = typeof(bool),
 
-					["i8"] = typeof(long),
-					["i4"] = typeof(int),
-					["i2"] = typeof(short),
-					["i1"] = typeof(sbyte),
-					["u8"] = typeof(ulong),
-					["u4"] = typeof(uint),
-					["u2"] = typeof(ushort),
-					["u1"] = typeof(byte),
-					["f8"] = typeof(double),
-					["f4"] = typeof(float),
-					["str"] = typeof(string),
-					["obj"] = typeof(object),
-					
+                    ["i8"] = typeof(long),
+                    ["i4"] = typeof(int),
+                    ["i2"] = typeof(short),
+                    ["i1"] = typeof(sbyte),
+                    ["u8"] = typeof(ulong),
+                    ["u4"] = typeof(uint),
+                    ["u2"] = typeof(ushort),
+                    ["u1"] = typeof(byte),
+                    ["f8"] = typeof(double),
+                    ["f4"] = typeof(float),
+                    ["str"] = typeof(string),
+                    ["obj"] = typeof(object),
+
                     ["yes"] = true,
-					["no"] = false,
+                    ["no"] = false,
 
                     ["parse_char"] = _((string s) => char.Parse(s)),
 
-					["empty"] = VEmpty.VALUE,
-					["default"] = _((Type t) => t.IsValueType ? Activator.CreateInstance(t) : null),
-					["addi"] = _((int a, int b) => a + b),
-					["addu"] = _((uint a, uint b) => a + b),
-					["subi"] = _((int a, int b) => a - b),
-					["muli"] = _((int a, int b) => a * b),
-					["divi"] = _((int a, int b) => a / b),
-					["modi"] = _((int a, int b) => a % b),
-					["xori"] = _((int a, int b) => a ^ b),
-					["mini"] = _((int a, int b) => Math.Min(a, b)),
-					["maxi"] = _((int a, int b) => Math.Max(a, b)),
-					["ori"] = _((int a, int b) => a | b),
-					["sl"] = _((int a, int b) => a << b),
-					["sr"] = _((int a, int b) => a >> b),
-					["addf"] = _((double a, double b) => a + b),
-					["subf"] = _((double a, double b) => a - b),
-					["mulf"] = _((double a, double b) => a * b),
-					["divf"] = _((double a, double b) => a / b),
-					["modf"] = _((double a, double b) => Math.IEEERemainder(a, b) + b / 2),
-					["minf"] = _((double a, double b) => Math.Min(a, b)),
-					["maxf"] = _((double a, double b) => Math.Max(a, b)),
+                    ["empty"] = VEmpty.VALUE,
+                    ["default"] = _((Type t) => t.IsValueType ? Activator.CreateInstance(t) : null),
+                    ["addi"] = _((int a, int b) => a + b),
+                    ["addu"] = _((uint a, uint b) => a + b),
+                    ["subi"] = _((int a, int b) => a - b),
+                    ["muli"] = _((int a, int b) => a * b),
+                    ["divi"] = _((int a, int b) => a / b),
+                    ["modi"] = _((int a, int b) => a % b),
+                    ["xori"] = _((int a, int b) => a ^ b),
+                    ["mini"] = _((int a, int b) => Math.Min(a, b)),
+                    ["maxi"] = _((int a, int b) => Math.Max(a, b)),
+                    ["ori"] = _((int a, int b) => a | b),
+                    ["sl"] = _((int a, int b) => a << b),
+                    ["sr"] = _((int a, int b) => a >> b),
+                    ["addf"] = _((double a, double b) => a + b),
+                    ["subf"] = _((double a, double b) => a - b),
+                    ["mulf"] = _((double a, double b) => a * b),
+                    ["divf"] = _((double a, double b) => a / b),
+                    ["modf"] = _((double a, double b) => Math.IEEERemainder(a, b) + b / 2),
+                    ["minf"] = _((double a, double b) => Math.Min(a, b)),
+                    ["maxf"] = _((double a, double b) => Math.Max(a, b)),
 
-					["not"] = _((bool b) => !b),
-					["and"] = _((object[] a) => a.All(a => (bool)a)),
-					["or"] = _((object[] a) => a.Any(a => (bool)a)),
+                    ["not"] = _((bool b) => !b),
+                    ["and"] = _((object[] a) => a.All(a => (bool)a)),
+                    ["or"] = _((object[] a) => a.Any(a => (bool)a)),
 
-					["nullor"] = _((object a, object b) => a ?? b),
+                    ["nullor"] = _((object a, object b) => a ?? b),
 
-					["count"] = _((IEnumerable data, object value) => data.Cast<object>().Count(d => {
-						var result = d.Equals(value);
-						return result;
-					})),
-					["gt"] = _((double a, double b) => a > b),
-					["geq"] = _((double a, double b) => a >= b),
-					["lt"] = _((double a, double b) => a < b),
-					["leq"] = _((double a, double b) => a <= b),
+                    ["count"] = _((IEnumerable data, object value) => data.Cast<object>().Count(d => {
+                        var result = d.Equals(value);
+                        return result;
+                    })),
+                    ["gt"] = _((double a, double b) => a > b),
+                    ["geq"] = _((double a, double b) => a >= b),
+                    ["lt"] = _((double a, double b) => a < b),
+                    ["leq"] = _((double a, double b) => a <= b),
 
-					["bt"] = _((double a, double b, double c) => a > b && a < c),
-					["beq"] = _((double a, double b, double c) => a >= b && a <= c),
+                    ["bt"] = _((double a, double b, double c) => a > b && a < c),
+                    ["beq"] = _((double a, double b, double c) => a >= b && a <= c),
 
-					["eq"] = _((object a, object b) => Equals(a, b)),
-					["neq"] = _((object a, object b) => !Equals(a, b)),
+                    ["eq"] = _((object a, object b) => Equals(a, b)),
+                    ["neq"] = _((object a, object b) => !Equals(a, b)),
 
-					["cat"] = _((object[] o) => string.Join(null, o)),
-					["range"] = _((int a, int b) => Enumerable.Range(a, b - a).ToArray()),
-					["newline"] = "\n",
-					["obj_str"] = _((object o) => o.ToString()),
+                    ["cat"] = _((object[] o) => string.Join(null, o)),
+                    ["range"] = _((int a, int b) => Enumerable.Range(a, b - a).ToArray()),
+                    ["newline"] = "\n",
+                    ["obj_str"] = _((object o) => o.ToString()),
 
                     ["ch_arr"] = _((string s) => s.ToCharArray()),
 
-					["Array"] = _((Type type, int dim) =>
-                    
+                    ["Array"] = _((Type type, int dim) =>
+
                     type.MakeArrayType(dim)),
-					["arr_get"] = _((Array a, int[] ind) => a.GetValue(ind)),
-					["arr_set"] = _((Array a, int[] ind, object value) => a.SetValue(value, ind)),
-					["arr_at"] = _((Array a, int[] ind) => new ValRef { src = a, index = ind }),
+                    ["arr_get"] = _((Array a, int[] ind) => a.GetValue(ind)),
+                    ["arr_set"] = _((Array a, int[] ind, object value) => a.SetValue(value, ind)),
+                    ["arr_at"] = _((Array a, int[] ind) => new ValRef { src = a, index = ind }),
                     ["arr_mk"] = _((Type t, int l) => Array.CreateInstance(t, l)),
-                    
+
                     ["str_append"] = _((StringBuilder sb, object o) => sb.Append(o)),
-                    
-                    
+
+
                     ["append"] = _((string a, string b) => a + b),
-					["append_ch"] = _((string a, char b) => a + b),
-					["row_from"] = _((Type t, object[] items) => {
-						var result = Array.CreateInstance(t, items.Length);
-						Array.Copy(items, result, items.Length);
-						return result;
-					}),
-					["rand_bool"] = _(() => new Random().Next(2) == 1),
-					["randf"] = _(new Random().NextDouble),
-					["rand_range"] = _((int a, int b) => new Random().Next(a, b)),
-					["Row"] = _((object type) => (type is Type t ? t : typeof(object)).MakeArrayType(1)),
-					["Grid"] = _((Type type) => type.MakeArrayType(2)),
-					["List"] = _((object item) => MakeGeneric(typeof(List<>), item)),
-					["HashSet"] = _((object item) => MakeGeneric(typeof(HashSet<>), item)),
-					["Dict"] = _((Type key, Type val) => typeof(Dictionary<,>).MakeGenericType(key, val)),
-					["ConcDict"] = _((Type key, Type val) => typeof(ConcurrentDictionary<,>).MakeGenericType(key, val)),
-					["StrBuild"] = typeof(StringBuilder),
-					["Fn"] = typeof(VFn),
-					["PQ"] = _((object a, object b) => MakeGeneric(typeof(PriorityQueue<,>), a, b)),
+                    ["append_ch"] = _((string a, char b) => a + b),
+                    ["row_from"] = _((Type t, object[] items) => {
+                        var result = Array.CreateInstance(t, items.Length);
+                        Array.Copy(items, result, items.Length);
+                        return result;
+                    }),
+                    ["rand_bool"] = _(() => new Random().Next(2) == 1),
+                    ["randf"] = _(new Random().NextDouble),
+                    ["rand_range"] = _((int a, int b) => new Random().Next(a, b)),
+                    ["Row"] = _((object type) => (type is Type t ? t : typeof(object)).MakeArrayType(1)),
+                    ["Grid"] = _((Type type) => type.MakeArrayType(2)),
+                    ["List"] = _((object item) => MakeGeneric(typeof(List<>), item)),
+                    ["HashSet"] = _((object item) => MakeGeneric(typeof(HashSet<>), item)),
+                    ["Dict"] = _((Type key, Type val) => typeof(Dictionary<,>).MakeGenericType(key, val)),
+                    ["ConcDict"] = _((Type key, Type val) => typeof(ConcurrentDictionary<,>).MakeGenericType(key, val)),
+                    ["StrBuild"] = typeof(StringBuilder),
+                    ["Fn"] = typeof(VFn),
+                    ["PQ"] = _((object a, object b) => MakeGeneric(typeof(PriorityQueue<,>), a, b)),
                     ["default"] = ValKeyword.DEFAULT,
-					["class"] = ValKeyword.CLASS,
-					["interface"] = ValKeyword.INTERFACE,
-					["ext"] = ValKeyword.EXTEND,
-					["enum"] = ValKeyword.ENUM,
-					["get"] = ValKeyword.GET,
-					["set"] = ValKeyword.SET,
-					["impl"] = ValKeyword.IMPLEMENT,
-					["inherit"] = ValKeyword.INHERIT,
-					["cut"] = ValKeyword.BREAK,
-					["skip"] = ValKeyword.CONTINUE,
-					["cancel"] = ValKeyword.CANCEL,
-					["ret"] = ValKeyword.RETURN,
-					["var"] = ValKeyword.VAR,
-					["yield"] = ValKeyword.YIELD,
-					["unmask"] = ValKeyword.UNALIAS,
-					["declare"] = ValKeyword.DECLARE,
-					["complement"] = ValKeyword.COMPLEMENT,
-					["any"] = ValKeyword.ANY,
-					["all"] = ValKeyword.ALL,
-					["fmt"] = ValKeyword.FMT,
-					["regex"] = ValKeyword.REGEX,
-					["replace"] = ValKeyword.REPLACE,
-					["macro"] = ValKeyword.MACRO,
+                    ["class"] = ValKeyword.CLASS,
+                    ["interface"] = ValKeyword.INTERFACE,
+                    ["ext"] = ValKeyword.EXTEND,
+                    ["enum"] = ValKeyword.ENUM,
+                    ["get"] = ValKeyword.GET,
+                    ["set"] = ValKeyword.SET,
+                    ["impl"] = ValKeyword.IMPLEMENT,
+                    ["inherit"] = ValKeyword.INHERIT,
+                    ["cut"] = ValKeyword.BREAK,
+                    ["skip"] = ValKeyword.CONTINUE,
+                    ["cancel"] = ValKeyword.CANCEL,
+                    ["ret"] = ValKeyword.RETURN,
+                    ["var"] = ValKeyword.VAR,
+                    ["yield"] = ValKeyword.YIELD,
+                    ["unmask"] = ValKeyword.UNALIAS,
+                    ["declare"] = ValKeyword.DECLARE,
+                    ["complement"] = ValKeyword.COMPLEMENT,
+                    ["any"] = ValKeyword.ANY,
+                    ["all"] = ValKeyword.ALL,
+                    ["fmt"] = ValKeyword.FMT,
+                    ["regex"] = ValKeyword.REGEX,
+                    ["replace"] = ValKeyword.REPLACE,
+                    ["macro"] = ValKeyword.MACRO,
                     ["magic"] = ValKeyword.MAGIC,
                     ["label"] = ValKeyword.LABEL,
                     ["go"] = ValKeyword.GO,
@@ -181,11 +181,13 @@ namespace Oblivia {
                     ["xml"] = ValKeyword.XML,
                     ["json"] = ValKeyword.JSON,
                     ["math"] = ValKeyword.MATH,
-				}
-			};
+
+
+                    ["ɩ"] = _((int i) => Enumerable.Range(0, i))
+                }
+            };
 		}
 	}
-
     public class ValMagic();
 	public class VError {
         public string msg;
@@ -194,13 +196,10 @@ namespace Oblivia {
             this.msg = msg;
         }
     }
-
-
     public record VIndex {
         public Action<object> Set;
         public Func<object> Get;
     }
-
     public record ValRef {
         public Array src;
         public int[] index;
@@ -230,6 +229,8 @@ namespace Oblivia {
     public enum ValKeyword {
         CLASS,INTERFACE,ENUM,
         GET,SET,PROP,
+
+        FALL,
 
         DEFAULT,
         MIMIC,
@@ -263,7 +264,6 @@ namespace Oblivia {
         MAKE,
         PUB, PRIV, STATIC, MACRO, TEMPLATE,
 
-
         FIELDS_OF,METHODS_OF,MEMBERS_OF,
         ATTR,
         MARK,
@@ -287,6 +287,8 @@ namespace Oblivia {
         //immutable
         VAL,
 
+        EMBED,
+
         //Create a label
         LABEL,
         //Go to label
@@ -297,6 +299,8 @@ namespace Oblivia {
         NOP,
         //Creates a magic constant e.g. null
         MAGIC,
+
+        TYPEOF,
 
         //Provides multiple values for tuple
         DECONSTRUCT,
@@ -334,7 +338,7 @@ namespace Oblivia {
         public bool hide;
         public IType type;
         public object val;
-        public bool init;
+        public bool ready;
     }
     public class ValAuto { }
     public class FnTicket {
@@ -362,6 +366,10 @@ namespace Oblivia {
     //Any methods called will return the complement of the result
     public class VComplement {
         public object on;
+    }
+    public record VFnPattern {
+        public VFn filter;
+
     }
     public record ValPattern { }
 	public record VGo {
@@ -404,7 +412,7 @@ namespace Oblivia {
                 case ExUpKey es:
 					return es.Assign(ctx, getNext);
 				case ExTuple et:
-                    return StAssignMulti.Assign(ctx, et.items.Select(i => (ExUpKey)(i.value)).ToArray(), getNext());
+                    return StAssignMulti.AssignTuple(ctx, et.items.Select(i => (ExUpKey)(i.value)).ToArray(), getNext());
             }
             throw new Exception();
         }
@@ -453,16 +461,16 @@ namespace Oblivia {
         }
         private void InitPars(IScope ctx) {
 			foreach(var (k, v) in pars.items) {
-				StDefKey.Init(ctx, k, v);
+				StDefKey.Define(ctx, k, v);
 			}
 		}
         public object CallPars (IScope caller_ctx, ExTuple pars) {
-            return CallFunc(caller_ctx, () => pars.EvalTuple(caller_ctx));
+            return CallFunc(() => pars.EvalTuple(caller_ctx));
         }
-        public object CallArgs (IScope caller_ctx, VTuple args) {
-            return CallFunc(caller_ctx, () => args);
+        public object CallArgs (VTuple args) {
+            return CallFunc(() => args);
         }
-        public object CallFunc (IScope caller_ctx, Func<VTuple> evalArgs) {
+        public object CallFunc (Func<VTuple> evalArgs) {
             var func_ctx = new VFnScope(this, parent_ctx, false);
             var argData = new Args { };
             func_ctx.locals["_arg"] = argData;
@@ -486,8 +494,8 @@ namespace Oblivia {
             var result = expr.Eval(func_ctx);
             return result;
         }
-        public object CallVoid (IScope ctx) => CallData(ctx, []);
-        public object CallData (IScope caller_ctx, IEnumerable<object> args) => CallFunc(caller_ctx, () => new VTuple {
+        public object CallVoid (IScope ctx) => CallData([]);
+        public object CallData (IEnumerable<object> args) => CallFunc(() => new VTuple {
             items = args.Select(a => ((string) null, (object) a)).ToArray()
         });
 		private void ReadPars (IScope func_ctx, Args argData) {
@@ -496,7 +504,7 @@ namespace Oblivia {
 				var val = func_ctx.GetLocal(p.key);
 				argData.list.Add(val);
 				argData.dict[p.key] = val;
-				StDefKey.Init(func_ctx, $"_{ind}", val);
+				StDefKey.Define(func_ctx, $"_{ind}", val);
 				ind += 1;
 			}
 		}
@@ -538,7 +546,7 @@ namespace Oblivia {
         public VDictScope MakeInstance () => MakeInstance(source_ctx);
         public VDictScope MakeInstance (IScope scope) {
             var r = (VDictScope)source_expr.Eval(scope);
-            r.AddClass(this);
+            r.SetClass(this);
             return r;
         }
         public object VarBlock (IScope ctx, ExBlock block) {
@@ -546,7 +554,17 @@ namespace Oblivia {
             var r = block.Apply(new VDictScope { locals = scope.locals, parent = ctx, temp = false });
             return r;
         }
-    }
+		public void Embed (VDictScope target) {
+			foreach(var (k, v) in _static.locals) {
+				switch(k) {
+					case "_classSet" or "_interfaceSet" or "_kind":
+						continue;
+				}
+                StDefKey.Define(target, k, v);
+			}
+			target.ClassSet.Add(this);
+		}
+	}
     public interface IScope {
         public IScope parent { get; }
         public object Get (string key, int up = -1) =>
@@ -560,12 +578,12 @@ namespace Oblivia {
         public object SetAt (string key, object val, int up);
         public object SetNearest (string key, object val);
         public IScope Copy (IScope parent);
-        public VDictScope MakeTemp () => new VDictScope {
+        public VDictScope MakeTemp () => new() {
             locals = { },
             parent = this,
             temp = true
         };
-        public VDictScope MakeTemp (object _) => new VDictScope {
+        public VDictScope MakeTemp (object _) => new() {
             locals = { ["_"] = _ },
             parent = this,
             temp = true
@@ -756,7 +774,6 @@ namespace Oblivia {
          parent != null ? parent.SetNearest(key, val) :
          new VError($"Unknown variable {key}");
     }
-
     public record VFnScope : IScope {
         public VFn func;
         public bool temp = false;
@@ -808,11 +825,15 @@ namespace Oblivia {
         public ConcurrentDictionary<string, dynamic> locals = new() {};
         public HashSet<VClass> ClassSet => locals.GetOrAdd("_classSet", new HashSet<VClass>() );
 		public HashSet<VInterface> InterfaceSet => locals.GetOrAdd("_interfaceSet", new HashSet<VInterface>());
-		public void AddClass (VClass vc) {
+		public void SetClass (VClass vc) {
             locals["_class"] = vc;
             locals["_proto"] = this;
             ClassSet.Add(vc);
         }
+
+
+
+
         public bool HasClass (VClass vc) => ClassSet.Contains(vc);
 		public void AddInterface (VInterface vi) => InterfaceSet.Add(vi);
         public bool HasInterface (VInterface vi) => InterfaceSet.Contains(vi);
@@ -895,7 +916,6 @@ namespace Oblivia {
         public Parser (List<Token> tokens) {
             this.tokens = tokens;
         }
-
         public static ExBlock FromFile (string path) {
             var tokenizer = new Tokenizer(File.ReadAllText(path));
             return new Parser(tokenizer.GetAllTokens()).NextBlock();
@@ -905,7 +925,13 @@ namespace Oblivia {
         public Token currToken => tokens[index];
         public TokenType tokenType => currToken.type;
         public INode NextStatement () {
-            var lhs = NextExpression();
+            switch(tokenType) {
+				case TokenType.AT:
+					inc();
+					var att = NextTerm();
+					return new ExInvokeBlock { type = att, source_block = new ExBlock { statements = [NextStatement()] } };
+			}
+            var lhs = NextExpr();
             switch(tokenType) {
                 case TokenType.COLON:
                     inc();
@@ -927,7 +953,7 @@ namespace Oblivia {
                                                 throw new Exception();
                                             }
                                         }
-                                        return new StAssignMulti { symbols = symbols.ToArray(), value = NextExpression(), deconstruct = true };
+                                        return new StAssignMulti { symbols = symbols.ToArray(), value = NextExpr(), deconstruct = true };
                                     }
                                 default: {
                                         inc();
@@ -939,7 +965,7 @@ namespace Oblivia {
                                                 throw new Exception();
                                             }
                                         }
-                                        return new StDefMulti { lhs = symbols.ToArray(), rhs = NextExpression(), deconstruct = true };
+                                        return new StDefMulti { lhs = symbols.ToArray(), rhs = NextExpr(), deconstruct = true };
                                     }
                             }
                         //Local tuple define/assign
@@ -955,7 +981,7 @@ namespace Oblivia {
                                                 throw new Exception();
                                             }
                                         }
-                                        return new StAssignMulti { symbols = symbols.ToArray(), value = NextExpression() };
+                                        return new StAssignMulti { symbols = symbols.ToArray(), value = NextExpr() };
                                     }
                                 default: {
                                         List<string> symbols = [];
@@ -966,7 +992,7 @@ namespace Oblivia {
                                                 throw new Exception();
                                             }
                                         }
-                                        return new StDefMulti { lhs = symbols.ToArray(), rhs = NextExpression() };
+                                        return new StDefMulti { lhs = symbols.ToArray(), rhs = NextExpr() };
                                     }
                             }
                         //Local key define/assign
@@ -974,13 +1000,13 @@ namespace Oblivia {
                             switch(tokenType) {
                                 case TokenType.EQUAL:
                                     inc();
-                                    return new StAssignSymbol { symbol = es, value = NextExpression() };
+                                    return new StAssignSymbol { symbol = es, value = NextExpr() };
                                 default:
                                     switch(up) {
                                         case -1 or 1:
                                             return new StDefKey {
                                                 key = es.key,
-                                                value = NextExpression()
+                                                value = NextExpr()
                                             };
                                         default:
                                             throw new Exception("Can only define in current scope");
@@ -992,97 +1018,97 @@ namespace Oblivia {
 							throw new Exception();
                         case ExMap { expr: true, map: ExUpKey euk } em:
 							throw new Exception();
-
-
 						//Return
 						case ExSelf { up: { } up }:
-							return new StReturn { val = NextExpression(), up = up };
+							return new StReturn { val = NextExpr(), up = up };
 						case ExInvoke { expr: ExUpKey { up: { } up, key: { } key }, args: { } args }:
                             switch(up) {
                                 case -1 or 1:
-                                    return new StDefFunc {
+                                    return new StDefFn {
                                         key = key,
                                         pars = args.ParTuple(),
-                                        value = NextExpression()
+                                        value = NextExpr()
                                     };
                                 default:
                                     throw new Exception("Cannot define non-local function");
                             }
                         //Self call tuple
                         case ExInvoke { expr: ExSelf { up: 1 or -1 }, args: ExTuple et }:
-                            return new StDefFunc {
+                            return new StDefFn {
                                 key = "_call",
                                 pars = et,
-                                value = NextExpression()
+                                value = NextExpr()
                             };
                         default:
                             switch(tokenType) {
                                 case TokenType.EQUAL: {
                                         inc();
-                                        return new StAssignExpr { lhs = lhs, rhs = NextExpression() };
+                                        return new StAssignExpr { lhs = lhs, rhs = NextExpr() };
                                     }
                             }
                             throw new Exception("Cannot define this");
                     }
                 default:
-                    return NextExpression(lhs);
+                    return CompoundExpr(lhs);
             }
         }
-        public INode NextPattern () => NextExpression();
-        public INode NextExpression () {
+        public INode NextPattern () => NextExpr();
+        public INode NextExpr () {
             var lhs = NextTerm();
-            return NextExpression(lhs);
+            return CompoundExpr(lhs);
         }
-		public INode NextExpression (INode lhs) {
+		public INode CompoundExpr (INode lhs) {
             Start:
             switch(tokenType) {
                 case TokenType.SPACE:
                     inc();
                     goto Start;
-                case TokenType.DASH:
+                case TokenType.MINUS:
                     inc();
                     switch(tokenType) {
 						//fn type
-						case TokenType.R_ANGLE:
+						case TokenType.ANGLE_R:
                             inc();
                             switch(tokenType) {
-                                case TokenType.R_PAREN:
-                                case TokenType.R_CURLY:
-                                case TokenType.R_SQUARE:
-                                case TokenType.R_ANGLE:
+                                case TokenType.TUPLE_R:
+                                case TokenType.BLOCK_R:
+                                case TokenType.ARRAY_R:
+                                case TokenType.ANGLE_R:
                                     return new ExFnType { lhs = lhs };
-                                default:
-									var rhs = NextExpression();
-									return NextExpression(new ExFnType { lhs = lhs, rhs = rhs });
+                                default: {
+										var rhs = NextExpr();
+										return CompoundExpr(new ExFnType { lhs = lhs, rhs = rhs });
+									}
 							}
-                        default:
-                            var to = NextExpression();
-                            return NextExpression(new ExRange { rhs = to });
+                        default: {
+								var rhs = NextExpr();
+								return CompoundExpr(new ExRange { lhs = lhs, rhs = rhs });
+							}
                     }
                     break;
-                case TokenType.L_CURLY:
-                    return NextExpression(new ExInvokeBlock { type = lhs, source_block = NextBlock() });
+                case TokenType.BLOCK_L:
+                    return CompoundExpr(new ExInvokeBlock { type = lhs, source_block = NextBlock() });
                 case TokenType.PIPE: {
                         inc();
                         switch(tokenType) {
-                            case TokenType.SPARK:
+                            case TokenType.STAR:
                                 inc();
-                                return NextExpression(new ExMap { src = lhs, map = new ExInvoke { expr = new ExSelf { up = 1 }, args = ExTuple.SingleExpr(NextExpression())  } , expr = true});
-                            case TokenType.DOT:
+                                return CompoundExpr(new ExMap { src = lhs, map = new ExInvoke { expr = new ExSelf { up = 1 }, args = ExTuple.Expr(NextExpr())  } , expr = true});
+                            case TokenType.PERIOD:
 								inc();
-								return NextExpression(new ExMap { src = lhs, map = new ExInvoke { expr = new ExSelf { up = 1 }, args = ExTuple.SingleExpr(NextTerm()) }, expr = true });
+								return CompoundExpr(new ExMap { src = lhs, map = new ExInvoke { expr = new ExSelf { up = 1 }, args = ExTuple.Expr(NextTerm()) }, expr = true });
 							case TokenType.SLASH:
 								inc();
-								return NextExpression(new ExMap { src = lhs, map = NextExpression(), expr = true });
+								return CompoundExpr(new ExMap { src = lhs, map = NextExpr(), expr = true });
                             default: {
                                     var cond = default(INode);
                                     var type = default(INode);
                                     switch(tokenType) {
-                                        case TokenType.L_ANGLE: {
+                                        case TokenType.ANGLE_L: {
                                                 inc();
-                                                cond = NextExpression();
+                                                cond = NextExpr();
                                                 switch(tokenType) {
-                                                    case TokenType.R_ANGLE:
+                                                    case TokenType.ANGLE_R:
                                                         inc();
                                                         break;
                                                     default:
@@ -1094,58 +1120,70 @@ namespace Oblivia {
                                     switch(tokenType) {
                                         case TokenType.COLON: {
                                                 inc();
-                                                type = NextExpression();
+                                                type = NextExpr();
                                                 break;
                                             }
                                     }
-                                    return NextExpression(new ExMap { src = lhs, cond = cond, type = type, map = NextTerm() });
+                                    return CompoundExpr(new ExMap { src = lhs, cond = cond, type = type, map = NextTerm() });
                                 }
 						}
                     }
-                case TokenType.L_PAREN: {
+                case TokenType.TUPLE_L: {
                         inc();
-                        return NextExpression(new ExInvoke { expr = lhs, args = NextArgTuple() });
+                        return CompoundExpr(new ExInvoke { expr = lhs, args = NextArgTuple() });
                     }
-                case TokenType.SPARK: {
+                case TokenType.STAR: {
 						inc();
                         switch(tokenType) {
                             case TokenType.PIPE:
                                 inc();
-								return NextExpression(new ExMap {
-									src = NextExpression(),
+								return CompoundExpr(new ExMap {
+									src = NextExpr(),
 									map = lhs,
 								});
                             default:
-								return NextExpression(new ExInvoke {
+								return CompoundExpr(new ExInvoke {
 									expr = lhs,
-									args = ExTuple.SpreadExpr(NextExpression()),
+									args = ExTuple.SpreadExpr(NextExpr()),
 								});
 						}
 					}
-                case TokenType.DOT: {
+                case TokenType.PERIOD: {
                         inc();
                         switch(tokenType) {
                             case TokenType.PIPE:
                                 inc();
-								return NextExpression(new ExMap {
+								return CompoundExpr(new ExMap {
 									src = NextTerm(),
 									map = lhs,
 								});
-                            default:
-								return NextExpression(new ExInvoke { expr = lhs, args = ExTuple.SpreadExpr(NextTerm()) });
+                            case TokenType.PERIOD:
+								inc();
+								return CompoundExpr(new ExTemp { lhs = lhs, rhs = NextExpr() });
+							default:
+								return CompoundExpr(new ExInvoke { expr = lhs, args = ExTuple.SpreadExpr(NextTerm()) });
 						}
                     }
                 case TokenType.SHOUT: {
                         inc();
-                        return NextExpression(new ExInvoke { expr = lhs, args = ExTuple.Empty });
+                        return CompoundExpr(new ExInvoke { expr = lhs, args = ExTuple.Empty });
                     }
                 case TokenType.PERCENT: {
                         inc();
-                        return NextExpression(new ExSpread { value = lhs });
+                        switch(tokenType) {
+                            case TokenType.PLUS:
+                                //Accumulator
+                                return CompoundExpr(new ExSeqOp { fn = lhs, op = ExSeqOp.EOp.Reduce });
+                            case TokenType.MINUS:
+                                //Sliding window
+                                return CompoundExpr(new ExSeqOp { fn=lhs, op = ExSeqOp.EOp.SlidingWindow });
+                            default:
+								return CompoundExpr(new ExSpread { value = lhs });
+						}
                     }
                 case TokenType.EQUAL: {
                         inc();
-                        var Eq = (bool invert) => NextExpression(new ExEqual {
+                        var Eq = (bool invert) => CompoundExpr(new ExEqual {
                             lhs = lhs,
                             rhs = NextTerm(),
                             invert = invert
@@ -1155,27 +1193,53 @@ namespace Oblivia {
                                     inc();
                                     return Eq(false);
                                 }
-                            case TokenType.DASH: {
+                            case TokenType.MINUS: {
                                     inc();
                                     return Eq(true);
                                 }
-                            case TokenType.R_ANGLE:{
-                                var rhs = NextExpression();
-                                    return NextExpression(new ExFn { pars = (ExTuple)lhs, result = rhs });
+                            case TokenType.ANGLE_R:{
+                                var rhs = NextExpr();
+                                    return CompoundExpr(new ExFn { pars = (ExTuple)lhs, result = rhs });
+								}
+							case TokenType.TUPLE_L: {
+                                    var tup = NextTupleOrLisp();
+									throw new Exception("Impl tuple match");
+								}
+                            case TokenType.ARRAY_L: {
+                                    var arr = NextArrayOrLisp();
+									throw new Exception("Impl array match");
+								}
+							case TokenType.BLOCK_L: {
+                                    //Structure match
+                                    var block = (ExBlock)NextExpr();
+                                    foreach(var ex in block.statements) {
+                                        switch(ex) {
+                                            case ExIs:
+                                            case ExIsAssign:
+                                            case ExInvoke:
+                                            case ExInvokeBlock:
+                                            case StDefKey:
+                                                continue;
+                                            default:
+
+                                                throw new Exception("Unsupported");
+                                        }
+                                    }
+                                    throw new Exception("Impl structure match");
                                 }
                             case TokenType.COLON: {
                                     var rhs = NextTerm();
-                                    return NextExpression(new ExIsAssign { lhs = lhs, rhs = rhs });
+                                    return CompoundExpr(new ExIsAssign { lhs = lhs, rhs = rhs });
                                 }
                             default:{
-                                var pattern = NextExpression();
+                                var pattern = NextExpr();
                                 switch(tokenType) {
                                     case TokenType.COLON:
                                         inc();
                                         var symbol = NextSymbol();
-                                        return NextExpression( new ExIs { lhs = lhs, rhs = pattern, key = symbol.key });
+                                        return CompoundExpr( new ExIs { lhs = lhs, rhs = pattern, key = symbol.key });
                                     default:
-                                        return NextExpression( new ExIs{ lhs = lhs, rhs = pattern, key = "_"});
+                                        return CompoundExpr( new ExIs{ lhs = lhs, rhs = pattern, key = "_"});
                                 }
                                     throw new Exception();
                                 }
@@ -1185,92 +1249,79 @@ namespace Oblivia {
                 case TokenType.SLASH: {
                         inc();
                         switch(tokenType) {
+                            case TokenType.PIPE:
+                                inc();
+                                var fn = NextTerm();
+                                return CompoundExpr(new ExFn {
+                                    pars = ExTuple.Empty,
+                                    result = new ExInvoke {
+                                        expr = fn,
+                                        args = ExTuple.Expr(lhs)
+                                    }
+                                });
                             case TokenType.SLASH:
                                 inc();
                                 //INDEXER
-                                return NextExpression(new ExAt { src = lhs, index = [NextTerm()] });
-                            case TokenType.SPARK:
-								return NextExpression(new ExAt { src = lhs, index = [NextExpression()] });
-							case TokenType.DOT:
-								return NextExpression(new ExAt { src = lhs, index = [NextTerm()] });
+                                return CompoundExpr(new ExAt { src = lhs, index = [NextTerm()] });
+                            case TokenType.STAR:
+                                inc();
+								return CompoundExpr(new ExAt { src = lhs, index = [NextExpr()] });
+							case TokenType.PERIOD:
+                                inc();
+								return CompoundExpr(new ExAt { src = lhs, index = [NextTerm()] });
 							case TokenType.NAME:
                                 var name = currToken.str;
                                 inc();
-                                return NextExpression(new ExMemberKey { src = lhs, key = name });
+                                return CompoundExpr(new ExMemberKey { src = lhs, key = name });
                             case TokenType.INTEGER:
                                 var num = currToken.str;
                                 inc();
-                                return NextExpression(new ExMemberDigit { src = lhs, num = num });
+                                return CompoundExpr(new ExMemberDigit { src = lhs, num = num });
                                 throw new Exception();
-                            case TokenType.L_CURLY:
-                                return NextExpression(new ExMemberBlock { lhs = lhs, rhs = (ExBlock)NextExpression(), local = false });
+                            case TokenType.BLOCK_L:
+                                return CompoundExpr(new ExMemberBlock { lhs = lhs, rhs = (ExBlock)NextExpr(), local = false });
                             default:
-                                return NextExpression(new ExMemberExpr { lhs = lhs, rhs = NextExpression(), local = true });
+                                return CompoundExpr(new ExMemberExpr { lhs = lhs, rhs = NextExpr(), local = true });
                         }
                     }
-                    /*
-                case TokenType.SWIRL: {
+                case TokenType.ARRAY_L: {
+                        var arr = (ExSeq)NextArrayOrLisp();
+                        return CompoundExpr(new ExAt { src = lhs, index = arr.items });
+                    }
+                case TokenType.AT: {
+                        inc();
+                        var term = NextTerm();
+                        return CompoundExpr(new ExCompose { items = (ExTuple)NextTupleOrLisp()});
+                    }
+				case TokenType.QUESTION: {
                         inc();
                         switch(tokenType) {
                             case TokenType.PIPE:
-                                inc();
-                                return NextExpression(new ExprMap { src = NextExpression(), map = new ExprAt { src = lhs, index = [new ExprSelf { up = 1 }] }, expr = true });
-                                throw new Exception();
-                        }
-                        return NextExpression(new ExprAt { src = lhs, index = [NextTerm()] });
-                    }
-                    */
-                case TokenType.L_SQUARE: {
-                        var arr = NextArray();
-                        return NextExpression(new ExAt { src = lhs, index = arr.items });
-                    }
-                    /*
-				case (TokenType.PLUS): {
-						inc();
-						var positive = NextExpression();
-						var negative = default(INode);
-						switch(tokenType) {
-							case TokenType.DASH: {
-
-									inc();
-									negative = NextExpression();
-									break;
-								}
-						}
-						return NextExpression(new ExprBranch {
-							condition = lhs,
-							positive = positive,
-							negative = negative
-						});
-					}
-                    */
-
-				case TokenType.QUERY: {
-                        inc();
-                        switch(tokenType) {
+                                var rhs = NextExpr();
+                                return CompoundExpr(new ExFilter { lhs = lhs, rhs = rhs });
                             case TokenType.PERCENT: {
 									inc();
-									return NextExpression(new ExLoop { condition = lhs, positive = NextExpression() });
+									return CompoundExpr(new ExLoop { condition = lhs, positive = NextExpr() });
                                 }
                             case TokenType.COLON: {
                                     inc();
-                                    return new ExCriteria { item = lhs, cond = NextExpression() };
+                                    return new ExCriteria { item = lhs, cond = NextExpr() };
                                 }
-                            case TokenType.L_CURLY: {
+                            case TokenType.BLOCK_L: {
                                     inc();
                                     var items = new List<(INode cond, INode yes)> { };
                                     ReadBranch:
                                     switch(tokenType) {
-                                        case TokenType.R_CURLY:
+                                        case TokenType.BLOCK_R:
                                             inc();
-                                            return NextExpression(new ExMatchPattern {
+                                            return CompoundExpr(new ExMatchPattern {
                                                 item = lhs,
                                                 branches = items
                                             });
                                     }
                                     var cond_group = new List<INode> { };
                                     ReadItem:
-                                    cond_group.Add(NextExpression());
+                                    cond_group.Add(NextExpr());
                                     /*
                                     if(cond is ExprFunc ef) {
                                      //Handle lambda
@@ -1281,7 +1332,7 @@ namespace Oblivia {
                                     switch(tokenType) {
                                         case TokenType.COLON:
                                             inc();
-                                            var yes = NextExpression();
+                                            var yes = NextExpr();
                                             foreach(var c in cond_group) {
                                                 items.Add((c, yes));
                                             }
@@ -1290,22 +1341,22 @@ namespace Oblivia {
                                             goto ReadItem;
                                     }
                                 }
-                            case TokenType.L_SQUARE: {
+                            case TokenType.ARRAY_L: {
                                     inc();
                                     INode type = null;
                                     switch(tokenType) {
                                         case TokenType.COLON:
                                             inc();
-                                            type = NextExpression();
+                                            type = NextExpr();
                                             break;
                                     }
                                     var items = new List<(INode cond, INode yes, INode no)> { };
                                     Read:
-                                    var cond = NextExpression();
+                                    var cond = NextExpr();
                                     switch(tokenType) {
                                         case TokenType.COLON: {
                                                 inc();
-                                                var yes = NextExpression();
+                                                var yes = NextExpr();
                                                 items.Add((cond, yes, null));
                                                 break;
                                             }
@@ -1313,9 +1364,9 @@ namespace Oblivia {
                                             throw new Exception();
                                     }
                                     switch(tokenType) {
-                                        case TokenType.R_SQUARE: {
+                                        case TokenType.ARRAY_R: {
                                                 inc();
-                                                return NextExpression(new ExCondSeq {
+                                                return CompoundExpr(new ExCondSeq {
                                                     type = type,
                                                     filter = lhs,
                                                     items = items
@@ -1329,15 +1380,25 @@ namespace Oblivia {
                                     inc();
                                     switch(tokenType) {
                                         case TokenType.PLUS:
-                                            return NextExpression(new ExLoop { condition = lhs, positive = NextExpression() });
+                                            inc();
+                                            return CompoundExpr(new ExLoop { condition = lhs, positive = NextExpr() });
+                                            /*
+                                        case TokenType.MINUS:
+                                            inc();
+                                            return CompoundExpr(new ExBranch {
+                                                condition = lhs,
+                                                positive = NextExpr(),
+                                                negative = NextExpr()
+                                            });
+                                            */
                                         default:
 											var positive = NextStatement();
 											var negative = default(INode);
 											switch(tokenType) {
-												case TokenType.QUERY: {
+												case TokenType.QUESTION: {
 														inc();
 														switch(tokenType) {
-															case TokenType.DASH: {
+															case TokenType.MINUS: {
 																	inc();
 																	negative = NextStatement();
 																	break;
@@ -1350,7 +1411,7 @@ namespace Oblivia {
 													}
 													break;
 											}
-											return NextExpression(new ExBranch {
+											return CompoundExpr(new ExBranch {
 												condition = lhs,
 												positive = positive,
 												negative = negative
@@ -1363,61 +1424,66 @@ namespace Oblivia {
                         }
                         break;
                     }
-            }
-            /*
-            if(t == TokenType.PERCENT) {
-             inc();
-             if(tokenType == TokenType.L_CURLY) {
-              return NextExpression(new ExprApply { lhs = lhs, rhs = NextBlock() });
-             } else {
-              //return NextExpression(new ExprApplyBlock { lhs = lhs, rhs = NextExpression() });
-              throw new Exception("Expected block");
-             }
-            }
-            */
+				case TokenType.AND: {
+                        inc();
+						var rhs = NextTerm();
+						return new ExDyadic { lhs = lhs, rhs = rhs, fn = ExDyadic.EFn.AND };
+					}
+				case TokenType.OR: {
+                        inc();
+						var rhs = NextTerm();
+						return new ExDyadic { lhs = lhs, rhs = rhs, fn = ExDyadic.EFn.OR };
+					}
+                case TokenType.XOR: {
+                        inc();
+						var rhs = NextTerm();
+						return new ExDyadic { lhs = lhs, rhs = rhs, fn = ExDyadic.EFn.XOR };
+					}
+			}
             return lhs;
         }
         INode NextTerm () {
             Read:
             switch(tokenType) {
-
 				/*
 				case TokenType.SWIRL:
 					inc();
 					return new ExPointer { dest = NextTerm() };
                 */
 
+				case TokenType.IOTA:
+                    inc();
+                    return (ExInvoke.Fn($"{(char)TokenType.IOTA}", NextTerm()));
 
-				case TokenType.DASH:{
+				case TokenType.MINUS:{
 					inc();
                         switch(tokenType) {
                             //fn type
-                            case TokenType.R_ANGLE: {
+                            case TokenType.ANGLE_R: {
                                     inc();
                                     switch(tokenType) {
-                                        case TokenType.R_PAREN:
-                                        case TokenType.R_CURLY:
-                                        case TokenType.R_SQUARE:
-                                        case TokenType.R_ANGLE:
+                                        case TokenType.TUPLE_R:
+                                        case TokenType.BLOCK_R:
+                                        case TokenType.ARRAY_R:
+                                        case TokenType.ANGLE_R:
                                             return new ExFnType{};
                                         default:
-                                            var output = NextExpression();
-                                            return NextExpression(new ExFnType {rhs = output});
+                                            var output = NextExpr();
+                                            return (new ExFnType {rhs = output});
                                     }
                                 }
-                            case TokenType.R_PAREN:
-                            case TokenType.R_CURLY:
-                            case TokenType.R_SQUARE:
+                            case TokenType.TUPLE_R:
+                            case TokenType.BLOCK_R:
+                            case TokenType.ARRAY_R:
                                 return new ExRange { };
                             default:
-                                var to = NextExpression();
-                                return NextExpression(new ExRange { rhs = to });
+                                var to = NextExpr();
+                                return (new ExRange { rhs = to });
                         }
                     }
-
-				case TokenType.L_SQUARE:
-                    return NextArray();
-                case TokenType.QUERY:
+				case TokenType.ARRAY_L:
+                    return NextArrayOrLisp();
+                case TokenType.QUESTION:
                     return NextLambda();
                 case TokenType.NAME:
                     return NextSymbol();
@@ -1427,17 +1493,17 @@ namespace Oblivia {
                     return NextString();
                 case TokenType.INTEGER:
                     return NextInteger();
-                case TokenType.L_CURLY:
+                case TokenType.BLOCK_L:
                     return NextBlock();
-                case TokenType.L_PAREN:
-                    return NextTupleOrExpression();
+                case TokenType.TUPLE_L:
+                    return NextTupleOrLisp();
                     /*
                 case TokenType.PERCENT:
                     return new ExprSpread { value= NextExpression() };
                     */
                 case TokenType.QUOTE:
                     inc();
-                    return new ExAlias { expr = NextExpression() };
+                    return new ExAlias { expr = NextExpr() };
                 case TokenType.COMMA:
                     inc();
                     goto Read;
@@ -1450,7 +1516,7 @@ namespace Oblivia {
 
 
 
-		int ReadLispOp () {
+		string ReadLispOp () {
 
 			var start = index;
 			var d = new Dictionary<string, int> {
@@ -1475,41 +1541,44 @@ namespace Oblivia {
 			ReadOp:
 			switch(tokenType) {
 				case TokenType.PLUS:
-				case TokenType.DASH:
-				case TokenType.SPARK:
+				case TokenType.MINUS:
+				case TokenType.STAR:
 				case TokenType.SLASH:
 				case TokenType.CARET:
 				case TokenType.PIPE:
-				case TokenType.AMPERSAND:
+				case TokenType.AMP:
 				case TokenType.PERCENT:
 				case TokenType.EQUAL:
+                case TokenType.ANGLE_L:
+                case TokenType.ANGLE_R:
+                case TokenType.PERIOD:
 					op += currToken.str;
 					inc();
 					goto ReadOp;
 				case TokenType.COLON:
 					if(op == "") {
-						return 0;
+						return "";
 					}
 					inc();
-					return d[op];
+					return op;
 				default:
 					index = start;
-					return 0;
+					return "";
 			}
 		}
 
-		INode NextTupleOrExpression () {
+		INode NextTupleOrLisp () {
             inc();
             var op = ReadLispOp();
-            var expr = NextExpression();
+            var expr = NextExpr();
             switch(tokenType) {
-                case TokenType.R_PAREN: {
+                case TokenType.TUPLE_R: {
                         inc();
                         return expr;
                     }
                 default:
                     var t = NextTuple(expr);
-                    if(op>0) {
+                    if(op.Any()) {
                         return new ExLisp { args = [..t.vals], op = op };
                     }
 					return t;
@@ -1517,11 +1586,11 @@ namespace Oblivia {
 		}
         ExTuple NextArgTuple () {
             switch(tokenType) {
-                case TokenType.R_PAREN:
+                case TokenType.TUPLE_R:
                     inc();
                     return ExTuple.Empty;
                 default:
-                    return NextTuple(NextExpression());
+                    return NextTuple(NextExpr());
             }
         }
         ExTuple NextTuple (INode first) {
@@ -1537,18 +1606,18 @@ namespace Oblivia {
                         break;
                 }
                 switch(tokenType) {
-                    case TokenType.R_PAREN:
+                    case TokenType.TUPLE_R:
                         inc();
                         return new ExTuple { items = items.ToArray() };
                     default:
-                        return AddEntry(NextExpression());
+                        return AddEntry(NextExpr());
                 }
             }
             void NextPair (INode lhs) {
                 switch(lhs) {
                     case ExUpKey { up: -1, key: { } key }: {
                             inc();
-                            var val = NextExpression();
+                            var val = NextExpr();
                             items.Add((key, val));
                             break;
                         }
@@ -1557,14 +1626,14 @@ namespace Oblivia {
                 }
             }
         }
-        ExSeq NextArray () {
+        INode NextArrayOrLisp () {
             List<INode> items = [];
             inc();
             INode type = null;
             switch(tokenType) {
                 case TokenType.COLON:
                     inc();
-                    type = NextExpression();
+                    type = NextExpr();
                     break;
             }
 
@@ -1573,11 +1642,11 @@ namespace Oblivia {
                 case TokenType.COMMA:
                     inc();
                     goto Check;
-                case TokenType.R_SQUARE:
+                case TokenType.ARRAY_R:
                     inc();
                     return new ExSeq { items = items, type = type };
                 default:
-                    var item = NextExpression();
+                    var item = NextExpr();
                     if(tokenType == TokenType.COLON) {
                         
                     } else {
@@ -1588,7 +1657,7 @@ namespace Oblivia {
                             var l = new List<INode> { item };
                             while(tokenType == TokenType.COLON) {
                                 inc();
-                                l.Add(NextExpression());
+                                l.Add(NextExpr());
                             }
                             var tuple = ExTuple.ListExpr(l);
                             items.Add(tuple);
@@ -1615,10 +1684,10 @@ namespace Oblivia {
             switch(t) {
                 case TokenType.SHOUT: {
                         inc();
-                        var result = NextExpression();
+                        var result = NextExpr();
                         return new ExFn { pars = ExTuple.Empty, result = result };
                     }
-                case TokenType.L_PAREN:
+                case TokenType.TUPLE_L:
                     inc();
                     var pars = NextArgTuple().ParTuple();
 					switch(tokenType) {
@@ -1626,7 +1695,7 @@ namespace Oblivia {
 							inc();
 							break;
 					}
-					var r = new ExFn { pars = pars, result = NextExpression() };
+					var r = new ExFn { pars = pars, result = NextExpr() };
                     return r;
                 default:
                     throw new Exception($"Unexpected token {t}");
@@ -1681,7 +1750,7 @@ namespace Oblivia {
             var ele = new List<INode>();
             Check:
             switch(tokenType) {
-                case TokenType.R_CURLY:
+                case TokenType.BLOCK_R:
                     inc();
                     return new ExBlock { statements = ele };
                 case TokenType.COMMA:
@@ -1694,9 +1763,16 @@ namespace Oblivia {
             throw new Exception($"Unexpected token in object expression: {currToken.type}");
         }
     }
-
-
-
+    public class ExTemp : INode {
+        public INode lhs;
+        public INode rhs;
+		public object Eval (IScope ctx) {
+            var v = lhs.Eval(ctx);
+            var sc = ctx.MakeTemp();
+            sc.locals["_"] = v;
+            return rhs.Eval(sc);
+		}
+	}
 	public class ExFnType : INode {
 		public INode lhs = ExVal.Empty;
 		public INode rhs = ExVal.Empty;
@@ -1707,8 +1783,7 @@ namespace Oblivia {
 			};
 		}
 	}
-
-	public class SuperVal {
+	public class SuperVal : LVal {
 		public (IType type, object val)[] items;
 		public void Assign (object next) {
 			foreach(var i in Enumerable.Range(0, items.Length)) {
@@ -1718,6 +1793,11 @@ namespace Oblivia {
 				}
 			}
 		}
+
+		public object Assign (IScope ctx, Func<object> getVal) {
+            Assign(getVal());
+            return this;
+		}
 	}
 	public interface IType {
 		public bool Accept (object src);
@@ -1726,18 +1806,47 @@ namespace Oblivia {
 		public IType[] lhs;
 		public IType rhs;
 		public bool Accept (object src) {
-			return (src is VFn fn);
+			return (src is VFn fn && fn.pars.vals.Zip(lhs).All(p => true));
 		}
 	}
 	public class ExRange : INode {
 		public INode lhs = ExVal.Empty;
 		public INode rhs = ExVal.Empty;
 		public object Eval (IScope ctx) {
-			return null;
+            return null;
+		}
+	}
+    public class VRange {
+        public int? start;
+        public int? end;
+        public IEnumerable<int> GetInt() {
+            for(var i = start ?? throw new Exception(); i < (end ?? throw new Exception()); i++) { yield return i; }
+        }
+    }
+    public class ExSeqOp : INode {
+        public enum EOp {
+            Reduce, SlidingWindow
+        };
+        public EOp op;
+        public INode fn;
+		public object Eval (IScope ctx) {
+			throw new NotImplementedException();
 		}
 	}
 	public class ExSpread : INode {
         public INode value;
+
+        /*
+        public IEnumerable<LVal> SpreadVals () {
+            switch(value) {
+                case ExBlock eb:
+
+                case ExTuple et:
+                case ExUpKey:
+                    case ExMemberKey
+            }
+        }
+        */
         public object Eval (IScope ctx) {
             //TODO: alias
             return Handle(value.Eval(ctx));
@@ -1802,7 +1911,7 @@ namespace Oblivia {
         public string Source => $"{type} {source_block.Source}";
         public object MakeScope (VDictScope ctx) => source_block.MakeScope(ctx);
         public object Eval (IScope ctx) {
-            var getResult = () => (object)source_block.Eval(ctx);
+            var getResult = () => source_block.Eval(ctx);
             var t = type.Eval(ctx);
 
             var getArgs = () => {
@@ -1858,7 +1967,16 @@ namespace Oblivia {
                     }
                 case ValKeyword.ENUM: {
                         var locals = new Dictionary<string, object> { };
-                        var rhs = getResult();
+                        foreach(var st in source_block.statements) {
+                            switch(st) {
+                                case ExUpKey { up: -1, key: { } k }:
+                                    locals[k] = new object();
+                                    break;
+                                case ExInvoke { expr: ExUpKey { up: -1, key: { } k } }:
+                                    locals[k] = new object();
+                                    break;
+                            }
+                        }
                         return new VDictScope { locals = [], parent = ctx, temp = false };
 					}
 				default:
@@ -1884,7 +2002,6 @@ namespace Oblivia {
             return b;
         }
     }
-
 	public class ExIsAssign : INode {
 
         public INode lhs;
@@ -1893,6 +2010,7 @@ namespace Oblivia {
             return null;
 		}
 	}
+    public class StructurePattern { }
 	public class ExIs : INode {
         public INode lhs;
         public INode rhs;
@@ -1965,9 +2083,8 @@ namespace Oblivia {
     public class VCriteria {
         public object type;
         public INode cond;
-
         public bool Accept(object o) {
-            return ExIs.Is(o, type) && (bool)cond.Eval(ExMemberBlock.MakeLocalScope(o));
+            return ExIs.Is(o, type) && (bool)cond.Eval(ExMemberBlock.MakeScope(o));
         }
     }
     public class ExBranch : INode {
@@ -2035,6 +2152,9 @@ namespace Oblivia {
         public INode expr;
         public ExTuple args;
         //public string Source => $"{expr.Source}{(args.Count > 1 ? $"({string.Join(", ", args.Select(a => a.Source))})" : args.Count == 1 ? $"*{args.Single().Source}" : $"!")}";
+
+        public static ExInvoke Fn (string symbol, INode arg) => new() { expr = new ExUpKey { key = symbol }, args = ExTuple.Expr(arg) };
+
         public object Eval (IScope ctx) {
             var f = expr.Eval(ctx);
             switch(f) {
@@ -2091,7 +2211,26 @@ namespace Oblivia {
                         }
                         return VEmpty.VALUE;
                     }
-                case ValKeyword.INHERIT: {
+                case ValKeyword.EMBED: {
+                        var vds = (VDictScope)ctx;
+                        var arg = args.EvalTuple(ctx);
+                        foreach(var (k, v) in arg.items) {
+                            switch(v) {
+                                case VClass vc:
+                                    vc.Embed(vds);
+                                    break;
+                                case VDictScope _vds: {
+                                        foreach(var other in _vds.locals.Keys) {
+                                            StDefKey.Define(ctx, other, new VAlias { ctx = _vds, expr = new ExUpKey { key = other, up = 1 } });
+                                        }
+                                        break;
+                                    }
+                                default: throw new Exception("Class expected");
+                            }
+                        }
+                        return VEmpty.VALUE;
+                    }
+				case ValKeyword.INHERIT: {
                         throw new Exception();
                         foreach(var(k, v) in args.EvalTuple(ctx).items) {
                             switch(v) {
@@ -2168,7 +2307,7 @@ namespace Oblivia {
                         return new VType(tt.MakeGenericType(argTypes)).Cast(aa, at);
                     }
                 case VFn vf: {
-                        return vf.CallFunc(ctx, evalArgs);
+                        return vf.CallFunc(evalArgs);
                     }
                 case Delegate de: {
                         var args = evalArgs();
@@ -2219,17 +2358,26 @@ namespace Oblivia {
                 case ExtendObject ext:
                     throw new Exception();
                 case VFnScope vfs: {
-						return vfs.func.CallFunc(ctx, evalArgs);
+						return vfs.func.CallFunc(evalArgs);
 					}
                 case VDictScope s: {
                         if(s.locals.TryGetValue("_call", out var f) && f is VFn vf) {
-                            return vf.CallFunc(ctx, evalArgs);
+                            return vf.CallFunc(evalArgs);
                         }
                         throw new Exception("Illegal");
                     }
                 case VObjScope vos: {
                         return InvokeFunc(ctx, vos.o, evalArgs);
                     }
+                    case Array a:{
+						var ind = ((Array)evalArgs().vals.Single()).OfType<int>().ToArray();
+						return new VIndex {
+                            
+                            Get = () => a.GetValue(ind),
+                            Set = (object o) => a.SetValue(o, ind) };
+					}
+
+
 				case IDictionary d: {
 						var ind = evalArgs().vals.Single();
                         return new VIndex { Get = () => d[ind], Set = (object o) => d[ind] = o };
@@ -2274,7 +2422,7 @@ namespace Oblivia {
         public List<INode> statements;
         public XElement ToXML () => new("Block", statements.Select(i => i.ToXML()));
         public string Source => $"{{{string.Join(", ", statements.Select(i => i.Source))}}}";
-        public bool obj => _obj ??= statements.Any(s => s is StDefFunc or StDefKey or StDefMulti);
+        public bool obj => _obj ??= statements.Any(s => s is StDefFn or StDefKey or StDefMulti);
         public bool? _obj;
         public object Eval (IScope ctx) {
             if(statements.Count == 0)
@@ -2282,22 +2430,26 @@ namespace Oblivia {
 			var f = new VDictScope(ctx, false);
 			object r = VEmpty.VALUE;
 			foreach(var s in statements) {
-				r = s.Eval(f);
+				
 				switch(s) {
-					case ExMemberKey { key: { } key } eg:
-						ctx.SetLocal(key, r);
-						break;
-					case ExUpKey { key: { } key } es:
-						ctx.SetLocal(key, r);
-						break;
                     case ExFnType { lhs:ExInvoke{ expr:ExUpKey{ allowDefine:true, key:{ }key } } } ft:
-                        ctx.SetLocal(key, new VDeclared { name = key, type = ft });
-                        break;
+                        //fix type
+						StDefKey.Define(ctx, key, new VDeclared { name = key, type = ft });
+                        continue;
+                    case ExFnType { lhs: ExUpKey { allowDefine: true, key: { } key }, rhs:{ }rhs } ft:
+                        //Fix the type
+						StDefKey.Define(ctx, key, new VDeclared { name = key, type = ft });
+						continue;
 				}
+
+				r = s.Eval(f);
+
+				AutoKey(f, s, r);
 				switch(r) {
 					case VRet vr:  return vr.Up();
                     case VYield vy:   throw new Exception();
 				}
+				f.locals["__"] = r;
 			}
             return obj ? f : r;
         }
@@ -2310,27 +2462,38 @@ namespace Oblivia {
                 }
                 */
                 r = s.Eval(f);
-
-				switch(s) {
-					case ExMemberKey { key: { } key } eg:
-						f.SetLocal(key, r);
-						break;
-					case ExUpKey { key: { } key } es:
-						f.SetLocal(key, r);
-						break;
-				}
+                AutoKey(f, s, r);
 				switch(r) {
                     case VRet vr:  return vr.Up();
-                }
-            }
+				}
+				f.SetLocal("__", r);
+			}
             return f;
         }
-        public VDictScope MakeScope (IScope ctx) => new VDictScope(ctx, false);
+        public VDictScope MakeScope (IScope ctx) => new(ctx, false);
         public object StagedEval (IScope ctx) => StagedApply(MakeScope(ctx));
-        public object StagedApply (VDictScope f) {
+
+        public void AutoKey(IScope f, INode s, object r) {
+			switch(s) {
+				case ExAlias { expr: ExMemberKey { key: { } key } } ea:
+					StDefKey.Define(f, key, r);
+					break;
+				case ExAlias { expr: ExUpKey { key: { } key } } ea:
+					StDefKey.Define(f, key, r);
+					break;
+				case ExMemberKey { key: { } key } eg:
+					StDefKey.Define(f, key, r);
+					break;
+				case ExUpKey { key: { } key } es:
+					StDefKey.Define(f, key, r);
+					break;
+			}
+		}
+
+        //Called during class def
+        public object StagedApply (IScope f) {
             var def = () => { };
             var seq = new List<INode> { };
-
             var labels = new Dictionary<string, int>();
             foreach(var s in statements) {
                 switch(s) {
@@ -2340,7 +2503,7 @@ namespace Oblivia {
 						break;
 					}
 					*/
-					case StDefFunc df when df.value is ExInvokeBlock { type: ExUpKey { key: "class" or "interface" } }: {
+					case StDefFn df when df.value is ExInvokeBlock { type: ExUpKey { key: "class" or "interface" } }: {
                             df.Define(f);
                             break;
                         }
@@ -2364,9 +2527,6 @@ namespace Oblivia {
                 }
             }
             def();
-
-
-
             var i = 0;
             while(i < seq.Count) {
 				object r = VEmpty.VALUE;
@@ -2379,14 +2539,7 @@ namespace Oblivia {
 						r = s.Eval(f);
 						break;
 				}
-                switch(s) {
-					case ExMemberKey { key: { } key } eg:
-						f.locals[key] = r;
-						break;
-					case ExUpKey { key: { } key } es:
-						f.locals[key] = r;
-						break;
-				}
+                AutoKey(f, s, r);
 				switch(r) {
 					case VRet vr:
 						return vr.Up();
@@ -2407,11 +2560,12 @@ namespace Oblivia {
 						}
 						return vg.Up();
 				}
+				f.SetLocal("__", r);
 				i++;
             }
 			return f;
 		}
-        public object EvalDefer (VDictScope ctx) {
+        public object EvalDefer (IScope ctx) {
             return null;
         }
     }
@@ -2444,11 +2598,21 @@ namespace Oblivia {
             return ctx;
         }
     }
-
-    public class ExMemberDigit : LVal {
-        public INode src;
+    public class ExMemberDigit : INode {
+		/*, LVal*/
+		public INode src;
         public string num;
+
+        public object Eval (IScope ctx) {
+            return 0;
+        }
     }
+
+    //Try to find extension fn, then member fn
+    public class ExFindFn {
+
+    }
+
 	public class ExMemberKey : INode, LVal {
         public INode src;
         public string key;
@@ -2465,6 +2629,7 @@ namespace Oblivia {
                 };
 			}
 			switch(source) {
+                case VError ve: throw new Exception(ve.msg);
 				case VDictScope s:  { return f(s);}
 				case VClass vc:     { return f(vc._static); }
 				case Type t:        { return f(new VTypeScope { t = t }); }
@@ -2503,7 +2668,10 @@ namespace Oblivia {
 					}
 			}
 		}
-        public static IScope MakeScope (object o, IScope par, bool local) => MakeScope(o, local ? par : null);
+        public static IScope MakeScope (object o, IScope par, bool local) => MakeScope(o, local ? null : par);
+		public object Assign (IScope ctx, Func<object> getVal) {
+            return null;
+		}
 		public object Eval (IScope ctx) =>
 			rhs.Apply(MakeScope(lhs.Eval(ctx), ctx, local));
 	}
@@ -2511,16 +2679,20 @@ namespace Oblivia {
 		public INode lhs;
 		public INode rhs;
 		public bool local = true;
+		public object Assign (IScope ctx, Func<object> getVal) {
+            return null;
+		}
 		public object Eval (IScope ctx) {
-			return lhs.Eval(ExMemberBlock.MakeScope(lhs.Eval(ctx), ctx, local));
+			return rhs.Eval(ExMemberBlock.MakeScope(lhs.Eval(ctx), ctx, local));
 		}
 	}
 	public class ExVal : INode {
+        public static ExVal From (object v) => new() { value = v };
         public object value;
         public XElement ToXML () => new("Value", new XAttribute("value", value));
         public string Source => $"{value}";
         public object Eval (IScope ctx) => value;
-        public static ExVal Empty = new ExVal { value = VEmpty.VALUE };
+        public static ExVal Empty = new() { value = VEmpty.VALUE };
 	}
     public class ExCondSeq : INode {
         public INode type;
@@ -2594,7 +2766,11 @@ namespace Oblivia {
                 //TODO: Allow lambda matches
 				var b = cond.Eval(inner_ctx);
 				if(Is(b) || b is ValKeyword.DEFAULT) {
-					return yes.Eval(inner_ctx);
+                    var res = yes.Eval(inner_ctx);
+                    if(res is ValKeyword.FALL) {
+                        continue;
+                    }
+                    return res;
 				}
 			}
 			throw new Exception("Fell out of match expression");
@@ -2610,6 +2786,28 @@ namespace Oblivia {
 			}
 		}
     }
+    public class ExCompose : INode{
+        public ExTuple items;
+        public object Eval (IScope ctx) => throw new Exception();
+    }
+    public class ExFilter : INode {
+        public INode lhs;
+        public INode rhs;
+		public object Eval (IScope ctx) {
+            return null;
+
+            var l = lhs.Eval(ctx);
+            var r = (VFn)rhs.Eval(ctx);
+			object FilterFn (dynamic seq, VFn f) {
+				object tr (IScope inner_ctx, object item) =>
+					ExInvoke.InvokeArgs(inner_ctx, f, item switch {
+						VTuple vt => vt,
+						_ => VTuple.Single(item)
+					});
+				return ExMap.Map(seq, ctx, null, null, (Transform)tr);
+			}
+		}
+	}
     public class ExMap : INode, LVal {
         public INode src;
         public INode map;
@@ -2625,6 +2823,7 @@ namespace Oblivia {
                 case VEmpty: throw new Exception("Variable not found");
                 case ICollection c: return Map(c);
                 case IEnumerable e: return Map(e);
+                case VRange r: return Map(r.GetInt());
 				case VDictScope vds: {
 						if(vds._seq(out var seq) && seq is VFn vf) return Map(vf.CallPars(ctx, ExTuple.Empty));
 						throw new Exception();
@@ -2640,12 +2839,13 @@ namespace Oblivia {
 				default:
                     throw new Exception("Sequence expected");
             }
-
-
 			object MapFunc (dynamic seq) {
 				Func<Type>? t = type is { } _t ? () => (Type)_t.Eval(ctx) : null;
 				var f = map.Eval(ctx);
-				object tr (IScope inner_ctx, object item) =>
+                if(f is Type tt) {
+                    return ExMap.Map(seq, ctx, cond, (Func<Type>?)(() => tt), null);
+                }
+				Transform tr = (IScope inner_ctx, object item) =>
 					ExInvoke.InvokeArgs(inner_ctx, f, item switch {
 						VTuple vt => vt,
 						_ => VTuple.Single(item)
@@ -2684,7 +2884,14 @@ namespace Oblivia {
 		}
         public delegate object Transform (IScope inner_ctx, object item);
 		public static object Map (dynamic seq, IScope ctx, INode cond, Func<Type> t, Transform tr) {
+
 			var result = new List<object>();
+			if(tr == null) {
+				foreach(var item in seq) {
+					result.Add(item);
+				}
+				goto Done;
+            }
 			int index = 0;
 			foreach(var item in seq) {
 				var inner_ctx = ExMap.MakeCondCtx(ctx, item, index);
@@ -2714,21 +2921,25 @@ namespace Oblivia {
 			Done:
 			return Convert(result, t);
 		}
+		public object Assign (IScope ctx, Func<object> getVal) {
+            return null;
+		}
 	}
     public class StDefKey : INode {
         public string key;
         public INode value;
+        public INode type;
         public XElement ToXML () => new("KeyVal", new XAttribute("key", key), value.ToXML());
         public string Source => $"{key}:{value?.Source ?? "null"}";
         public object Eval (IScope ctx) {
             var val = value.Eval(ctx);
             switch(val) {
                 case VError ve: throw new Exception(ve.msg);
-                default: return Init(ctx, key, val);
+                default: return Define(ctx, key, val);
             }
         }
-        public static object InitFrom (IScope ctx, string key, IScope from) => Init(ctx, key, from.Get(key));
-        public static object Init (IScope ctx, string key, object val) {
+        public static object DefineFrom (IScope ctx, string key, IScope from) => Define(ctx, key, from.Get(key));
+        public static object Define (IScope ctx, string key, object val) {
             var curr = ctx.GetLocal(key);
             if(curr is not VError) {
                 throw new Exception();
@@ -2752,7 +2963,7 @@ namespace Oblivia {
             block.StagedApply(_static);
             var c = new VClass { name = "unknown", source_ctx = f, source_expr = block, _static = _static };
             _static.locals["_kind"] = ValKeyword.CLASS;
-            _static.AddClass(c);
+            _static.SetClass(c);
             return c;
         }
         public static VDictScope DeclareClass (IScope f, ExBlock block, string key) {
@@ -2765,7 +2976,7 @@ namespace Oblivia {
             };
             f.SetLocal(key, c);
 			_static.locals["_kind"] = ValKeyword.CLASS;
-			_static.AddClass(c);
+			_static.SetClass(c);
             return _static;
         }
         public static VDictScope DeclareInterface (IScope f, ExBlock block, string key) {
@@ -2789,8 +3000,15 @@ namespace Oblivia {
              parent_ctx = ctx
          };
     }
+    public class VTypeFn : IType {
+        public VFn criteria;
+		public bool Accept (object src) {
+			return (bool)criteria.CallData([src]);
+		}
+	}
     public class ExSeq : INode {
-        public INode type;
+		/*, LVal */
+		public INode type;
         public List<INode> items;
         public object Eval (IScope ctx) {
             List<object> l = [];
@@ -2811,31 +3029,64 @@ namespace Oblivia {
                     var arr = Array.CreateInstance(t, res.Length);
                     Array.Copy(res.ToArray(), arr, arr.Length);
                     return arr;
-                    //todo: function
+                //todo: function
+                case VFn f:
                 default: return res;
             }
         }
     }
     public class ExLisp : INode {
         public INode[] args;
-        public int op;
+        public string op;
         public object Eval (IScope ctx) {
-            var a = args.Eval(ctx);
-            return a;
+            var lhs = args.First().Eval(ctx);
+            foreach(var rhs in args.Skip(1)) {
+                //Get extension member or internal member
+                switch(lhs) {
+                    case IScope sc:
+						lhs = new ExInvoke { expr = new ExMemberKey { src = ExVal.From(lhs), key = op }, args = ExTuple.Expr(rhs) }.Eval(ctx);
+                        break;
+					default:
+                        var l = (dynamic)lhs;
+						var r = (dynamic)rhs.Eval(ctx);
+						lhs = op switch {
+                            "+" => l + r,
+                            "-" => l - r,
+                            "*" => l * r,
+                            "/" => l / r,
+							">" => l > r,
+							"<" => l < r,
+							">>" => l >> r,
+							"<<" => l << r,
+
+							"=" => l == r,
+
+                            ".." => l..r,
+
+							"&" => l & r,
+							"|" => l | r,
+
+							"%" => l % r,
+							"&&" => l && r,
+							"||" => l || r,
+
+						};
+						break;
+				}
+            }
+            return lhs;
         }
 	}
-    public class ExTuple : INode, LVal {
-        public (string key, INode value)[] items;
-
+    public class ExTuple : INode {
+        /*, LVal*/
+		public (string key, INode value)[] items;
         public IEnumerable<INode> vals => items.Select(i => i.value);
-        public static ExTuple Empty => new ExTuple { items = [] };
-		public static ExTuple SingleExpr (INode v) => new ExTuple { items = [(null, v)] };
-		public static ExTuple SingleVal (object v) => SingleExpr(new ExVal { value = v });
-		public static ExTuple SpreadExpr (INode n) => SingleExpr(new ExSpread { value = n });
+        public static ExTuple Empty => new() { items = [] };
+		public static ExTuple Expr (INode v) => new() { items = [(null, v)] };
+		public static ExTuple Val (object v) => Expr(new ExVal { value = v });
+		public static ExTuple SpreadExpr (INode n) => Expr(new ExSpread { value = n });
 		public static ExTuple SpreadVal (object v) => SpreadExpr(new ExVal { value = v });
-        public static ExTuple ListExpr (IEnumerable<INode> items) => new ExTuple { items = items.Select(i => ((string)null, i)).ToArray() };
-
-
+        public static ExTuple ListExpr (IEnumerable<INode> items) => new() { items = items.Select(i => ((string)null, i)).ToArray() };
 		public VTuple EvalTuple (IScope ctx) {
             var it = new List<(string key, object val)> { };
             /*
@@ -2891,7 +3142,7 @@ namespace Oblivia {
             }
         }
         public ExTuple ParTuple () =>
-         new ExTuple {
+         new() {
              items = items.Select(pair => {
                  if(pair.key == null) {
                      switch(pair.value) {
@@ -2912,14 +3163,13 @@ namespace Oblivia {
         public (string key, object val)[] items;
         public object[] vals => items.Select(i => i.val).ToArray();
         public object Eval (IScope ctx) => this;
-
-        public static VTuple Single (object v) => new VTuple { items = [(null, v)] };
+        public static VTuple Single (object v) => new() { items = [(null, v)] };
         public void Spread (List<(string key, object val)> it) {
             foreach(var (key, val) in items) {
                 it.Add((key, val));
             }
         }
-        public ExTuple expr => new ExTuple {
+        public ExTuple expr => new() {
             items = items.Select(pair => (pair.key, (INode)new ExVal { value = pair.val })).ToArray()
         };
         public void Inherit(IScope ctx) {
@@ -2932,7 +3182,63 @@ namespace Oblivia {
             }
         }
     }
-    public class StDefFunc : INode {
+    public class ExMonadic {
+        public INode rhs;
+    }
+    public class ExDyadic : INode {
+        public INode lhs;
+        public INode rhs;
+        public EFn fn;
+
+		public object Eval (IScope ctx) {
+            switch(fn) {
+                case EFn.AND: {
+                        var l = (bool)lhs.Eval(ctx);
+                        switch(l) {
+                            case true: {
+                                    var r =(bool) rhs.Eval(ctx);
+                                    switch(r) {
+                                        case true:  return true;
+                                        case false: return false;
+                                    }
+                                }
+                            case false: return false;
+                        }
+                    }
+				case EFn.OR: {
+						var l = (bool)lhs.Eval(ctx);
+						switch(l) {
+							case false: {
+									var r = (bool)rhs.Eval(ctx);
+									switch(r) {
+										case false: return false;
+										case true:  return true;
+									}
+								}
+							case true: return true;
+						}
+					}
+
+				case EFn.XOR: {
+						var l = (bool)lhs.Eval(ctx);
+						var r = (bool)rhs.Eval(ctx);
+                        return l ^ r;
+					}
+
+				default:
+                    throw new Exception();
+			}
+		}
+
+		public enum EFn {
+            ERR,
+            AND,
+            OR,
+            XOR,
+
+            };
+    }
+    public class StDefFn : INode {
         public string key;
         public ExTuple pars;
         public INode value;
@@ -2972,12 +3278,12 @@ namespace Oblivia {
                 case VTuple vt:
                     if(deconstruct) {
 						foreach(var sym in lhs) {
-							StDefKey.Init(ctx, sym, vt.items.Where(pair => pair.key == sym).Single());
+							StDefKey.Define(ctx, sym, vt.items.Where(pair => pair.key == sym).Single());
 						}
 						return VEmpty.VALUE;
 					} else if(lhs.Length == vt.items.Length) {
                         foreach(var i in Enumerable.Range(0, lhs.Length)) {
-                            StDefKey.Init(ctx, lhs[i], vt.items[i].val);
+                            StDefKey.Define(ctx, lhs[i], vt.items[i].val);
                         }
                         return VEmpty.VALUE;
                     } else {
@@ -2986,7 +3292,7 @@ namespace Oblivia {
                 case IScope sc:
                     if(deconstruct) {
                         foreach(var sym in lhs) {
-                            StDefKey.InitFrom(ctx, sym, sc);
+                            StDefKey.DefineFrom(ctx, sym, sc);
                         }
                         return VEmpty.VALUE;
                     } else {
@@ -2996,7 +3302,6 @@ namespace Oblivia {
             throw new Exception();
         }
     }
-
 	public class StAssignSymbol : INode {
 		public ExUpKey symbol;
 		public INode value;
@@ -3052,6 +3357,11 @@ namespace Oblivia {
 			}
 			object AssignType (Type prevType) {
 				var next = getNext();
+                if(next is VError e) {
+                    throw new Exception(e.msg);
+                }
+
+
 				if(prevType == null) {
 					goto Do;
 				}
@@ -3139,9 +3449,26 @@ namespace Oblivia {
         public ExUpKey[] symbols;
         public INode value;
         public object Eval (IScope ctx) {
-            return Assign(ctx, symbols, value.Eval(ctx));
+
+
+            return deconstruct ? AssignDestructure(ctx, symbols, value.Eval(ctx)) : AssignTuple(ctx, symbols, value.Eval(ctx));
         }
-        public static object Assign (IScope ctx, ExUpKey[] symbols, object val) {
+        public static object AssignDestructure(IScope ctx, ExUpKey[] symbols, object val) {
+            switch(val) {
+                case Args a:
+                    foreach(var s in symbols) {
+                        s.Assign(ctx, () => a.dict[s.key]);
+					}
+					return VEmpty.VALUE;
+				case IScope from:
+                    foreach(var s in symbols) {
+                        s.Assign(ctx, () => from.GetLocal(s.key));
+                    }
+                    return VEmpty.VALUE;
+            }
+            throw new Exception();
+        }
+        public static object AssignTuple (IScope ctx, ExUpKey[] symbols, object val) {
 			switch(val) {
 				case VTuple vt:
 					if(symbols.Length == vt.items.Length) {
@@ -3168,7 +3495,6 @@ namespace Oblivia {
 							StAssignSymbol.AssignSymbol(ctx, symbols[i], () => v);
 						}
 						return VEmpty.VALUE;
-
 					} else {
 						throw new Exception();
 					}
@@ -3176,7 +3502,6 @@ namespace Oblivia {
             throw new Exception();
 		}
     }
-
     public class StAssignDynamic:INode {
         public INode[] lhs;
         public INode rhs;
@@ -3226,7 +3551,8 @@ namespace Oblivia {
         object Eval (IScope ctx);
     }
     public interface LVal {
-        //object Assign (IScope ctx, Func<object> getVal);
+        object Assign (IScope ctx, Func<object> getVal);
+        //IEnumerable<LVal> Unpack ();
     }
     public class Tokenizer {
         string src;
@@ -3390,70 +3716,126 @@ namespace Oblivia {
                         return new Token { type = TokenType.NAME, str = v };
                     }
             }
-            if(c switch {
-                ':' => TokenType.COLON,
-                '(' => TokenType.L_PAREN,
-                ')' => TokenType.R_PAREN,
-                '[' => TokenType.L_SQUARE,
-                ']' => TokenType.R_SQUARE,
-                '{' => TokenType.L_CURLY,
-                '}' => TokenType.R_CURLY,
-                '<' => TokenType.L_ANGLE,
-                '>' => TokenType.R_ANGLE,
-                ',' => TokenType.COMMA,
-                '^' => TokenType.CARET,
-                '.' => TokenType.DOT,
-                '@' => TokenType.SWIRL,
-                '?' => TokenType.QUERY,
-                '=' => TokenType.EQUAL,
-                '!' => TokenType.SHOUT,
-                '*' => TokenType.SPARK,
-                '|' => TokenType.PIPE,
-                '$' => TokenType.CASH,
-                '+' => TokenType.PLUS,
-                '-' => TokenType.DASH,
-                '/' => TokenType.SLASH,
-                '%' => TokenType.PERCENT,
-                '#' => TokenType.HASH,
-                '\'' => TokenType.QUOTE,
 
-                ' ' => TokenType.SPACE,
-                _ => default(TokenType?)
-            } is { } tt) {
-                index += 1;
-                return new Token { type = tt, str = str(c) };
-            }
+            
+			if(Enum.IsDefined(typeof(TokenType), (ulong)c)) {
+
+				var _t = (TokenType)(ulong)c;
+				index += 1;
+				return new Token { type = _t, str = str(c) };
+			}
             throw new Exception();
         }
     }
+    public enum TokenType : ulong {
+        COMMA = ',',
+        COLON = ':',
+		BLOCK_L = '{',
+		BLOCK_R = '}',
+		TUPLE_L = '(',
+        TUPLE_R = ')',
+        ARRAY_L = '[',
+        ARRAY_R = ']',
+        ANGLE_L = '<',
+        ANGLE_R = '>',
+        CARET = '^',
+        PERIOD = '.',
+        EQUAL ='=',
+		PLUS = '+',
+		MINUS = '-',
+		SLASH = '/',
+		QUOTE = '\'',
+		AT = '@',
+        QUESTION = '?',
+        SHOUT = '!',
+        STAR = '*',
+        PIPE = '|',
+        AMP = '&',
+        CASH = '$',
+        PERCENT = '%',
+        HASH = '#',
+        REPEAT = '¨',
+		FLOOR = '⌊',
+		TIMES = '×',
+		IOTA = 'ɩ',
+        DIVIDE = '÷',
 
-    public enum TokenType {
-        NAME,
-        COMMA,
-        COLON,
-        L_PAREN,
-        R_PAREN,
-        L_CURLY,
-        R_CURLY,
-        L_SQUARE,
-        R_SQUARE,
-        L_ANGLE,
-        R_ANGLE,
-        CARET,
-        DOT,
-        EQUAL,
-        STRING,
+        NOT= '¬',
+        INV_QUESTION = '¿',
+
+		NOT_EQUAL = '≠',
+        APPROX_EQUAL = '≈',
+        EQUIV = '≡',
+        NOT_EQUIV = '≢',
+        INF = '∞',
+        INTERSECT = '∩',
+        INTEGRAL = '∫',
+        SQRT = '√',
+        BULLET_OPERATOR = '∙',
+        SUM = '∑',
+        PRODUCT = '∏',
+        INCREMENT = '∆',
+        GEQ = '≥',
+        LEQ = '≤',
+
+		ARROW_W = '←',
+        ARROW_E = '→',
+        ARROW_S = '↓',
+        ARROW_N = '↑',
+        CROSS_PRODUCT = '⨯',
+
+		HOUSE = '⌂',
+        DEGREE = '°',
+        BULLET = '•',
+        SECTION = '§',
+        LOZENGE = '◊',
+        CIRCLE = '○',
+        INV_SHOUT = '¡',
+        TRI_N = '▲',
+        TRI_S = '▼',
+        MINI_TRI_N = '▴',
+        MINI_TRI_E = '▸',
+        MINI_TRI_S = '▾',
+        MINI_TRI_W = '◂',
+        PTR_R = '►',
+        PTR_L = '◄',
+        INTERRO = '‽',
+        DOUBLE_SHOUT = '‼',
+		SPACE = ' ',
+
+        IN = '∈',
+        NOT_IN = '∉',
+
+        EMPTY = '∅',
+
+        IS_SUBSET = '⊆',
+        HAS_SUBSET = '⊇',
+
+        SUBSET = '⊂',
+        SUBSET_2 = '⊃',
+
+        DELTA = 'Δ',
+
+		OR = '∨',
+		AND = '∧',
+		XOR = '⊻',
+
+		CAP = '∩',
+        CUP = '∪',
+
+        CO_PRODUCT = '⊔',
+        AAA = '⊓',
+
+		NAME = 0xFFFFFFFFFFFFFFF0,
+		STRING,
         INTEGER,
-        PLUS,
-        DASH,
-        SLASH,
-        QUOTE,
-        SPACE,
-        SWIRL, QUERY, SHOUT, SPARK, PIPE, AMPERSAND, CASH, PERCENT, HASH,
-
-        EOF
+		EOF,
     }
-    public class Token {
+	//≣
+	//«µ»əɅʌΘ∕❮❯❰❱
+	//
+	//Ⱶⱻ♪♫↔↕↨∟
+	public class Token {
         public TokenType type;
         public string str;
 

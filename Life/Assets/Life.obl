@@ -6,12 +6,12 @@
         at(x:i4 y:i4):      grid(mod.|[x:width y:height]|i4)
         get(x:i4 y:i4):     at(x y)/Get()
         set(x:i4 y:i4 b:bit):   at(x y)/Set(b)
-        new(width:i4 height:i4): Life {
+        new(width:i4 height:i4):_class{
             {width height} := ^^,
             grid := Grid.bit/ctor(width height)
             debug()
         }
-        debug(): print*|cat*|[["width: ",width],["height: ",height]]
+        debug(): print*|cat*|[["width: "width],["height: "height]]
         activeCount:0
         txt:StrBuild/ctor()
         update(): {

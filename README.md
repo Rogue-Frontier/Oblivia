@@ -1,8 +1,27 @@
-# Oblivia
-Oblivia is an experimental programming language that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
-- **Scopes are objects.** The syntax you use to create objects in JavaScript is now the syntax you use to create blocks in Oblivia. A block with no explicit return simply returns itself as an object (if it has keys) or the last expression (if there are no keys).
-- **Hyper-terse infix-based syntax.** A small set of primitive operations are given the most terse syntax. Casting values is as easy as `A(B)` with type `A` and value `B`. Defining variables is simply `A:B(C)` with variable name `A`, type `B`, and value `C`.
-- **No keywords.** In Oblivia, a keyword is simply a function or value.
+# Oblivia: Object-Building Language Intended for Very Idiosyncratic Articulations
+Oblivia (OBL) is an esolang that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
+
+- **Terse syntax**:
+  - A small set of primitive operations are given the most terse syntax.
+  - Casting values is as easy as `A(B)` with type `A` and value `B`.
+  - Defining variables is simply `A:B(C)` with variable name `A`, type `B`, and value `C`.
+- **Scopes = Objects**: In Oblivia, scopes have the power of objects.
+  - Pass a scope to a function.
+  - Name a variable or a member and it automatically becomes a key of the scope.
+  - A scope with no explicit return simply returns itself as an object (if it has keys) or the last expression (no keys).
+- **Objects = Functions**: In Oblivia, any object can define the `(), [], {}` operators.
+- **Variables of any name**: Variable names are not restricted by those already defined in the outer scope. To access variables of an outer scope, Oblivia introduces the `^` "up" function
+- **Same syntax everywhere**:
+  - `:` is the define operator
+  - `A(B), A[B], A{C}` is a function call.
+  - Patterns can be stored in objects
+- **Classes are objects too**: Classes can have a static `companion` (or not) that implements interfaces and behaves just like regular singleton objects.
+
+## Inspiration
+
+- JavaScript: Destructuring
+- CSharp: Tuples
+- APL: short-left, long-right precedence
 
 ## Example
 The following code implements a Conway's Game of Life and updates until the count of active cells becomes unchanging
@@ -74,12 +93,38 @@ The following code implements a Conway's Game of Life and updates until the coun
 }
 ```
 ## Syntax
-There are no arithmetic operators. See global function table for arithmetic functions.
+Oblivia has 3 basic structures.
+- Array: Contains a sequence of items and nothing more.
+- Tuple: Contains a sequence of items, some with string keys.
+- Block: Contains a set of variables with string keys. Supports advanced operations such as `ret`
+
+### Arithmetic
+Lisp-like arithmetic allows you to spread operands. Operators are converted to reductions e.g. `[+: a b c] = a/\+(b)/\+(c) = reduce([a b c] ?(a b) a/\+(b))`
+- `[+: a b]`
+- `[-: a b]`
+- `[*: a b]`
+- `[**: a b]`
+- `[/: a b]`
+- `[//: a b]`
+- `[^: a b]`
+- `[%: a b]`
+- `[=: a b]`
+- `[>: a b]`
+- `[<: a b]`
+- `[~: a b]`
+- `[>>: a b]`
+- `[<<: a b]`
+- `[&: a b]`
+- `[|: a b]`
+- `[&&: a b]`
+- `[||: a b]`
 
 ### Define
 - `A:B`: field A has value B. If `B` is a type, then the value is a *placeholder*
 - `A!:B`: function A with no args has output B
 - `A(B, C): D`: function A with args B,C has output D
+- `A[B C]: D`
+- `A{B C}: D`
 ### Statement
 - `A := B`: reassign field A to B (same type). You can use `_` for the current value of `A`
 - `^: A`: Return `A` from the current scope.
@@ -99,25 +144,36 @@ There are no arithmetic operators. See global function table for arithmetic func
 - `^^A`: Get value of symbol `A` from the parent scope.
 - `^^^A`: Get value of symbol `A` from parent's parent scope.
 - `'A`: Alias of expression `A`. Assignments on variable `B:'A` will attempt to assign to `A`.
+- `[A B C]`: Make an object array
+- `[A:B C:D] = [(A B), (C D)]`
+- `[:type A B C]`: Make an array of `type`
+- `{ A }`: Creates an scope and applies the statements `A` to it. If the scope has no locals or returns, then the scope returns the result of the last statement (empty if no statements). Otherwise returns an object.
 - `A ?+ B ?- C`: If A then B else C.
-- `A | B`: Map array A by function B.
-- `A |/ B`: From every item in `A` get value of symbol `B`.
-- `A |* B`: From every item in `A` call with arg `B`
-- `A ?% B`: While A, evaluate B.
+- `A ?++ B ?+- C ?-- D`: While A, evaluate B. If at least one iter, eval `C`. If no iter, eval `D`
+- `A(B)`
+- `A[B]`: `A([B])`
+- `A{B}`: `A({B})` Call `A` with the result of `{B}`
+  - If `A` is a class, then constructs an instance of `A` and applies the statements `B` to it.
+- `A-B`: Range from A to B
+- `A->B`: Function type
+- `A..B`: Eval A, assign to _, then eval B
+- `A.B`: `A(B)` Call `A` with arg *term* `B` (no spread)
+- `A*B`: `A(B)` Call `A` with arg *expression* `B` (spread if tuple)
 - `A/B`: In the scope of *expression* `A` evaluate *expression* B. Cannot access outer scopes.
 - `A/{B}`: In the scope of *expression* `A`, evaluate statements `B`. Can access outer scopes.
 - `A/ctor`: From .NET type `A` get the unnamed constructor.
-- `A*B`: Call `A` with arg *expression* `B` (spread if tuple)
-- `A.B`: Call `A` with arg *term* `B` (no spread)
-- `A *| B`: Call `A` with every item from *expression* `B` (spread if tuple)
-- `A .| B`: Call `A` with every item from *term* `B` (no spread)
-- `[A B C]`: Make an object array
-- `[:type A B C]`: Make an array of `type`
-- `A { B }`: Call `A` with the result of `{ B }`
-  - If `A` is a class, then constructs an instance of `A` and applies the statements `B` to it.
-- `{ A }`: Creates an scope and applies the statements `A` to it. If the scope has no locals or returns, then the scope returns the result of the last statement (empty if no statements). Otherwise returns an object.
+- `A|B`: Map array A by function B.
 - `?(): A`: Creates a lambda with no arguments and output `A`
-- `?(A,B): C`: Creates a lambda with arguments A,B and output `C`
+- `?(A): B`: Creates a lambda with arguments `A` and output `B`
+- `A.|B`: `B|A` Call `A` with every item from *term* `B` (no spread)
+- `A*|B`: `B|A` Call `A` with every item from *expression* `B` (spread if tuple)
+- `A/|B`: `?(C) B(A C)`
+- `A/|B(C)`: `B(A C)`
+- `A|.B`: `A|?(a):a(B)` From every item in `A` call with arg term `B`
+- `A|*B`: `A|?(a):a(B)` From every item in `A` call with arg expression `B`
+- `A|/B`: `A | ?(a) a/B` From every item in `A` get value of symbol `B`.
+- `A||B`: `?(C) A | ?(a) B(a C)`
+- `A||B(C)`: `A | ?(a) B(a C)`
 - `A ?[
     B0:C0
     B1:C1
@@ -129,16 +185,30 @@ There are no arithmetic operators. See global function table for arithmetic func
     B1:C1
     B2:C2
     B3:C3
-}`: Match expression (naive): For each pair `B:C`, if `A = B`, then returns `C`.
+    D0
+    D1
+    D3
+}`: Match expression (naive): For each pair `B:C`, if `A = B`, then returns `C`. Can also accept lambda `D`
+- `?{ A0:B0 }`: Matcher function
 - `A =+ B`: Returns true if `A` equals `B`
 - `A =- B`: Returns true if `A` does not equal `B`
 - `A = B`: Returns true if `A` matches pattern `B`
 - `A = B:C`: Returns true if `A` matches pattern `B` and assigns the value to `C`
+- `A =: B`: Returns true if `A = typeof(B)`
 
 ## Design philosophy
 - Whitespace is the simplest operator.
-  - `A B` simply means that `A` occurs before `B` in a sequence.
+  - Two adjacent identifiers `A B` simply means that `A` occurs before `B` in a sequence. Identifiers are never grouped together outside of tuples and arrays. `{ A B:C D } = { A:A, B:C, D:D }`, `{ (A B):(C D) } = { A:C, B:D }` 
   - There is *never* a statement of the form `A B` such that `A`,`B` are identifiers and `A` performs some operation on `B`, other than occurring earlier in a sequence.
 - Function calls with 0/1 arguments are allowed alternate syntax to save pixels
   - Calls with n>1 arguments always require enclosing delimiters `A(B C)`
   - Calls with 0, 1 arguments are allowed single-ended operators `A!`, `A*B`, `A.B`
+
+## Rejected features.
+OBL emphasizes **generality** and **terseness**, rejecting features that are not versatile enough to justify the syntax cost.
+- Infix arithmetic: Fails when you need to reduce an array, making the procedure unnecessarily verbose.
+  - `(+: a b)` Lisp-like arithmetic solves this by making arithmetic spreadable.
+- Partial application / *whatever-priming* (Raku): Scope-constrained to simple expressions. Cannot control argument order.
+  - `?(<par>) <expr>` Lambdas solve this problem by forward declaring arguments and allowing any size scope.
+- `=`-based assignment: This function is often confused between assignments and boolean comparisons.
+  - OBL uses `:=`, where `:` makes it clear that this function is strictly assignment. `=` is a pattern match function.

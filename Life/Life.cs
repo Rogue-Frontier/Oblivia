@@ -14,7 +14,6 @@ range(1, grid.width) | (x:int): int {
 /*
 ?@
 */
-
 var tokenizer = new Tokenizer(File.ReadAllText("Assets/Life.obl"));
 var tokens = new List<Token> { };
 while(tokenizer.Next() is { type: not TokenType.EOF } t) {
@@ -24,7 +23,6 @@ var parser = new Parser(tokens);
 var scope = parser.NextBlock();
 T Val<T> (T t) => t;
 var global = new VDictScope();
-
 global.locals = new() {
 	["class"] = ValKeyword.CLASS,
 	["void"] = typeof(void),
@@ -50,6 +48,7 @@ global.locals = new() {
 		var result = d.Equals(value);
 		return result;
 	})),
+
 	["gt"] = Val((double a, double b) => a > b),
 	["geq"] = Val((double a, double b) => a >= b),
 	["lt"] = Val((double a, double b) => a < b),
@@ -61,7 +60,7 @@ global.locals = new() {
 	["false"] = false,
 
 	["print"] = Val((object o) => Console.WriteLine(o)),
-	["clear"] = Val(() => Console.Clear()),
+	["clear"] = Val(Console.Clear),
 	["set_cursor"] = Val(Console.SetCursorPosition),
 
 	["Console"] = typeof(Console),
@@ -79,8 +78,6 @@ global.locals = new() {
 
 	["str_append"] = Val((StringBuilder sb, object o) => sb.Append(o)),
 	
-
-
 	["row_from"] = Val((Type t, object[] items) => {
 		var result = Array.CreateInstance(t, items.Length);
 		Array.Copy(items, result, items.Length);

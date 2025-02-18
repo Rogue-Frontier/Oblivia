@@ -11,42 +11,39 @@
             grid := Grid.bit/ctor(width height)
             debug()
         }
-        debug(): print*|cat*|[["width: "width],["height: "height]]
-        activeCount:0
+        debug(): print*|cat*|[["width: " width],["height: " height]]
+        activeNum:0
         txt:StrBuild/ctor()
         update(): {
-            activeCount := 0
+            activeNum := 0
             g:get
             txt/Clear()
             ɩheight | ?(y:i4): {
                 ɩwidth | ?(x:i4): {
                     w:(-:x 1) n:(+:y 1) e:(+:x 1) s:(-:y 1)
                     c:count(g.|[w:n x:n e:n w:y e:y w:s x:s e:s] yes)
-                    active:g(x y).._?+(<:c 2)∨(>:c 3)?+no?-_?-(=:c 3)?+yes?-_
-                    #              _??((<:c 2)∨(>:c 3)??(no _),(=:c 3)??(yes _))
+                    a:g(x y)
+                    active:a?+(<:c 2)∨(>:c 3)?+no?-a?-(=:c 3)?+yes?-a
                     set(x y active)
-                    activeCount := active ?+ (+:_ 1) ?- _
-                    str_append(txt active ?+ "+" ?- "-")
+                    activeNum := active ?+ (+:_ 1) ?- _
+                    txt/Append(active ?+ "+" ?- "-")
                 }
-                str_append(txt newline)
+                txt/Append(newline)
             }
-            print*cat["active: " activeCount]
+            print*cat["active: " activeNum]
         }
     }
     main(args:str): i4* {
         life:Life/new(32 32)
         print*life/grid[:i4 0 0]/Get()
         ɩ(life/width) | ?(x:i4):ɩ(life/height) | ?(y:i4):life/set(x y rand_bool())
-        count:1 prevCount:0 run:yes
+        num:1 prevNum:0 run:yes
         Console/Clear()
         run ?++ {
             life/update()
-            prevCount := count
-            count := life/activeCount
-            # Assign and return prev value
-            # prevCount <- count <- life/activeCount
-            run := neq(count prevCount)
-            # idea: auto-match abbrev e.g. Console/SetCurPos
+            prevNum := num
+            num := life/activeNum
+            run := neq(num prevNum)
             Console/{
                 SetCursorPosition(0 0)
                 Write*life/txt/ToString()

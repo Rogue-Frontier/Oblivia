@@ -59,6 +59,8 @@ namespace Oblivia {
                     ["str"] = typeof(string),
                     ["obj"] = typeof(object),
 
+                    ["_else"] = ValKeyword.GO_ELSE,
+
                     ["yes"] = true,
                     ["no"] = false,
 
@@ -231,6 +233,8 @@ namespace Oblivia {
         GET,SET,PROP,
 
         FALL,
+
+        GO_ELSE,
 
         DEFAULT,
         MIMIC,
@@ -2100,8 +2104,12 @@ namespace Oblivia {
             var cond = condition.Eval(ctx);
             switch(cond) {
                 case true:
-                    return  positive.Eval(ctx);
-                case false:
+                    var r = positive.Eval(ctx);
+                    if(r is ValKeyword.GO_ELSE) {
+                        return negative.Eval(ctx);
+                    }
+					return r;
+				case false:
                     switch(negative) {
                         case null:  return VEmpty.VALUE;
                         default:    return negative.Eval(ctx);
@@ -3793,6 +3801,10 @@ namespace Oblivia {
 		FLOOR = '⌊',
 
 
+        PRECEDES = '≺',
+        SUCCEEDS = '≻',
+        PRECEDES_NOT = '≽',
+        SUCCEEDS_NOT = '≼',
 
 		INV_QUESTION = '¿',
 

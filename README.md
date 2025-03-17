@@ -16,6 +16,7 @@ Oblivia (OBL) is an esolang that aims to do with objects what Lisp does with lis
   - `A(B), A[B], A{C}` is a function call.
   - Patterns can be stored in objects
 - **Classes are objects too**: Classes can have a static `companion` (or not) that implements interfaces and behaves just like regular singleton objects.
+- **Term and Expression scoping**:
 
 ## Inspiration
 

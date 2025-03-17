@@ -121,6 +121,10 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 
 ### Define
 - `A:B`: field A has value B. If `B` is a type, then the value is a *placeholder*
+- `A -> B`: Declare field A with type B
+- `A() -> B`: Declare method A has type B`
+- `A -> B: C`
+- `A() -> B: C`
 - `A!:B`: function A with no args has output B
 - `A(B, C): D`: function A with args B,C has output D
 - `A[B C]: D`
@@ -163,6 +167,7 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `A/{B}`: In the scope of *expression* `A`, evaluate statements `B`. Can access outer scopes.
 - `A/ctor`: From .NET type `A` get the unnamed constructor.
 - `A|B`: Map array A by function B.
+- `A?|B`: Filter A by B
 - `?(): A`: Creates a lambda with no arguments and output `A`
 - `?(A): B`: Creates a lambda with arguments `A` and output `B`
 - `A.|B`: `B|A` Call `A` with every item from *term* `B` (no spread)

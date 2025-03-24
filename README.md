@@ -200,7 +200,17 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `A =- B`: Returns true if `A` does not equal `B`
 - `A = B`: Returns true if `A` matches pattern `B`
 - `A = B:C`: Returns true if `A` matches pattern `B` and assigns the value to `C`
-- `A =: B`: Returns true if `A = typeof(B)`
+- `A =: B`: if `A = typeof(B)`, then sets `A := B` and returns true
+
+- `$A(B)`
+- `$(A:B)`
+- `$[A B C]`: Array
+- `$[A:B C:D]`: 
+- `$[A=B C=D]`: 
+- `${ A = B }`: Object member `A` of type `B`
+- `${ A = B:C }`: Object member `A` of type `B`; make local `C:B(A)`
+- `${ A:B }`: Object member `A` of type `B`; define `A:B`
+
 
 ## Design philosophy
 - Whitespace is the simplest operator.

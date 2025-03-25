@@ -13,9 +13,9 @@
 
 
 
-    parse_d(s:string):double/Parse.s
+    parse_d(s:string):f8/Parse.s
     trunc:int_from
-    FastAlphaMult(alpha:int red:int):{
+    FastAlphaMult(alpha:i4 red:i4):{
         
         alpha := ori(_ sl(alpha 8))
         red := muli(_ alpha)
@@ -306,7 +306,7 @@
         print*abc/c,
 
         {a b}: ab
-        print* ab = {a:5},
+        #print* ab = {a:5},
         
         print* 5=complement(5)
         

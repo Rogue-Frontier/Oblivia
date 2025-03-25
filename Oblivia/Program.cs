@@ -18,7 +18,6 @@ using System.Xml.Serialization;
 using static Oblivia.ExMap;
 using static System.Formats.Asn1.AsnWriter;
 using static System.Runtime.InteropServices.JavaScript.JSType;
-//TODO: Remove '@' Indexer
 namespace Oblivia {
 	public class Std {
         public static VDictScope std;
@@ -316,7 +315,12 @@ namespace Oblivia {
 		REGEX,
 		MATH,
         FMT,
-        LEAF
+        LEAF,
+
+        CONSTEVAL,
+        CONSTEXPR,
+
+        MEASURE
     }
     public class VInterType {
         public object[] items;
@@ -436,6 +440,10 @@ namespace Oblivia {
     public record ExAlias:INode {
         public INode expr;
         public object Eval (IScope ctx) => new VAlias { ctx = ctx, expr = expr };
+    }
+    public record ExRef : INode {
+        public INode expr;
+        public object Eval (IScope ctx) => null;
     }
 	public record ValLazy {
 		public INode expr;
@@ -916,8 +924,8 @@ namespace Oblivia {
     }
     public class Parser {
         int index;
-        List<Token> tokens;
-        public Parser (List<Token> tokens) {
+        List<IToken> tokens;
+        public Parser (List<IToken> tokens) {
             this.tokens = tokens;
         }
         public static ExBlock FromFile (string path) {
@@ -926,18 +934,22 @@ namespace Oblivia {
         }
         void inc () => index++;
         void dec () => index--;
-        public Token currToken => tokens[index];
-        public TokenType tokenType => currToken.type;
-        public INode NextStatement () {
-            switch(tokenType) {
-				case TokenType.AT:
+        public IToken currToken => tokens[index];
+		public TokenType currTokenType => currToken.type;
+		public string currTokenStr=> (currToken as StrToken).str;
+		public INode NextStatement () {
+            switch(currTokenType) {
+				case TokenType.at:
 					inc();
 					var att = NextTerm();
 					return new ExInvokeBlock { type = att, source_block = new ExBlock { statements = [NextStatement()] } };
 			}
             var lhs = NextExpr();
-            switch(tokenType) {
-                case TokenType.COLON:
+            switch(currTokenType) {
+                case TokenType.coloneqq:
+
+                    throw new Exception();
+                case TokenType.colon:
                     inc();
                     switch(lhs) {
                         case ExVal ev:
@@ -946,8 +958,8 @@ namespace Oblivia {
                             throw new Exception("");
                         //Local structure define / assign
                         case ExBlock eb:
-                            switch(tokenType) {
-                                case TokenType.EQUAL: {
+                            switch(currTokenType) {
+                                case TokenType.equal: {
                                         inc();
                                         List<ExUpKey> symbols = [];
                                         foreach(var item in eb.statements) {
@@ -974,8 +986,8 @@ namespace Oblivia {
                             }
                         //Local tuple define/assign
                         case ExTuple et:
-                            switch(tokenType) {
-                                case TokenType.EQUAL: {
+                            switch(currTokenType) {
+                                case TokenType.equal: {
                                         inc();
                                         List<ExUpKey> symbols = [];
                                         foreach(var item in et.vals) {
@@ -1001,8 +1013,8 @@ namespace Oblivia {
                             }
                         //Local key define/assign
                         case ExUpKey { up: { } up } es:
-                            switch(tokenType) {
-                                case TokenType.EQUAL:
+                            switch(currTokenType) {
+                                case TokenType.equal:
                                     inc();
                                     return new StAssignSymbol { symbol = es, value = NextExpr() };
                                 default:
@@ -1044,8 +1056,8 @@ namespace Oblivia {
                                 value = NextExpr()
                             };
                         default:
-                            switch(tokenType) {
-                                case TokenType.EQUAL: {
+                            switch(currTokenType) {
+                                case TokenType.equal: {
                                         inc();
                                         return new StAssignExpr { lhs = lhs, rhs = NextExpr() };
                                     }
@@ -1063,21 +1075,21 @@ namespace Oblivia {
         }
 		public INode CompoundExpr (INode lhs) {
             Start:
-            switch(tokenType) {
-                case TokenType.SPACE:
+            switch(currTokenType) {
+                case TokenType.space:
                     inc();
                     goto Start;
-                case TokenType.MINUS:
+                case TokenType.minus:
                     inc();
-                    switch(tokenType) {
+                    switch(currTokenType) {
                         //fn type
-                        case TokenType.ANGLE_R:
+                        case TokenType.angle_r:
                             inc();
-                            switch(tokenType) {
-                                case TokenType.TUPLE_R:
-                                case TokenType.BLOCK_R:
-                                case TokenType.ARRAY_R:
-                                case TokenType.ANGLE_R:
+                            switch(currTokenType) {
+                                case TokenType.tuple_r:
+                                case TokenType.block_r:
+                                case TokenType.array_r:
+                                case TokenType.angle_r:
                                     return new ExFnType { lhs = lhs };
                                 default: {
                                         var rhs = NextExpr();
@@ -1090,29 +1102,29 @@ namespace Oblivia {
                             }
                     }
                     break;
-                case TokenType.BLOCK_L:
+                case TokenType.block_l:
                     return CompoundExpr(new ExInvokeBlock { type = lhs, source_block = NextBlock() });
-                case TokenType.PIPE: {
+                case TokenType.pipe: {
                         inc();
-                        switch(tokenType) {
-                            case TokenType.STAR:
+                        switch(currTokenType) {
+                            case TokenType.star:
                                 inc();
                                 return CompoundExpr(new ExMap { src = lhs, map = new ExInvoke { expr = new ExSelf { up = 1 }, args = ExTuple.Expr(NextExpr()) }, expr = true });
-                            case TokenType.PERIOD:
+                            case TokenType.period:
                                 inc();
                                 return CompoundExpr(new ExMap { src = lhs, map = new ExInvoke { expr = new ExSelf { up = 1 }, args = ExTuple.Expr(NextTerm()) }, expr = true });
-                            case TokenType.SLASH:
+                            case TokenType.slash:
                                 inc();
                                 return CompoundExpr(new ExMap { src = lhs, map = NextExpr(), expr = true });
                             default: {
                                     var cond = default(INode);
                                     var type = default(INode);
-                                    switch(tokenType) {
-                                        case TokenType.ANGLE_L: {
+                                    switch(currTokenType) {
+                                        case TokenType.angle_l: {
                                                 inc();
                                                 cond = NextExpr();
-                                                switch(tokenType) {
-                                                    case TokenType.ANGLE_R:
+                                                switch(currTokenType) {
+                                                    case TokenType.angle_r:
                                                         inc();
                                                         break;
                                                     default:
@@ -1121,25 +1133,22 @@ namespace Oblivia {
                                                 break;
                                             }
                                     }
-                                    switch(tokenType) {
-                                        case TokenType.COLON: {
-                                                inc();
-                                                type = NextExpr();
-                                                break;
-                                            }
-                                    }
+                                    if(currTokenType == TokenType.colon) {
+										inc();
+										type = NextExpr();
+									}
                                     return CompoundExpr(new ExMap { src = lhs, cond = cond, type = type, map = NextTerm() });
                                 }
                         }
                     }
-                case TokenType.TUPLE_L: {
+                case TokenType.tuple_l: {
                         inc();
                         return CompoundExpr(new ExInvoke { expr = lhs, args = NextArgTuple() });
                     }
-                case TokenType.STAR: {
+                case TokenType.star: {
                         inc();
-                        switch(tokenType) {
-                            case TokenType.PIPE:
+                        switch(currTokenType) {
+                            case TokenType.pipe:
                                 inc();
                                 return CompoundExpr(new ExMap {
                                     src = NextExpr(),
@@ -1152,68 +1161,68 @@ namespace Oblivia {
                                 });
                         }
                     }
-                case TokenType.PERIOD: {
+                case TokenType.period: {
                         inc();
-                        switch(tokenType) {
-                            case TokenType.PIPE:
+                        switch(currTokenType) {
+                            case TokenType.pipe:
                                 inc();
                                 return CompoundExpr(new ExMap {
                                     src = NextTerm(),
                                     map = lhs,
                                 });
-                            case TokenType.PERIOD:
+                            case TokenType.period:
                                 inc();
                                 return CompoundExpr(new ExTemp { lhs = lhs, rhs = NextExpr() });
                             default:
                                 return CompoundExpr(new ExInvoke { expr = lhs, args = ExTuple.SpreadExpr(NextTerm()) });
                         }
                     }
-                case TokenType.SHOUT: {
+                case TokenType.bang: {
                         inc();
                         return CompoundExpr(new ExInvoke { expr = lhs, args = ExTuple.Empty });
                     }
-                case TokenType.PERCENT: {
+                case TokenType.percent: {
                         inc();
-                        switch(tokenType) {
-                            case TokenType.PLUS:
+                        switch(currTokenType) {
+                            case TokenType.plus:
                                 //Accumulator
                                 return CompoundExpr(new ExSeqOp { fn = lhs, op = ExSeqOp.EOp.Reduce });
-                            case TokenType.MINUS:
+                            case TokenType.minus:
                                 //Sliding window
                                 return CompoundExpr(new ExSeqOp { fn = lhs, op = ExSeqOp.EOp.SlidingWindow });
                             default:
                                 return CompoundExpr(new ExSpread { value = lhs });
                         }
                     }
-                case TokenType.EQUAL: {
+                case TokenType.equal: {
                         inc();
                         var Eq = (bool invert) => CompoundExpr(new ExEqual {
                             lhs = lhs,
                             rhs = NextTerm(),
                             invert = invert
                         });
-                        switch(tokenType) {
-                            case TokenType.PLUS: {
+                        switch(currTokenType) {
+                            case TokenType.plus: {
                                     inc();
                                     return Eq(false);
                                 }
-                            case TokenType.MINUS: {
+                            case TokenType.minus: {
                                     inc();
                                     return Eq(true);
                                 }
-                            case TokenType.ANGLE_R: {
+                            case TokenType.angle_r: {
                                     var rhs = NextExpr();
                                     return CompoundExpr(new ExFn { pars = (ExTuple)lhs, result = rhs });
                                 }
-                            case TokenType.TUPLE_L: {
+                            case TokenType.tuple_l: {
                                     var tup = NextTupleOrLisp();
                                     throw new Exception("Impl tuple match");
                                 }
-                            case TokenType.ARRAY_L: {
+                            case TokenType.array_l: {
                                     var arr = NextArrayOrLisp();
                                     throw new Exception("Impl array match");
                                 }
-                            case TokenType.BLOCK_L: {
+                            case TokenType.block_l: {
                                     //Structure match
                                     var block = (ExBlock)NextExpr();
                                     foreach(var ex in block.statements) {
@@ -1231,14 +1240,14 @@ namespace Oblivia {
                                     }
                                     throw new Exception("Impl structure match");
                                 }
-                            case TokenType.COLON: {
+                            case TokenType.colon: {
                                     var rhs = NextTerm();
                                     return CompoundExpr(new ExIsAssign { lhs = lhs, rhs = rhs });
                                 }
                             default: {
                                     var pattern = NextExpr();
-                                    switch(tokenType) {
-                                        case TokenType.COLON:
+                                    switch(currTokenType) {
+                                        case TokenType.colon:
                                             inc();
                                             var symbol = NextSymbol();
                                             return CompoundExpr(new ExIs { lhs = lhs, rhs = pattern, key = symbol.key });
@@ -1250,10 +1259,10 @@ namespace Oblivia {
                         }
                         throw new Exception();
                     }
-                case TokenType.SLASH: {
+                case TokenType.slash: {
                         inc();
-                        switch(tokenType) {
-                            case TokenType.PIPE:
+                        switch(currTokenType) {
+                            case TokenType.pipe:
                                 inc();
                                 var fn = NextTerm();
                                 return CompoundExpr(new ExFn {
@@ -1263,93 +1272,68 @@ namespace Oblivia {
                                         args = ExTuple.Expr(lhs)
                                     }
                                 });
-                            case TokenType.SLASH:
+                            case TokenType.slash:
                                 inc();
                                 //INDEXER
                                 return CompoundExpr(new ExAt { src = lhs, index = [NextTerm()] });
-                            case TokenType.STAR:
+                            case TokenType.star:
                                 inc();
                                 return CompoundExpr(new ExAt { src = lhs, index = [NextExpr()] });
-                            case TokenType.PERIOD:
+                            case TokenType.period:
                                 inc();
                                 return CompoundExpr(new ExAt { src = lhs, index = [NextTerm()] });
-                            case TokenType.NAME:
-                                var name = currToken.str;
+                            case TokenType.name:
+                                var name = currTokenStr;
                                 inc();
                                 return CompoundExpr(new ExMemberKey { src = lhs, key = name });
-                            case TokenType.INTEGER:
-                                var num = currToken.str;
+                            case TokenType.measure:
+                                var num = (currToken as MeasureToken).val;
                                 inc();
-                                return CompoundExpr(new ExMemberDigit { src = lhs, num = num });
+                                return CompoundExpr(new ExMemberNumber { src = lhs, num = num });
                                 throw new Exception();
-                            case TokenType.BLOCK_L:
+                            case TokenType.block_l:
                                 return CompoundExpr(new ExMemberBlock { lhs = lhs, rhs = (ExBlock)NextExpr(), local = false });
                             default:
                                 return CompoundExpr(new ExMemberExpr { lhs = lhs, rhs = NextExpr(), local = true });
                         }
                     }
-                case TokenType.ARRAY_L: {
+                case TokenType.array_l: {
                         var arr = (ExSeq)NextArrayOrLisp();
                         return CompoundExpr(new ExAt { src = lhs, index = arr.items });
                     }
-                case TokenType.AT: {
+                case TokenType.at: {
                         inc();
                         var term = NextTerm();
                         return CompoundExpr(new ExCompose { items = (ExTuple)NextTupleOrLisp() });
                     }
-                case TokenType.QUESTION: {
+                case TokenType.question: {
                         inc();
-                        switch(tokenType) {
-                            case TokenType.PIPE:
+                        switch(currTokenType) {
+                            case TokenType.pipe:
                                 var rhs = NextExpr();
                                 return CompoundExpr(new ExFilter { lhs = lhs, rhs = rhs });
-                            case TokenType.PERCENT: {
+                            case TokenType.percent: {
                                     inc();
                                     return CompoundExpr(new ExLoop { condition = lhs, positive = NextExpr() });
                                 }
-                            case TokenType.COLON: {
+                            case TokenType.colon: {
                                     inc();
                                     return new ExCriteria { item = lhs, cond = NextExpr() };
                                 }
-                            case TokenType.BLOCK_L: {
-                                    inc();
-                                    var items = new List<(INode cond, INode yes)> { };
-                                    ReadBranch:
-                                    switch(tokenType) {
-                                        case TokenType.BLOCK_R:
-                                            inc();
-                                            return CompoundExpr(new ExMatchPattern {
-                                                item = lhs,
-                                                branches = items
-                                            });
-                                    }
-                                    var cond_group = new List<INode> { };
-                                    ReadItem:
-                                    cond_group.Add(NextExpr());
-                                    /*
-                                    if(cond is ExprFunc ef) {
-                                     //Handle lambda
-                                     //If this lambda accepts this object as argument, then treat it as a branch.
-                                     goto ReadBranch;
-                                    }
-                                    */
-                                    switch(tokenType) {
-                                        case TokenType.COLON:
-                                            inc();
-                                            var yes = NextExpr();
-                                            foreach(var c in cond_group) {
-                                                items.Add((c, yes));
-                                            }
-                                            goto ReadBranch;
-                                        default:
-                                            goto ReadItem;
-                                    }
+                            case TokenType.block_l: {
+                                    return CompoundExpr(new ExSwitch {
+                                        fn = new ExSwitchFn { branches = NextSwitch() },
+                                        item = lhs
+                                    });
+
                                 }
-                            case TokenType.ARRAY_L: {
+                            case TokenType.array_l: {
                                     inc();
                                     INode type = null;
-                                    switch(tokenType) {
-                                        case TokenType.COLON:
+
+
+                                    switch(currTokenType) {
+                                        case TokenType.colon:
                                             inc();
                                             type = NextExpr();
                                             break;
@@ -1357,8 +1341,8 @@ namespace Oblivia {
                                     var items = new List<(INode cond, INode yes, INode no)> { };
                                     Read:
                                     var cond = NextExpr();
-                                    switch(tokenType) {
-                                        case TokenType.COLON: {
+                                    switch(currTokenType) {
+                                        case TokenType.colon: {
                                                 inc();
                                                 var yes = NextExpr();
                                                 items.Add((cond, yes, null));
@@ -1367,8 +1351,8 @@ namespace Oblivia {
                                         default:
                                             throw new Exception();
                                     }
-                                    switch(tokenType) {
-                                        case TokenType.ARRAY_R: {
+                                    switch(currTokenType) {
+                                        case TokenType.array_r: {
                                                 inc();
                                                 return CompoundExpr(new ExCondSeq {
                                                     type = type,
@@ -1376,14 +1360,14 @@ namespace Oblivia {
                                                     items = items
                                                 });
                                             }
-                                        default:
-                                            goto Read;
                                     }
-                                }
-                            case TokenType.PLUS: {
+
+									goto Read;
+								}
+                            case TokenType.plus: {
                                     inc();
-                                    switch(tokenType) {
-                                        case TokenType.PLUS:
+                                    switch(currTokenType) {
+                                        case TokenType.plus:
                                             inc();
                                             return CompoundExpr(new ExLoop { condition = lhs, positive = NextExpr() });
                                         /*
@@ -1395,45 +1379,50 @@ namespace Oblivia {
                                             negative = NextExpr()
                                         });
                                         */
-                                        default:
-                                            var positive = NextStatement();
-                                            var negative = default(INode);
-                                            switch(tokenType) {
-                                                case TokenType.QUESTION: {
-                                                        inc();
-                                                        switch(tokenType) {
-                                                            case TokenType.MINUS: {
-                                                                    inc();
-                                                                    negative = NextStatement();
-                                                                    break;
-                                                                }
-                                                            default: {
-                                                                    dec();
-                                                                    break;
-                                                                }
-                                                        }
-                                                    }
-                                                    break;
-                                            }
-                                            return CompoundExpr(new ExBranch {
-                                                condition = lhs,
-                                                positive = positive,
-                                                negative = negative
-                                            });
                                     }
-                                }
+									var positive = NextStatement();
+									var negative = default(INode);
+									switch(currTokenType) {
+										case TokenType.question: {
+												inc();
+												switch(currTokenType) {
+													case TokenType.minus: {
+															inc();
+															negative = NextStatement();
+															break;
+														}
+													default: {
+															dec();
+															break;
+														}
+												}
+											}
+											break;
+									}
+									return CompoundExpr(new ExBranch {
+										condition = lhs,
+										positive = positive,
+										negative = negative
+									});
+								}
                             default:
                                 dec();
                                 break;
                         }
                         break;
                     }
-                case TokenType.AND: return Dyadic(ExDyadic.EFn.AND);
-				case TokenType.OR: return Dyadic(ExDyadic.EFn.OR);
-				case TokenType.XOR: return Dyadic(ExDyadic.EFn.XOR);
-                case TokenType.CEIL: return Dyadic(ExDyadic.EFn.MAX);
-                case TokenType.FLOOR: return Dyadic(ExDyadic.EFn.MIN);
-            }
+                case TokenType.and:                     return Dyadic(ExDyadic.EFn.AND);
+				case TokenType.or:                      return Dyadic(ExDyadic.EFn.OR);
+				case TokenType.xor:                     return Dyadic(ExDyadic.EFn.XOR);
+				case TokenType.nand:                    return Dyadic(ExDyadic.EFn.NAND);
+				case TokenType.nor:                     return Dyadic(ExDyadic.EFn.NOR);
+				case TokenType.ceil:                    return Dyadic(ExDyadic.EFn.MAX);
+                case TokenType.floor:                   return Dyadic(ExDyadic.EFn.MIN);
+				case TokenType.existential_quantifier:  return Dyadic(ExDyadic.EFn.exists);
+				case TokenType.universal_quantifier:    return Dyadic(ExDyadic.EFn.for_all);
+                case TokenType.double_plus:             return Dyadic(ExDyadic.EFn.concat);
+				case TokenType.count:                   return Dyadic(ExDyadic.EFn.count);
+			}
             ExDyadic Dyadic (ExDyadic.EFn fn) {
                 inc();
 				return new ExDyadic { fn = fn, lhs = lhs, rhs = NextTerm() };
@@ -1441,85 +1430,117 @@ namespace Oblivia {
 
             return lhs;
         }
-        INode NextTerm () {
+
+		List<(INode cond, INode yes)> NextSwitch () {
+			inc();
+			var items = new List<(INode cond, INode yes)> { };
+			ReadBranch:
+			switch(currTokenType) {
+				case TokenType.block_r:
+					inc();
+                    return items;
+			}
+            //To match multiple conds, use any()
+            var cond = NextExpr();
+			switch(currTokenType) {
+				case TokenType.colon:
+					inc();
+					var branch = NextExpr();
+                    items.Add((cond, branch));
+					goto ReadBranch;
+			}
+			switch(cond) {
+				case ExFn fn:
+					items.Add((fn.pars, fn.result));
+					goto ReadBranch;
+                default:
+                    throw new Exception("Unknown branch format");
+			}
+		}
+		INode NextTerm () {
 			ExMonadic Monadic(ExMonadic.EFn fn) {
 				inc();
-				return new ExMonadic { fn = fn, rhs = NextTerm() };
+				return new ExMonadic {
+                    fn = fn,
+                    rhs = NextTerm()
+                };
 			}
 			Read:
-            switch(tokenType) {
+            switch(currTokenType) {
+				case TokenType.empty:
+					inc();
+					return new ExVal { value = VEmpty.VALUE };
+				case TokenType.tautology:
+                    inc(); 
+                    return new ExVal { value = true };
+				case TokenType.contradiction: 
+                    inc(); 
+                    return new ExVal { value = false };
+				case TokenType.not:     return Monadic(ExMonadic.EFn.NOT);
+				case TokenType.floor:   return Monadic(ExMonadic.EFn.FLOOR);
+				case TokenType.ceil:    return Monadic(ExMonadic.EFn.CEILING);
+				case TokenType.iota:    return Monadic(ExMonadic.EFn.IOTA);
 				/*
-				case TokenType.SWIRL:
-					inc();
-					return new ExPointer { dest = NextTerm() };
-                */
-				case TokenType.IOTA:    return Monadic(ExMonadic.EFn.IOTA);
-				case TokenType.NOT:     return Monadic(ExMonadic.EFn.NOT);
-                case TokenType.FLOOR:   return Monadic(ExMonadic.EFn.FLOOR);
-				case TokenType.CEIL:    return Monadic(ExMonadic.EFn.CEIL);
-				case TokenType.MINUS:{
-					inc();
-                        switch(tokenType) {
-                            //fn type
-                            case TokenType.ANGLE_R: {
-                                    inc();
-                                    switch(tokenType) {
-                                        case TokenType.TUPLE_R:
-                                        case TokenType.BLOCK_R:
-                                        case TokenType.ARRAY_R:
-                                        case TokenType.ANGLE_R:
-                                            return new ExFnType{};
-                                        default:
-                                            var output = NextExpr();
-                                            return (new ExFnType {rhs = output});
-                                    }
-                                }
-                            case TokenType.TUPLE_R:
-                            case TokenType.BLOCK_R:
-                            case TokenType.ARRAY_R:
-                                return new ExRange { };
-                            default:
-                                var to = NextExpr();
-                                return (new ExRange { rhs = to });
-                        }
-                    }
-				case TokenType.ARRAY_L:
-                    return NextArrayOrLisp();
-                case TokenType.QUESTION:
-                    return NextLambda();
-                case TokenType.NAME:
-                    return NextSymbol();
-                case TokenType.CARET:
-                    return NextCaretSymbol();
-                case TokenType.STRING:
-                    return NextString();
-                case TokenType.INTEGER:
-                    return NextInteger();
-                case TokenType.BLOCK_L:
-                    return NextBlock();
-                case TokenType.TUPLE_L:
-                    return NextTupleOrLisp();
+			case TokenType.minus:{
+				inc();
+					switch(tokenType) {
+						//fn type
+						case TokenType.angle_r: {
+								inc();
+								switch(tokenType) {
+									case TokenType.tuple_r:
+									case TokenType.block_r:
+									case TokenType.array_r:
+									case TokenType.angle_r:
+										return new ExFnType{};
+									default:
+										var output = NextExpr();
+										return (new ExFnType {rhs = output});
+								}
+							}
+						case TokenType.tuple_r:
+						case TokenType.block_r:
+						case TokenType.array_r:
+							return new ExRange { };
+						default:
+							var to = NextExpr();
+							return (new ExRange { rhs = to });
+					}
+				}
+				*/
+				case TokenType.name:    return NextSymbol();
+				case TokenType.caret:   return NextCaretSymbol();
+				case TokenType.str:     return NextString();
+				case TokenType.measure: return NextInteger();
+                case TokenType.question:return NextFn();
+                case TokenType.amp:     return NextRef();
+				case TokenType.tuple_l: return NextTupleOrLisp();
+				case TokenType.array_l: return NextArrayOrLisp();
+				case TokenType.block_l: return NextBlock();
                     /*
                 case TokenType.PERCENT:
                     return new ExprSpread { value= NextExpression() };
                     */
-                case TokenType.QUOTE:
-                    inc();
-                    return new ExAlias { expr = NextExpr() };
-                case TokenType.COMMA:
+                case TokenType.quote:
+                    return NextAlias();
+                case TokenType.comma:
                     inc();
                     goto Read;
-                case TokenType.SPACE:
+                case TokenType.space:
                     inc();
                     goto Read;
             }
             throw new Exception($"Unexpected token in expression: {currToken.type}");
         }
-
-
-
+        ExRef NextRef () {
+            inc();
+            return new ExRef { expr = NextExpr() };
+        }
+        ExAlias NextAlias () {
+			inc();
+			return new ExAlias { expr = NextExpr() };
+		}
 		string ReadLispOp () {
-
 			var start = index;
 			var d = new Dictionary<string, int> {
 				["+"] = 1,
@@ -1533,31 +1554,38 @@ namespace Oblivia {
 				["="] = 9,
                 [">"] = 10,
                 ["<"] = 11,
+
+
                 [">="] = 12,
                 ["<="] = 13,
-
                 [">>"] = 14,
-                ["<<"] = 15
+                ["<<"] = 15,
+				["&&"] = 16,
+				["||"] = 17,
+				["++"] = 18,
+				["--"] = 19,
+				["**"] = 20,
+				["//"] = 21,
 			};
 			var op = "";
 			ReadOp:
-			switch(tokenType) {
-				case TokenType.PLUS:
-				case TokenType.MINUS:
-				case TokenType.STAR:
-				case TokenType.SLASH:
-				case TokenType.CARET:
-				case TokenType.PIPE:
-				case TokenType.AMP:
-				case TokenType.PERCENT:
-				case TokenType.EQUAL:
-                case TokenType.ANGLE_L:
-                case TokenType.ANGLE_R:
-                case TokenType.PERIOD:
-					op += currToken.str;
+			switch(currTokenType) {
+				case TokenType.plus:
+				case TokenType.minus:
+				case TokenType.star:
+				case TokenType.slash:
+				case TokenType.caret:
+				case TokenType.pipe:
+				case TokenType.amp:
+				case TokenType.percent:
+				case TokenType.equal:
+                case TokenType.angle_l:
+                case TokenType.angle_r:
+                case TokenType.period:
+					op += currTokenStr;
 					inc();
 					goto ReadOp;
-				case TokenType.COLON:
+				case TokenType.colon:
 					if(op == "") {
 						return "";
 					}
@@ -1568,13 +1596,12 @@ namespace Oblivia {
 					return "";
 			}
 		}
-
 		INode NextTupleOrLisp () {
             inc();
             var op = ReadLispOp();
             var expr = NextExpr();
-            switch(tokenType) {
-                case TokenType.TUPLE_R: {
+            switch(currTokenType) {
+                case TokenType.tuple_r: {
                         inc();
                         return expr;
                     }
@@ -1587,8 +1614,8 @@ namespace Oblivia {
 			}
 		}
         ExTuple NextArgTuple () {
-            switch(tokenType) {
-                case TokenType.TUPLE_R:
+            switch(currTokenType) {
+                case TokenType.tuple_r:
                     inc();
                     return ExTuple.Empty;
                 default:
@@ -1599,16 +1626,16 @@ namespace Oblivia {
             var items = new List<(string key, INode val)> { };
             return AddEntry(first);
             ExTuple AddEntry (INode lhs) {
-                switch(tokenType) {
-                    case TokenType.COLON:
+                switch(currTokenType) {
+                    case TokenType.colon:
                         NextPair(lhs);
                         break;
                     default:
                         items.Add((null, lhs));
                         break;
                 }
-                switch(tokenType) {
-                    case TokenType.TUPLE_R:
+                switch(currTokenType) {
+                    case TokenType.tuple_r:
                         inc();
                         return new ExTuple { items = items.ToArray() };
                     default:
@@ -1632,32 +1659,31 @@ namespace Oblivia {
             List<INode> items = [];
             inc();
             INode type = null;
-            switch(tokenType) {
-                case TokenType.COLON:
+            switch(currTokenType) {
+                case TokenType.colon:
                     inc();
                     type = NextExpr();
                     break;
             }
-
             Check:
-            switch(tokenType) {
-                case TokenType.COMMA:
+            switch(currTokenType) {
+                case TokenType.comma:
                     inc();
                     goto Check;
-                case TokenType.ARRAY_R:
+                case TokenType.array_r:
                     inc();
                     return new ExSeq { items = items, type = type };
                 default:
                     var item = NextExpr();
-                    if(tokenType == TokenType.COLON) {
+                    if(currTokenType == TokenType.colon) {
                         
                     } else {
 
                     }
-                    switch(tokenType) {
-                        case TokenType.COLON:
+                    switch(currTokenType) {
+                        case TokenType.colon:
                             var l = new List<INode> { item };
-                            while(tokenType == TokenType.COLON) {
+                            while(currTokenType == TokenType.colon) {
                                 inc();
                                 l.Add(NextExpr());
                             }
@@ -1680,37 +1706,48 @@ namespace Oblivia {
                     goto Check;
             }
         }
-        INode NextLambda () {
+        INode NextFn () {
             inc();
-            var t = tokenType;
+            var t = currTokenType;
             switch(t) {
-
-                case TokenType.QUESTION:
+                /*
+                case TokenType.question:
                     inc();
                     var branches = NextTerm();
                     throw new Exception();
-
-                case TokenType.SHOUT: {
-                        inc();
-                        var result = NextExpr();
-                        return new ExFn { pars = ExTuple.Empty, result = result };
-                    }
-                case TokenType.TUPLE_L:
+                    */
+                /*
+            case TokenType.bang: {
+                    inc();
+                    var result = NextExpr();
+                    return new ExFn { pars = ExTuple.Empty, result = result };
+                }
+                */
+                case TokenType.block_l:
+                    var branches = NextSwitch();
+                    return CompoundExpr(new ExSwitchFn { branches = branches });
+                    throw new Exception();
+                case TokenType.array_l:
+                    throw new Exception();
+                case TokenType.tuple_l:
                     inc();
                     var pars = NextArgTuple().ParTuple();
-					switch(tokenType) {
-						case TokenType.COLON:
+					switch(currTokenType) {
+						case TokenType.colon:
 							inc();
 							break;
 					}
-					var r = new ExFn { pars = pars, result = NextExpr() };
+					var r = new ExFn {
+                        pars = pars,
+                        result = NextExpr()
+                    };
                     return r;
                 default:
                     throw new Exception($"Unexpected token {t}");
             }
         }
         ExUpKey NextSymbol () {
-            var name = currToken.str;
+            var name = currTokenStr;
             inc();
             return new ExUpKey { key = name, up = -1 };
         }
@@ -1718,23 +1755,25 @@ namespace Oblivia {
             inc();
             int up = 1;
             Check:
-            switch(tokenType) {
-                case TokenType.CARET: {
+            switch(currTokenType) {
+                case TokenType.caret: {
                         up += 1;
                         inc();
                         goto Check;
                     }
-                case TokenType.NAME: {
-                        var s = new ExUpKey { up = up, key = currToken.str };
+                case TokenType.name: {
+                        var s = new ExUpKey { up = up, key = currTokenStr };
                         inc();
                         return s;
                     }
-                case TokenType.CASH: {
+                    /*
+                case TokenType.cash: {
                         //Return This
                         var s = new ExSelf { up = up };
                         inc();
                         return s;
                     }
+                    */
                     /*
                 case TokenType.L_PAREN:
                     return new ExMemberTuple { lhs = new ExSelf { up = up }, rhs = (ExTuple)NextExpression(), local = true };
@@ -1744,12 +1783,12 @@ namespace Oblivia {
             }
         }
         public ExVal NextString () {
-            var value = tokens[index].str;
+            var value = currTokenStr;
             inc();
             return new ExVal { value = value };
         }
         public ExVal NextInteger () {
-            var value = int.Parse(tokens[index].str);
+            var value = (currToken as MeasureToken).val;
             inc();
             return new ExVal { value = value };
         }
@@ -1757,18 +1796,22 @@ namespace Oblivia {
             inc();
             var ele = new List<INode>();
             Check:
-            switch(tokenType) {
-                case TokenType.BLOCK_R:
+            switch(currTokenType) {
+                //Lambda
+                case TokenType.pipe:
+                    throw new Exception();
+
+                case TokenType.block_r:
                     inc();
                     return new ExBlock { statements = ele };
-                case TokenType.COMMA:
+                case TokenType.comma:
                     inc();
                     goto Check;
                 default:
                     ele.Add(NextStatement());
                     goto Check;
             }
-            throw new Exception($"Unexpected token in object expression: {currToken.type}");
+            throw new Exception($"Unexpected token in object expression: {currTokenType}");
         }
     }
     public class ExTemp : INode {
@@ -2018,6 +2061,14 @@ namespace Oblivia {
             return null;
 		}
 	}
+    /*
+
+${
+    foo = int:bar
+    baz = int
+    qux:int
+}
+    */
     public class StructurePattern { }
 	public class ExIs : INode {
         public INode lhs;
@@ -2025,9 +2076,6 @@ namespace Oblivia {
         public string? key;
         public object Eval(IScope ctx) {
             var l = lhs.Eval(ctx);
-
-
-
             var r = rhs.Eval(ctx);
 			ctx.SetLocal("_lhs", l);
 			ctx.SetLocal("_rhs", r);
@@ -2610,13 +2658,13 @@ namespace Oblivia {
             return ctx;
         }
     }
-    public class ExMemberDigit : INode {
+    public class ExMemberNumber : INode {
 		/*, LVal*/
 		public INode src;
-        public string num;
+        public double num;
 
         public object Eval (IScope ctx) {
-            return 0;
+            return num;
         }
     }
 
@@ -2760,20 +2808,37 @@ namespace Oblivia {
             return arr;
         }
     }
-    public class ExMatchPattern : INode {
-        public INode item;
+
+    public class ExSwitchFn : INode {
+        public object Eval(IScope ctx) {
+            return new VFn {
+                expr = new ExSwitch {
+                    fn = this,
+                    item = new ExUpKey {
+                        key = "_arg",
+                        up = 1
+                    }
+                }
+            };
+        }
         public List<(INode cond, INode yes)> branches;
-        public object Eval (IScope ctx) {
+        public object Call (IScope ctx, INode item) {
             var val = item.Eval(ctx);
             if(val is VIndex vi) {
                 val = vi.Get();
             }
             return Match(ctx, branches, val);
 		}
+        /*
+$Some(data)
+${foo = int:bar}
+$(foo:int bar:int)
+        */
         public static object Match(IScope ctx, List<(INode cond, INode yes)> branches, object val) {
 			//To do: Add recursive call
 			var inner_ctx = ctx.MakeTemp(val);
 			inner_ctx.locals["_default"] = val;
+
 			foreach(var (cond, yes) in branches) {
                 //TODO: Allow lambda matches
 				var b = cond.Eval(inner_ctx);
@@ -2798,6 +2863,13 @@ namespace Oblivia {
 			}
 		}
     }
+    public class ExSwitch : INode {
+        public INode item;
+        public ExSwitchFn fn;
+		public object Eval (IScope ctx) {
+            return fn.Call(ctx, item);
+		}
+	}
     public class ExCompose : INode{
         public ExTuple items;
         public object Eval (IScope ctx) => throw new Exception();
@@ -3052,6 +3124,13 @@ namespace Oblivia {
         public string op;
         public object Eval (IScope ctx) {
             var lhs = args.First().Eval(ctx);
+            if(args.Length == 1) {
+                var l = (dynamic)lhs;
+                return op switch {
+                    "++" => l + 1,
+                    "--" => l - 1
+                };
+            }
             foreach(var rhs in args.Skip(1)) {
                 //Get extension member or internal member
                 switch(lhs) {
@@ -3066,22 +3145,24 @@ namespace Oblivia {
                             "-" => l - r,
                             "*" => l * r,
                             "/" => l / r,
-							">" => l > r,
-							"<" => l < r,
-							">>" => l >> r,
-							"<<" => l << r,
-
-							"=" => l == r,
-
-                            ".." => l..r,
 
 							"&" => l & r,
 							"|" => l | r,
-
+							"^" => l ^ r,
 							"%" => l % r,
+							"=" => l == r,
+							"≠" => l != r,
+							">" => l > r,
+							"<" => l < r,
+
+							"**" => Math.Pow(l, r),
+							"//" => (int)Math.Floor(l / r),
+
+							">>" => l >> r,
+							"<<" => l << r,
+							".." => l .. r,
 							"&&" => l && r,
 							"||" => l || r,
-
 						};
 						break;
 				}
@@ -3142,10 +3223,8 @@ namespace Oblivia {
             var a = EvalTuple(ctx);
             switch(a.Length) {
                 case 0: return VEmpty.VALUE;
-                case 1:
-                    return a.items.Single().val;
-                default:
-                    return a;
+                case 1: return a.items.Single().val;
+                default:return a;
             }
         }
         public void Spread (IScope ctx, List<(string key, object val)> it) {
@@ -3205,7 +3284,11 @@ namespace Oblivia {
                     return Enumerable.Range(0, (int)r);
                 case EFn.NOT:
                     return !(bool)r;
-                default:throw new Exception();
+				case EFn.FLOOR:
+					return Math.Floor((dynamic)r);
+				case EFn.CEILING:
+					return Math.Ceiling((dynamic)r);
+				default:throw new Exception();
             }
 		}
 
@@ -3214,7 +3297,7 @@ namespace Oblivia {
             IOTA,
             NOT,
             FLOOR,
-            CEIL
+            CEILING
         }
     }
     public class ExDyadic : INode {
@@ -3223,55 +3306,73 @@ namespace Oblivia {
         public EFn fn;
 
 		public object Eval (IScope ctx) {
-            switch(fn) {
-                case EFn.AND: {
-                        var l = (bool)lhs.Eval(ctx);
-                        switch(l) {
-                            case true: {
-                                    var r =(bool) rhs.Eval(ctx);
-                                    switch(r) {
-                                        case true:  return true;
-                                        case false: return false;
-                                    }
-                                }
-                            case false: return false;
-                        }
+
+            bool and(){
+                foreach(var b in (INode[])[lhs, rhs]) {
+                    switch(b.Eval(ctx)) {
+                        case false:
+                            return false;
+                        case true:continue;
+                        default: throw new Exception();
                     }
-				case EFn.OR: {
-						var l = (bool)lhs.Eval(ctx);
-						switch(l) {
-							case false: {
-									var r = (bool)rhs.Eval(ctx);
-									switch(r) {
-										case false: return false;
-										case true:  return true;
-									}
-								}
-							case true: return true;
-						}
-					}
+                }
+                return true;
+            };
+            bool or() {
 
-				case EFn.XOR: {
-						var l = (bool)lhs.Eval(ctx);
-						var r = (bool)rhs.Eval(ctx);
-                        return l ^ r;
-					}
+                foreach(var b in (INode[])[lhs, rhs]) {
+                    switch(b.Eval(ctx)) {
+                        case true:
+                            return true;
+                        case false:
+                            continue;
+                        default: throw new Exception();
+                    }
+                }
+                return false;
+            };
+            bool xor() {
+                var l = (bool)lhs.Eval(ctx);
+                var r = (bool)rhs.Eval(ctx);
+                return l ^ r;
+            };
 
+			switch(fn) {
+                case EFn.AND:
+                    return and();
+				case EFn.OR:
+                    return or();
+				case EFn.XOR:
+                    return xor();
+                case EFn.NAND:
+                    return !and();
+                case EFn.NOR:
+                    return !or();
+                case EFn.XNOR:
+                    return !xor();
+                case EFn.MAX:
+                    return Math.Max((dynamic)lhs.Eval(ctx), (dynamic)rhs.Eval(ctx));
+				case EFn.MIN:
+					return Math.Min((dynamic)lhs.Eval(ctx), (dynamic)rhs.Eval(ctx));
+                case EFn.for_all:
+
+                case EFn.exists:
+
+				case EFn.count:
+
+				case EFn.concat:
 				default:
                     throw new Exception();
 			}
 		}
-
 		public enum EFn {
             ERR,
-            AND,
-            OR,
-            XOR,
+            AND, OR, XOR,
+            NAND, NOR, XNOR,
+            MAX, MIN,
+            FRONT, BACK,
 
-            MAX,
-            MIN,
-            FRONT,
-            BACK
+            for_all, exists, concat, count
 
             };
     }
@@ -3597,16 +3698,16 @@ namespace Oblivia {
         public Tokenizer (string src) {
             this.src = src;
         }
-        public List<Token> GetAllTokens () {
-            var tokens = new List<Token> { };
-            while(Next() is { type: not TokenType.EOF } t) {
+        public List<IToken> GetAllTokens () {
+            var tokens = new List<IToken> { };
+            while(Next() is { type: not TokenType.eof } t) {
                 tokens.Add(t);
             }
             return tokens;
         }
-        public Token Next () {
+        public IToken Next () {
             if(index >= src.Length) {
-                return new Token { type = TokenType.EOF };
+                return new StrToken { type = TokenType.eof };
             }
             var str = (params char[] c) => string.Join("", c);
             void inc () => index += 1;
@@ -3702,7 +3803,7 @@ namespace Oblivia {
                         }
                         dest += 1;
                         index = dest;
-                        return new Token { type = TokenType.STRING, str = v };
+                        return new StrToken { type = TokenType.str, str = v };
                     }
                     /*
                 case '\t':
@@ -3713,12 +3814,26 @@ namespace Oblivia {
                         goto Check;
                     }
                 case (>= '0' and <= '9'): {
-                        int dest;
-                        for(dest = index + 1; dest < src.Length && src[dest] is >= '0' and <= '9'; dest++) {
-                        }
-                        var v = src[index..dest];
+                        int dest = index + 1;
+
+                        Read:
+
+                        int val = 0;
+
+                        if(dest < src.Length) {
+
+                            switch(src[dest]) {
+                                case var ch and (>= '0' and <= '9'):
+                                    val = val * 10 + ch - '0';
+                                    dest++;
+                                    goto Read;
+                                case '_':
+                                    dest++;
+                                    goto Read;
+							}
+						}
                         index = dest;
-                        return new Token { type = TokenType.INTEGER, str = v };
+                        return new MeasureToken { val = val, measure = "" };
                     }
                 case ((>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or '_' or (>= '0' and <= '9')): {
                         int dest = index;
@@ -3750,7 +3865,7 @@ namespace Oblivia {
                         }
                         Done:
                         index = dest;
-                        return new Token { type = TokenType.NAME, str = v };
+                        return new StrToken { type = TokenType.name, str = v };
                     }
             }
 
@@ -3759,131 +3874,219 @@ namespace Oblivia {
 
 				var _t = (TokenType)(ulong)c;
 				index += 1;
-				return new Token { type = _t, str = str(c) };
+				return new StrToken { type = _t, str = str(c) };
 			}
             throw new Exception();
         }
     }
     public enum TokenType : ulong {
-        COMMA = ',',
-        COLON = ':',
-		BLOCK_L = '{',
-		BLOCK_R = '}',
-		TUPLE_L = '(',
-        TUPLE_R = ')',
-        ARRAY_L = '[',
-        ARRAY_R = ']',
-        ANGLE_L = '<',
-        ANGLE_R = '>',
-        CARET = '^',
-        PERIOD = '.',
-        EQUAL ='=',
-		PLUS = '+',
-		MINUS = '-',
-		SLASH = '/',
-		QUOTE = '\'',
-		AT = '@',
-        QUESTION = '?',
-        SHOUT = '!',
-        STAR = '*',
-        PIPE = '|',
-        AMP = '&',
-        CASH = '$',
-        PERCENT = '%',
-        HASH = '#',
-        REPEAT = '¨',
-		TIMES = '×',
-		IOTA = 'ɩ',
-        DIVIDE = '÷',
+        comma = ',',
+        colon = ':',
+		block_l = '{',
+		block_r = '}',
+		tuple_l = '(',
+        tuple_r = ')',
+        array_l = '[',
+        array_r = ']',
+        angle_l = '<',
+        angle_r = '>',
+		brack_l = '⟨',
+		brack_r = '⟩',
+		caret = '^',
+        period = '.',
+        equal ='=',
+		plus = '+',
+		minus = '-',
+		slash = '/',
+		quote = '\'',
+		at = '@',
+        question = '?',
+        bang = '!',
+        star = '*',
+        pipe = '|',
+        amp = '&',
+        cash = '$',
+        percent = '%',
+        hash = '#',
+        repeat = '¨',
+		times = '×',
+		iota = 'ɩ',
+        divide = '÷',
 
-        DIVIDES = '∣',
-        CEIL = '⌈',
-		FLOOR = '⌊',
+        divides = '∣',
+        ceil = '⌈',
+		floor = '⌊',
 
+        ellipsis = '…',
+        h_ellipsis = '⋯',
+		v_ellipsis = '⋮',
+        ne_ellipsis = '⋰',
+        se_ellipsis = '⋱',
 
-        PRECEDES = '≺',
-        SUCCEEDS = '≻',
-        PRECEDES_NOT = '≽',
-        SUCCEEDS_NOT = '≼',
+        numero = '№',
+        irony = '⸮',
 
-		INV_QUESTION = '¿',
+        reference = '※',
+        asterism = '⁂',
 
-		NOT_EQUAL = '≠',
-        APPROX_EQUAL = '≈',
-        EQUIV = '≡', NOT_EQUIV = '≢',
+        radical = '√',
+
+        guillemet_l = '‹',
+        guillemet_r = '›',
+        guillemet_ll = '«',
+        guillemet_rr = '»',
+        manicule = '☞',
+        pilcrow = '¶',
+        copyright = '©',
+
+        registered = '®',
+        interpunct = '·',
+        bullet= '•',
+        double_hyphen = '⹀',
+        double_oblique_hyphen = '⸗',
+
+        colon_equals = '≔',
+
+		before = '≺',
+        after = '≻',
+        before_eq = '≽',
+        after_eq = '≼',
+
+		inv_question = '¿',
+
+		not_eq = '≠',
+        approx_eq = '≈',
+        equiv = '≡', not_equiv = '≢',
         INF = '∞',
-        INTERSECT = '∩',
-        INTEGRAL = '∫',
+        integral = '∫',
         SQRT = '√',
-        BULLET_OPERATOR = '∙',
-        SUM = '∑',
-        PRODUCT = '∏',
-        INCREMENT = '∆',
-        GEQ = '≥',
-        LEQ = '≤',
+        bullet_op = '∙',
+        sum = '∑',
+        product = '∏',
+        increment = '∆',
+        geq = '≥',
+        leq = '≤',
 
-		ARROW_W = '←',
-        ARROW_E = '→',
-        ARROW_S = '↓',
-        ARROW_N = '↑',
-        CROSS_PRODUCT = '⨯',
+		arrow_w = '←',
+        arrow_e = '→',
+        arrow_s = '↓',
+        arrow_n = '↑',
+        cross_product = '⨯',
 
 		HOUSE = '⌂',
-        DEGREE = '°',
+        degree = '°',
         BULLET = '•',
-        SECTION = '§',
-        LOZENGE = '◊',
-        CIRCLE = '○',
-        INV_SHOUT = '¡',
-        TRI_N = '▲',
-        TRI_S = '▼',
-        MINI_TRI_N = '▴',
-        MINI_TRI_E = '▸',
-        MINI_TRI_S = '▾',
-        MINI_TRI_W = '◂',
+        section = '§',
+        lozenge = '◊',
+        circle = '○',
+        inv_bang = '¡',
+        triangle_n = '▲',
+        triangle_s = '▼',
+        small_triangle_n = '▴',
+        small_triangle_e = '▸',
+        small_triangle_s = '▾',
+        small_triangle_w = '◂',
         PTR_R = '►',
         PTR_L = '◄',
-        INTERRO = '‽',
-        DOUBLE_SHOUT = '‼',
-		SPACE = ' ',
+        interrobang = '‽',
+        double_bang = '‼',
+		space = ' ',
 
-        IN = '∈',
-        NOT_IN = '∉',
+        member_of = '∈',
+        not_member_of = '∉',
 
-        EMPTY = '∅',
+        empty = '∅',
 
-        IS_SUBSET = '⊆',
-        HAS_SUBSET = '⊇',
+        double_plus = '⧺',
+        count = '⧣',
 
-        SUBSET = '⊂',
-        SUBSET_2 = '⊃',
+		is_subset_eq = '⊆',
+        has_subset_eq = '⊇',
+        is_subset = '⊂',
+        has_subset = '⊃',
 
-        DELTA = 'Δ',
+        delta = 'Δ',
 
-        NOT = '¬',
-		OR = '∨',
-		AND = '∧',
-		XOR = '⊻',
+        universal_quantifier = '∀',
+        existential_quantifier = '∃',
 
-		CAP = '∩',
-        CUP = '∪',
+        nvdash = '⊬',
+        nvDash = '⊭',
+        diamond = '◇',
+        coloneqq = '≔',
+        triangleq = '≜',
+        def = '≝',
+        strictif= '⥽',
 
-        CO_PRODUCT = '⊔',
+        ulcorner = '⌜',
+        urcorner = '⌝',
+        nexists = '∄',
+        nand_ = '⊼',
+        nor_ = '⊽',
+        odot = '⊙',
+        left_right_tack = '⟛',
+        models = '⊧',
+        forces= '⊩',
+        never= '⟡',
+        was_never= '⟢',
+        will_never= '⟣',
+        was_always = '⟤',
+        will_always= '⟥',
+        reverse_not = '⌐',
+        and_and = '⨇',
+
+		implies = '⇒',
+        iff= '⇔',
+
+        maps_to = '↦',
+        is_proportional_to = '∝',
+        such_that = '∋',
+        dice = '⚄',
+
+		therefore = '∴',
+        because = '∵',
+
+        tautology = '⊤',
+        contradiction = '⊥',
+
+
+		proves = '⊢',
+        entails = '⊨',
+
+		not = '¬',
+		or = '∨',
+        nor = '⍱',
+		and = '∧',
+        nand = '⍲',
+		xor = '⊻',
+
+		intersection = '∩',
+        union = '∪',
+
+        co_product = '⊔',
         AAA = '⊓',
 
-		NAME = 0xFFFFFFFFFFFFFFF0,
-		STRING,
-        INTEGER,
-		EOF,
-    }
-	//≣
-	//«µ»əɅʌΘ∕❮❯❰❱
-	//
-	//Ⱶⱻ♪♫↔↕↨∟
-	public class Token {
-        public TokenType type;
-        public string str;
 
+
+		name = 0xFFFFFFFFFFFFFFF0,
+		str,
+        measure,
+		eof,
+    }
+    //≣
+    //«µ»əɅʌΘ∕❮❯❰❱
+    //
+    //Ⱶⱻ♪♫↔↕↨∟
+
+    public interface IToken { TokenType type { get; } }
+	public class StrToken:IToken {
+        public TokenType type { get; set; }
+        public string str;
         public string ToString () => $"[{type}] {str}";
+    }
+    public class MeasureToken:IToken {
+        public TokenType type => TokenType.measure;
+        public int val;
+        public string measure;
     }
 }

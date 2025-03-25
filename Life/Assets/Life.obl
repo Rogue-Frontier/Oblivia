@@ -1,34 +1,40 @@
 ﻿{
     print:Console/WriteLine
     Life:class {
-        width:i4 height:i4 grid:Grid.bit
+        @dbg["width:" w]
+        w:i4
+        @dbg["height:" h]
+        h:i4 grid:Grid(bit)
         mod(n:i4 max:i4):   (%: (<: n 0) ?+ (+:n max) ?- n max)
-        at(x:i4 y:i4):      grid(mod.|[x:width y:height]|i4)
-        get(x:i4 y:i4):     at(x y)/Get()
-        set(x:i4 y:i4 b:bit):   at(x y)/Set(b)
-        new(width:i4 height:i4):_class{
-            {width height} := ^^,
-            grid := Grid.bit/ctor(width height)
+
+        xy: (x:i4 y:i4)
+        at(%xy):      grid(mod.|[x:w y:h]|i4)
+        get(%xy):     at(x y)/Get()
+        set(%xy b:bit):   at(x y)/Set(b)
+        new(w:i4 h:i4): _class {
+            {w h} := ^^,
+            grid := Grid(bit)/ctor(w h)
             debug()
         }
-        debug(): print*|cat*|[["width: " width],["height: " height]]
+        debug(): print*|cat*|[["width: " w],["height: " h]]
         activeNum:0
         txt:StrBuild/ctor()
         update(): {
             activeNum := 0
             g:get
             txt/Clear()
-            ɩheight | ?(y:i4): {
-                ɩwidth | ?(x:i4): {
+            ta: txt/Append
+            ɩh | ?(y:i4): {
+                ɩw | ?(x:i4): {
                     w:(-:x 1) n:(+:y 1) e:(+:x 1) s:(-:y 1)
-                    c:count(g.|[w:n x:n e:n w:y e:y w:s x:s e:s] yes)
+                    c:count(g.|[w:n x:n e:n w:y e:y w:s x:s e:s] ⊤)
                     a:g(x y)
-                    active:a?+(<:c 2)∨(>:c 3)?+no?-a?-(=:c 3)?+yes?-a
+                    active:a ?+ (<:c 2) ∨ (>:c 3) ?+ no ?- a ?- (=:c 3) ?+ ⊤ ?- a
                     set(x y active)
                     activeNum := active ?+ (+:_ 1) ?- _
-                    txt/Append(active ?+ "+" ?- "-")
+                    ta(active ?+ "+" ?- "-")
                 }
-                txt/Append(newline)
+                ta(newline)
             }
             print*cat["active: " activeNum]
         }
@@ -36,8 +42,8 @@
     main(args:str): i4* {
         life:Life/new(32 32)
         print*life/grid[:i4 0 0]/Get()
-        ɩ(life/width) | ?(x:i4):ɩ(life/height) | ?(y:i4):life/set(x y rand_bool())
-        num:1 prevNum:0 run:yes
+        ɩ(life/w) | ?(x:i4):ɩ(life/h) | ?(y:i4):life/set(x y rand_bool())
+        num:1 prevNum:0 run:⊤
         Console/Clear()
         run ?++ {
             life/update()

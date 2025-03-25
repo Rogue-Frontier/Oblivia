@@ -1,16 +1,16 @@
 {
 	
 	ValError: class {
-		msg: str
+		msg->str
 	}
 	ValRef: class {
 	
 	}
 	ValConstructor: class {
-		t:Type
+		t->Type
 	}
 	ValInstanceMethod: class {
-		src:obj key:str
+		src->obj key->str
 		Call(data:Row.obj): obj*{
 			
 		}

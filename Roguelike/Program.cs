@@ -197,7 +197,7 @@ class Mainframe :IScene {
 		ctx.locals["scene"] = this;
 		
 		var VF = (string s) => (VFn)ctx.locals[s];
-		VF("init").CallData(ctx, []);
+		VF("init").CallData([]);
 		update = VF("update");
 		render = VF("render");
 		handle_key = VF("handle_key");
@@ -205,15 +205,15 @@ class Mainframe :IScene {
 	}
 	VFn update, render, handle_key, handle_mouse;
 	void IScene.Update(System.TimeSpan delta) {
-		update.CallData(ctx, [delta]);
+		update.CallData([delta]);
 	}
 	void IScene.Render(System.TimeSpan delta) {
-		render.CallData(ctx, [delta]);
+		render.CallData([delta]);
 	}
 	void IScene.HandleKey(LibGamer.KB kb) {
-		handle_key.CallData(ctx, [kb]);
+		handle_key.CallData([kb]);
 	} 
 	void IScene.HandleMouse(LibGamer.HandState mouse) {
-		handle_mouse.CallData(ctx, [mouse]);
+		handle_mouse.CallData([mouse]);
 	}
 }

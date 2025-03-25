@@ -15,8 +15,8 @@ range(1, grid.width) | (x:int): int {
 ?@
 */
 var tokenizer = new Tokenizer(File.ReadAllText("Assets/Life.obl"));
-var tokens = new List<Token> { };
-while(tokenizer.Next() is { type: not TokenType.EOF } t) {
+var tokens = new List<StrToken> { };
+while(tokenizer.Next() is { type: not TokenType.eof } t) {
 	tokens.Add(t);
 }
 var parser = new Parser(tokens);

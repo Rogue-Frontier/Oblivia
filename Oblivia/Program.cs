@@ -494,7 +494,9 @@ namespace Oblivia {
             func_ctx.locals["_func"] = this;
             InitPars(func_ctx);
             int ind = 0;
-            foreach(var (k, v) in evalArgs().items) {
+            var args = evalArgs();
+
+			foreach(var (k, v) in args.items) {
                 if(k != null) {
                     ind = -1;
                     var val = StAssignSymbol.AssignLocal(func_ctx, k, () => v);
@@ -3879,17 +3881,15 @@ $(foo:int bar:int)
                         goto Check;
                     }
                 case (>= '0' and <= '9'): {
-                        int dest = index + 1;
+                        int dest = index;
 
-                        Read:
-
-                        int val = 0;
-
+						int val = 0;
+						Read:
                         if(dest < src.Length) {
-
-                            switch(src[dest]) {
-                                case var ch and (>= '0' and <= '9'):
-                                    val = val * 10 + ch - '0';
+                            var ch = src[dest];
+							switch(ch) {
+                                case(>= '0' and <= '9'):
+                                    val = val * 10 + (ch - '0');
                                     dest++;
                                     goto Read;
                                 case '_':

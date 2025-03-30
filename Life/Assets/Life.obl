@@ -6,9 +6,6 @@
         #@dbg["height:" h]
         h->i4
         grid->Grid(bit)
-        
-        
-        
         mod(n:i4 max:i4):(%: (<: n 0) ?+ (+:n max) ?- n max)
         # xy: (x:i4 y:i4)
         # %xy
@@ -17,9 +14,7 @@
         set(x:i4 y:i4 b:bit):at(x y)/Set(b)
         new(w:i4 h:i4): Life {
             print*cat["args: " _0 ", " _1],
-            (w h) := _arg/(w h),
-            
-            
+            (w h) := ^^/(w h),
             grid := Grid(bit)/ctor(w h)
             debug()
         }
@@ -30,16 +25,15 @@
             activeNum := 0
             g:get
             txt/Clear()
-            ta: txt/Append
+            ta: txt/Append,
             ɩh | ?(y:i4){
                 ɩw | ?(x:i4){
                     w:(-:x 1) n:(+:y 1) e:(+:x 1) s:(-:y 1)
                     c:count(g.|[w:n x:n e:n w:y e:y w:s x:s e:s] ⊤)
-                    a:g(x y)
-                    active:a ?+ (<:c 2) ∨ (>:c 3) ?+ no ?- a ?- (=:c 3) ?+ ⊤ ?- a
+                    active: g(x y) ?+ not((<:c 2)∨(>:c 3)) ?- eq(c 3)
                     set(x y active)
-                    activeNum := active ?+ (+:_ 1) ?- _
-                    ta(active ?+ "+" ?- "-")
+                    active ?+ { activeNum := (+:_ 1) }
+                    ta(active ?+ "*" ?- " ")
                 }
                 ta(newline)
             }
@@ -48,12 +42,9 @@
     }
     main(args:str) -> i4: {
         life:Life/new(32 32)
-
-        /*
-        print*life/grid[:i4 0 0]/Get()
+        print*life/grid[:i4 0 0]/Get(),
         ɩ(life/w) | ?(x:i4)ɩ(life/h) | ?(y:i4) life/set(x y rand_bool())
-        num:1 prevNum:0 run:⊤
-        i:1
+        num:1 prevNum:0 run:⊤ i:1
         Console/Clear()
         run ?++ {
             life/update()
@@ -66,7 +57,7 @@
                 Write*life/txt/ToString()
             }
         }
-        */
+        
         ^: 0
     }
 }

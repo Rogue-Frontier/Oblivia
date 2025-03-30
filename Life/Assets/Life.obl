@@ -41,6 +41,9 @@
         }
     }
     main(args:str) -> i4: {
+        
+        ɩ5 | print
+        /*
         life:Life/new(32 32)
         print*life/grid[:i4 0 0]/Get(),
         ɩ(life/w) | ?(x:i4)ɩ(life/h) | ?(y:i4) life/set(x y rand_bool())
@@ -57,7 +60,7 @@
                 Write*life/txt/ToString()
             }
         }
-        
+        */
         ^: 0
     }
 }

@@ -146,6 +146,9 @@ namespace Oblivia {
                     ["StrBuild"] = typeof(StringBuilder),
                     ["Fn"] = typeof(VFn),
                     ["PQ"] = _((object a, object b) => MakeGeneric(typeof(PriorityQueue<,>), a, b)),
+
+                    ["sat"] = 
+ValKeyword.SAT,
                     ["default"] = ValKeyword.DEFAULT,
                     ["class"] = ValKeyword.CLASS,
                     ["interface"] = ValKeyword.INTERFACE,
@@ -171,7 +174,7 @@ namespace Oblivia {
                     ["replace"] = ValKeyword.REPLACE,
                     ["macro"] = ValKeyword.MACRO,
                     ["magic"] = ValKeyword.MAGIC,
-                    ["label"] = ValKeyword.LABEL,
+
                     ["go"] = ValKeyword.GO,
 
                     ["pub"] = ValKeyword.PUB,
@@ -201,6 +204,9 @@ namespace Oblivia {
     public record VIndex {
         public Action<object> Set;
         public Func<object> Get;
+
+        public bool can_get = false;
+        public bool can_set = false;
     }
     public record ValRef {
         public Array src;
@@ -303,6 +309,7 @@ namespace Oblivia {
         NOP,
         //Creates a magic constant e.g. null
         MAGIC,
+        SAT,
 
         TYPEOF,
 
@@ -322,6 +329,10 @@ namespace Oblivia {
         CONSTEXPR,
 
         MEASURE
+    }
+    public class VPredicate {
+        public VFn predicate;
+        public bool Accept (object args) => predicate.CallData([args]) is true;
     }
     public class VInterType {
         public object[] items;
@@ -382,10 +393,12 @@ namespace Oblivia {
     }
     public record ValPattern { }
 	public record VGo {
-		public ExUpKey target;
-
-		public object Up () => this with { target = target with { up = target.up - 1 } };
+        public VLabel target;
 	}
+    public record VLabel {
+        public int index;
+        public VDictScope home;
+    }
     public record ExGet : INode {
         public INode get;
         public object Eval (IScope ctx) => new VGet { ctx = ctx, get = get };
@@ -1472,6 +1485,10 @@ namespace Oblivia {
 				case TokenType.xor:                     return DyadicTerm(ExDyadic.EFn.xor);
 				case TokenType.nand:                    return DyadicTerm(ExDyadic.EFn.nand);
 				case TokenType.nor:                     return DyadicTerm(ExDyadic.EFn.nor);
+
+				case TokenType.geq:                     return DyadicTerm(ExDyadic.EFn.geq);
+				case TokenType.leq:                     return DyadicTerm(ExDyadic.EFn.leq);
+
 				case TokenType.ceil:                    return DyadicTerm(ExDyadic.EFn.max);
                 case TokenType.floor:                   return DyadicTerm(ExDyadic.EFn.min);
 				case TokenType.existential_quantifier:  return DyadicTerm(ExDyadic.EFn.exists);
@@ -1505,6 +1522,8 @@ namespace Oblivia {
 				case TokenType.index_descend:   return MonadicTerm(ExMonadic.EFn.index_descend);
 				case TokenType.index_ascend:    return MonadicTerm(ExMonadic.EFn.index_ascend);
                 case TokenType.roll:            return MonadicTerm(ExMonadic.EFn.roll);
+
+                case TokenType.keyboard:        return MonadicTerm(ExMonadic.EFn.keyboard);
 				/*
 			case TokenType.minus:{
 				inc();
@@ -2076,18 +2095,44 @@ namespace Oblivia {
                         throw new Exception("Object expected");
                     }
                 case ValKeyword.ENUM: {
-                        var locals = new Dictionary<string, object> { };
-                        foreach(var st in source_block.statements) {
+						var keyToVal = new ConcurrentDictionary<string, dynamic>();
+						var valToKey = new ConcurrentDictionary<dynamic, string>();
+
+						var keys = new string[source_block.statements.Count];
+						var vals = new object[source_block.statements.Count];
+                        int i = 0;
+						foreach(var st in source_block.statements) {
+
+                            void Add(string k, dynamic v) {
+								keyToVal[k] = v;
+								valToKey[v] = k;
+								keys[i] = k;
+								vals[i] = v;
+							}
                             switch(st) {
-                                case ExUpKey { up: -1, key: { } k }:
-                                    locals[k] = new object();
+                                case ExUpKey { up: -1, key: { } k }:{
+                                    var v = new object();
+                                    Add(k, v);
                                     break;
-                                case ExInvoke { target: ExUpKey { up: -1, key: { } k } }:
-                                    locals[k] = new object();
+                                }
+                                case ExInvoke { target: ExUpKey { up: -1, key: { } k } }: {
+                                    var v = new object();
+                                    Add(k, v);
                                     break;
+                                }
+                                case StDefKey { key: { } k, value: { } val }: {
+                                    var v = val.Eval(ctx);
+                                    Add(k, v);
+                                    break;
+                                }
                             }
+							i++;
                         }
-                        return new VDictScope { locals = [], parent = ctx, temp = false };
+						keyToVal["_keyToVal"] = keyToVal;
+						keyToVal["_valToKey"] = valToKey;
+						keyToVal["_keys"] = keys;
+						keyToVal["_vals"] = vals;
+						return new VDictScope { locals = keyToVal, parent = ctx, temp = false };
 					}
 				default:
 					return ExInvoke.InvokeFunc(ctx, t, getArgs);
@@ -2167,8 +2212,9 @@ ${
                     return !Is(v, co.on);
                 case (var v, VInterType vmp):
                     return vmp.Accept(v);
-                    throw new Exception();
-                case (var v, VCriteria vcr):
+                case (var v, VPredicate sat):
+                    return sat.Accept(v);
+				case (var v, VCriteria vcr):
                     return vcr.Accept(v);
 				case (var v, VInterface vi): {
 						if(v is VDictScope vds && vds.HasInterface(vi)) {
@@ -2280,7 +2326,11 @@ ${
                 case VError ve:
                     throw new Exception(ve.msg);
                 case ValKeyword.MAGIC:      return new ValMagic();
-                case ValKeyword.GO:         return new VGo { target = args.items[0].value as ExUpKey };
+                case ValKeyword.GO: {
+
+                        var ar = args.Eval(ctx);
+						return new VGo { target = (VLabel)ar };
+					}
                 case ValKeyword.SET:        return new VSet { ctx= ctx, set = args };
                 case ValKeyword.GET:        return new VGet { ctx = ctx, get = args };
                 case ValKeyword.ANY:
@@ -2360,6 +2410,10 @@ ${
                         }
                         return VEmpty.VALUE;
                     }
+                case ValKeyword.SAT:
+                    var a = args.Eval(ctx);
+
+					return new VPredicate { predicate = (VFn)a};
                 case ValKeyword.FN:
                 default:    return InvokePars(ctx, f, args);
             }
@@ -2491,13 +2545,20 @@ ${
 						return new VIndex {
                             
                             Get = () => a.GetValue(ind),
-                            Set = (object o) => a.SetValue(o, ind) };
+                            Set = (object o) => a.SetValue(o, ind),
+                            can_get = true
+                        };
 					}
 
 
 				case IDictionary d: {
 						var ind = evalArgs().vals.Single();
-                        return new VIndex { Get = () => d[ind], Set = (object o) => d[ind] = o };
+                        return new VIndex {
+                            Get = () => d[ind],
+                            Set = (object o) => d[ind] = o,
+                            can_get = d.Contains(ind),
+                            can_set = true
+                        };
 					}
 				case IEnumerable e: {
 						var ind = evalArgs().vals.Single();
@@ -2544,26 +2605,41 @@ ${
         public object Eval (IScope ctx) {
             if(statements.Count == 0)
                 return VEmpty.VALUE;
-			var f = new VDictScope(ctx, false);
-			object r = VEmpty.VALUE;
-			foreach(var s in statements) {
-				switch(s) {
-                    case ExFnType { lhs:ExInvoke{ target:ExUpKey{ allowDefine:true, key:{ }key } }, rhs: { } rhs } ft:
-						StDefKey.Define(ctx, key, new VDeclared { name = key, type = ft });
-                        continue;
-                    case ExFnType { lhs: ExUpKey { allowDefine: true, key: { } key }, rhs:{ }rhs } ft:
-						var t = rhs.Eval(ctx);
-						StDefKey.Define(ctx, key, new VDeclared { name = key, type = t });
-                        continue;
+            var f = new VDictScope(ctx, false);
+            object r = VEmpty.VALUE;
+
+            var labels = new HashSet<int>();
+
+            for(int i = 0; i < statements.Count; i++) {
+				if(statements[i] is StDefKey { value: ExUpKey{key:"label" }, key:{ }k }) {
+                    var l = new VLabel { home = f, index = i };
+					f.locals[k] = l;
+                    labels.Add(i);
+					//statements[i] = new ExVal { value = l };
+                }
+            }
+
+            for(int i = 0; i < statements.Count; i++) {
+				if(labels.Contains(i)) {
+					continue;
 				}
-				r = s.Eval(f);
-				AutoKey(f, s, r);
-				switch(r) {
-					case VRet vr:  return vr.Up();
-                    case VYield vy:   throw new Exception();
-				}
-				f.locals["__"] = r;
-			}
+				var s = statements[i];
+                r = s.Eval(f);
+                AutoKey(f, s, r);
+                switch(r) {
+                    case VRet vr: return vr.Up();
+                    case VYield vy: throw new Exception();
+                    case VGo vg:
+                        if(vg.target.home == f) {
+                            i = vg.target.index;
+                            break;
+                        } else {
+                            return vg;
+                        }
+                        throw new Exception();
+                }
+                f.locals["__"] = r;
+            }
             return obj ? f : r;
         }
         public object Apply (IScope f) {
@@ -2578,6 +2654,8 @@ ${
                 AutoKey(f, s, r);
 				switch(r) {
                     case VRet vr:  return vr.Up();
+                    case VGo vg:
+                        throw new Exception();
 				}
 				f.SetLocal("__", r);
 			}
@@ -2608,6 +2686,8 @@ ${
             var def = () => { };
             var seq = new List<INode> { };
             var labels = new Dictionary<string, int>();
+
+            var i = 0;
             foreach(var s in statements) {
                 switch(s) {
 					/*
@@ -2616,7 +2696,7 @@ ${
 						break;
 					}
 					*/
-					case StDefFn df when df.value is ExInvokeBlock { type: ExUpKey { key: "class" or "interface" } }: {
+					case StDefFn df when df.value is ExInvokeBlock { type: ExUpKey { key: "class" or "interface" or "enum" } }: {
                             df.Define(ctx);
                             break;
                         }
@@ -2630,7 +2710,12 @@ ${
                             def += () => block.StagedApply(_static);
                             break;
                         }
-                    case StDefKey { key:{ }key, value: ExUpKey { key: "label" } }:
+
+					case StDefKey { value: ExInvokeBlock { type: ExUpKey { key: "enum", up: -1 }, source_block: { } block } } kv: {
+							def += () => kv.Eval(ctx);
+							break;
+						}
+					case StDefKey { key:{ }key, value: ExUpKey { key: "label" } }:
                         labels[key] = seq.Count;
                         seq.Add(s);
                         break;
@@ -2638,9 +2723,11 @@ ${
                         seq.Add(s);
                         break;
                 }
+
+                i++;
             }
             def();
-            var i = 0;
+            i = 0;
             while(i < seq.Count) {
 				object r = VEmpty.VALUE;
 				var s = seq[i];
@@ -2657,21 +2744,12 @@ ${
 					case VRet vr:
 						return vr.Up();
 					case VGo vg:
-						if(vg.target.up == 1) {
-							if(labels.TryGetValue(vg.target.key, out var ind)) {
-                                i = ind;
-                                continue;
-							}
-							throw new Exception();
-						}
-						if(vg.target.up == -1) {
-							if(labels.TryGetValue(vg.target.key, out var ind)) {
-                                i = ind;
-                                continue;
-							}
-							return vg;
-						}
-						return vg.Up();
+                        if(vg.target.home == ctx) {
+                            i = vg.target.index;
+                            continue;
+                        } else {
+                            return vg;
+                        }
 				}
 				ctx.SetLocal("__", r);
 				i++;
@@ -2905,14 +2983,7 @@ $(foo:int bar:int)
 			}
 			throw new Exception("Fell out of match expression");
 			bool Is (object pattern) {
-                switch(pattern) {
-                    case VInterType mp:
-                        return mp.Accept(val);
-                }
-				if(Equals(val, pattern))
-					return true;
-				else
-					return false;
+                return ExIs.Is(val, pattern);
 			}
 		}
     }
@@ -3066,22 +3137,35 @@ $(foo:int bar:int)
         public string key;
         public INode value;
         public INode type;
+        public bool first = true;
         public XElement ToXML () => new("KeyVal", new XAttribute("key", key), value.ToXML());
         public string Source => $"{key}:{value?.Source ?? "null"}";
         public object Eval (IScope ctx) {
 
             if(value == null) {
+                var val = new VDeclared { name = key, type = type.Eval(ctx) };
+                if(first) {
+                    Define(ctx, key, val);
+					first = false;
+				} else {
+                    Set(ctx, key, val);
+                }
+            } else {
+                var val = value.Eval(ctx);
+                if(val is VError ve) {
+					throw new Exception(ve.msg);
+				}
+				if(first) {
+					Define(ctx, key, val);
+                    first = false;
+				} else {
+					Set(ctx, key, val);
+				}
+			}
 
-                Set(ctx, key, new VDeclared { name = key, type = type.Eval(ctx) });
-                return VEmpty.VALUE;
-            }
+			return VEmpty.VALUE;
 
-            var val = value.Eval(ctx);
-            switch(val) {
-                case VError ve: throw new Exception(ve.msg);
-                default: return Define(ctx, key, val);
-            }
-        }
+		}
         public static object DefineFrom (IScope ctx, string key, IScope from) => Define(ctx, key, from.Get(key));
         public static object Define (IScope ctx, string key, object val) {
             var curr = ctx.GetLocal(key);
@@ -3206,6 +3290,9 @@ $(foo:int bar:int)
 							"≠" => l != r,
 							">" => l > r,
 							"<" => l < r,
+
+                            "<=" => l <= r,
+                            ">=" => l >= r,
 
 							"**" => Math.Pow(l, r),
 							"//" => (int)Math.Floor(l / r),
@@ -3340,6 +3427,9 @@ $(foo:int bar:int)
 					return Math.Floor((dynamic)r);
 				case EFn.ceil:
 					return Math.Ceiling((dynamic)r);
+
+                case EFn.keyboard:
+                    return((string)r)[0];
 				default:throw new Exception();
             }
 		}
@@ -3353,7 +3443,9 @@ $(foo:int bar:int)
             log,
 
 			index_ascend, index_descend,
-            roll
+            roll,
+
+            keyboard
 		}
 	}
     public class ExDyadic : INode {
@@ -3417,6 +3509,10 @@ $(foo:int bar:int)
 				case EFn.count:
 
 				case EFn.concat:
+                case EFn.geq:
+                    return (dynamic)lhs.Eval(ctx) >= (dynamic)rhs.Eval(ctx);
+                case EFn.leq:
+					return (dynamic)lhs.Eval(ctx) <= (dynamic)rhs.Eval(ctx);
 				default:
                     throw new Exception();
 			}
@@ -3425,6 +3521,8 @@ $(foo:int bar:int)
             err,
             and, or, xor,
             nand, nor, xnor,
+
+            geq, leq,
             max, min,
             front, back,
 
@@ -3852,13 +3950,21 @@ $(foo:int bar:int)
                         var v = "";
                         while(dest < src.Length) {
                             if(src[dest] == '\\') {
-                                dest += 1;
-								v += src[dest] switch {
+
+
+								var ss = src[(dest - 10)..(dest + 10)];
+
+								dest += 1;
+                                var ch = src[dest];
+
+
+								v += ch switch {
                                     'r' => '\r',
                                     'n' => '\n',
                                     't' => '\t',
                                     '\\' => '\\',
-                                    '"' => '"'
+                                    '"' => '"',
+                                    '\'' => '\''
                                 };
                                 dest++;
 							} else if(src[dest] == '"') {
@@ -4175,6 +4281,7 @@ $(foo:int bar:int)
         co_product = '⊔',
         AAA = '⊓',
 
+        keyboard = '⌨',
 
 
 		name = 0xFFFFFFFFFFFFFFF0,

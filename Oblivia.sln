@@ -13,7 +13,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Oblivion", "Oblivion\Oblivi
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ECS", "ECS\ECS.csproj", "{E579ED02-D866-42E9-8FE2-BE9F41457989}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ObliviaTalk", "ObliviaTalk\ObliviaTalk.csproj", "{87CA11BC-1B79-4DA1-9276-8D3F9C90DFD7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ObliviaTalk", "ObliviaTalk\ObliviaTalk.csproj", "{87CA11BC-1B79-4DA1-9276-8D3F9C90DFD7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

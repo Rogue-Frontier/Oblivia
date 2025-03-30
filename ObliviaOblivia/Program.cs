@@ -14,7 +14,7 @@ range(1, grid.width) | (x:int): int {
 /*
 ?@
 */
-var tokenizer = new Tokenizer(File.ReadAllText("Assets/Oblivia.obl"));
+var tokenizer = new Tokenizer(File.ReadAllText("Assets/Life.obl"));
 var tokens = new List<IToken> { };
 while(tokenizer.Next() is { type: not TokenType.eof } t) {
 	tokens.Add(t);
@@ -31,9 +31,6 @@ global.locals = new() {
 	["double"] = typeof(double),
 	["string"] = typeof(string),
 	["object"] = typeof(object),
-
-	["File"] = typeof(File),
-
 
 	["addi"] = Val((int a, int b) => a + b),
 	["subi"] = Val((int a, int b) => a - b),
@@ -80,7 +77,7 @@ global.locals = new() {
 	["array_at"] = Val((Array a, int[] ind) => new ValRef { src = a, index = ind }),
 
 	["str_append"] = Val((StringBuilder sb, object o) => sb.Append(o)),
-	
+
 	["row_from"] = Val((Type t, object[] items) => {
 		var result = Array.CreateInstance(t, items.Length);
 		Array.Copy(items, result, items.Length);

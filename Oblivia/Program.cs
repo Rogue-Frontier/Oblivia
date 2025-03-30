@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.ComponentModel.Design;
+using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Net.WebSockets;
@@ -473,7 +474,11 @@ namespace Oblivia {
         }
         private void InitPars(IScope ctx) {
 			foreach(var (k, v) in pars.items) {
-				StDefKey.Define(ctx, k, v);
+				StDefKey.Define(ctx, k, v switch {
+					VClass or Type => new VDeclared { name = k, type = v },
+					_ => v
+
+                });
 			}
 		}
         public object CallPars (IScope caller_ctx, ExTuple pars) {
@@ -554,8 +559,8 @@ namespace Oblivia {
         public string name;
         public VDictScope _static;
         public INode source_expr;
-        public IScope source_ctx;
-        public VDictScope MakeInstance () => MakeInstance(source_ctx);
+        public IScope parent_ctx;
+        public VDictScope MakeInstance () => MakeInstance(parent_ctx);
         public VDictScope MakeInstance (IScope scope) {
             var r = (VDictScope)source_expr.Eval(scope);
             r.SetClass(this);
@@ -1012,74 +1017,130 @@ namespace Oblivia {
                                     }
                             }
                         //Local key define/assign
-                        case ExUpKey { up: { } up } es:
+                        case ExUpKey es:
                             switch(currTokenType) {
                                 case TokenType.equal:
                                     inc();
                                     return new StAssignSymbol { symbol = es, value = NextExpr() };
                                 default:
-                                    switch(up) {
+                                    switch(es.up) {
                                         case -1 or 1:
-                                            return new StDefKey {
-                                                key = es.key,
-                                                value = NextExpr()
-                                            };
-                                        default:
-                                            throw new Exception("Can only define in current scope");
+                                            return new StDefKey {key = es.key, value = NextExpr()};
+                                        default:throw new Exception("Can only define in current scope");
                                     }
                             }
+                        //Local method define
+						case ExInvoke { target: ExUpKey uk } ei:
+							switch(uk.up) {
+								case -1 or 1:return new StDefFn {key = uk.key, pars = ei.args.ParTuple(), value = NextExpr()};
+								default:throw new Exception("Cannot define non-local function");
+							}
+						//Self call define
+						case ExInvoke { target: ExSelf { up: 1 or -1 }, args: ExTuple et }:
+							return new StDefFn {
+								key = "_call",
+								pars = et,
+								value = NextExpr()
+							};
+						//Return
+						case ExSelf { up: { } up }:
+							return new StReturn { val = NextExpr(), up = up };
+                        case ExFnType eft:
+                            switch(eft.lhs) {
+								//Local key define/assign
+								case ExUpKey es:
+									switch(currTokenType) {
+										case TokenType.equal:
+											inc();
+											return new StAssignSymbol { symbol = es, value = NextExpr() };
+										default:
+											switch(es.up) {
+												case -1 or 1:
+													return new StDefKey { key = es.key, value = NextExpr() };
+												default: throw new Exception("Can only define in current scope");
+											}
+									}
+								//Local method define
+								case ExInvoke { target: ExUpKey uk } ei:
+									switch(uk.up) {
+										case -1 or 1: return new StDefFn { key = uk.key, pars = ei.args.ParTuple(), value = NextExpr() };
+										default: throw new Exception("Cannot define non-local function");
+									}
+								//Self call define
+								case ExInvoke { target: ExSelf { up: 1 or -1 }, args: ExTuple et }:
+									return new StDefFn {
+										key = "_call",
+										pars = et,
+										value = NextExpr()
+									};
+								//Return
+								case ExSelf { up: { } up }:
+									return new StReturn { val = NextExpr(), up = up };
+							}
+                            throw new Exception();
 						case ExMemberExpr emb:
 							throw new Exception();
 						case ExMemberBlock emb:
 							throw new Exception();
                         case ExMap { expr: true, map: ExUpKey euk } em:
 							throw new Exception();
-						//Return
-						case ExSelf { up: { } up }:
-							return new StReturn { val = NextExpr(), up = up };
-						case ExInvoke { expr: ExUpKey { up: { } up, key: { } key }, args: { } args }:
-                            switch(up) {
-                                case -1 or 1:
-                                    return new StDefFn {
-                                        key = key,
-                                        pars = args.ParTuple(),
-                                        value = NextExpr()
-                                    };
-                                default:
-                                    throw new Exception("Cannot define non-local function");
-                            }
-                        //Self call tuple
-                        case ExInvoke { expr: ExSelf { up: 1 or -1 }, args: ExTuple et }:
-                            return new StDefFn {
-                                key = "_call",
-                                pars = et,
-                                value = NextExpr()
-                            };
                         default:
-                            switch(currTokenType) {
+							throw new Exception("Cannot define this");
+                            /*
+							switch(currTokenType) {
                                 case TokenType.equal: {
                                         inc();
                                         return new StAssignExpr { lhs = lhs, rhs = NextExpr() };
                                     }
                             }
-                            throw new Exception("Cannot define this");
+                            */
                     }
-                default:
-                    return CompoundExpr(lhs);
             }
-        }
+
+			switch(lhs) {
+				case ExFnType { lhs: ExUpKey { } k, rhs: { }t } efn:
+					return new StDefKey { key = k.key, type = t };
+				case ExFnType { lhs: ExInvoke { } m, rhs: ExUpKey { } t } efn:
+					return new StDefKey { key = (m.target as ExUpKey).key, type = new ExFnType { lhs = m.args, rhs = t } };
+
+                    case ExFnType efn:
+
+                        throw new Exception();
+			}
+
+			lhs = CompoundExpr(lhs);
+            
+			return lhs;
+		}
         public INode NextPattern () => NextExpr();
         public INode NextExpr () {
             var lhs = NextTerm();
             return CompoundExpr(lhs);
         }
 		public INode CompoundExpr (INode lhs) {
-            Start:
+
+			INode DyadicTerm (ExDyadic.EFn fn) => Dyadic(fn, NextTerm);
+			INode DyadicExpr (ExDyadic.EFn fn) => Dyadic(fn, NextExpr);
+			INode Dyadic (ExDyadic.EFn fn, Func<INode> n) {
+				inc();
+				return CompoundExpr(new ExDyadic { fn = fn, lhs = lhs, rhs = n() });
+			}
+			Start:
             switch(currTokenType) {
                 case TokenType.space:
                     inc();
                     goto Start;
-                case TokenType.minus:
+                case TokenType.angle_l:
+                    inc();
+                    switch(currTokenType) {
+                        case TokenType.minus:
+                            inc();
+                            return DyadicExpr(ExDyadic.EFn.assign);
+                        default:
+                            throw new Exception("Invalid");
+                    }
+
+				case TokenType.minus:
                     inc();
                     switch(currTokenType) {
                         //fn type
@@ -1109,10 +1170,10 @@ namespace Oblivia {
                         switch(currTokenType) {
                             case TokenType.star:
                                 inc();
-                                return CompoundExpr(new ExMap { src = lhs, map = new ExInvoke { expr = new ExSelf { up = 1 }, args = ExTuple.Expr(NextExpr()) }, expr = true });
+                                return CompoundExpr(new ExMap { src = lhs, map = new ExInvoke { target = new ExSelf { up = 1 }, args = ExTuple.Expr(NextExpr()) }, expr = true });
                             case TokenType.period:
                                 inc();
-                                return CompoundExpr(new ExMap { src = lhs, map = new ExInvoke { expr = new ExSelf { up = 1 }, args = ExTuple.Expr(NextTerm()) }, expr = true });
+                                return CompoundExpr(new ExMap { src = lhs, map = new ExInvoke { target = new ExSelf { up = 1 }, args = ExTuple.Expr(NextTerm()) }, expr = true });
                             case TokenType.slash:
                                 inc();
                                 return CompoundExpr(new ExMap { src = lhs, map = NextExpr(), expr = true });
@@ -1143,7 +1204,7 @@ namespace Oblivia {
                     }
                 case TokenType.tuple_l: {
                         inc();
-                        return CompoundExpr(new ExInvoke { expr = lhs, args = NextArgTuple() });
+                        return CompoundExpr(new ExInvoke { target = lhs, args = NextArgTuple() });
                     }
                 case TokenType.star: {
                         inc();
@@ -1156,7 +1217,7 @@ namespace Oblivia {
                                 });
                             default:
                                 return CompoundExpr(new ExInvoke {
-                                    expr = lhs,
+                                    target = lhs,
                                     args = ExTuple.SpreadExpr(NextExpr()),
                                 });
                         }
@@ -1174,12 +1235,12 @@ namespace Oblivia {
                                 inc();
                                 return CompoundExpr(new ExTemp { lhs = lhs, rhs = NextExpr() });
                             default:
-                                return CompoundExpr(new ExInvoke { expr = lhs, args = ExTuple.SpreadExpr(NextTerm()) });
+                                return CompoundExpr(new ExInvoke { target = lhs, args = ExTuple.SpreadExpr(NextTerm()) });
                         }
                     }
                 case TokenType.bang: {
                         inc();
-                        return CompoundExpr(new ExInvoke { expr = lhs, args = ExTuple.Empty });
+                        return CompoundExpr(new ExInvoke { target = lhs, args = ExTuple.Empty });
                     }
                 case TokenType.percent: {
                         inc();
@@ -1211,34 +1272,9 @@ namespace Oblivia {
                                     return Eq(true);
                                 }
                             case TokenType.angle_r: {
+                                    inc();
                                     var rhs = NextExpr();
                                     return CompoundExpr(new ExFn { pars = (ExTuple)lhs, result = rhs });
-                                }
-                            case TokenType.tuple_l: {
-                                    var tup = NextTupleOrLisp();
-                                    throw new Exception("Impl tuple match");
-                                }
-                            case TokenType.array_l: {
-                                    var arr = NextArrayOrLisp();
-                                    throw new Exception("Impl array match");
-                                }
-                            case TokenType.block_l: {
-                                    //Structure match
-                                    var block = (ExBlock)NextExpr();
-                                    foreach(var ex in block.statements) {
-                                        switch(ex) {
-                                            case ExIs:
-                                            case ExIsAssign:
-                                            case ExInvoke:
-                                            case ExInvokeBlock:
-                                            case StDefKey:
-                                                continue;
-                                            default:
-
-                                                throw new Exception("Unsupported");
-                                        }
-                                    }
-                                    throw new Exception("Impl structure match");
                                 }
                             case TokenType.colon: {
                                     var rhs = NextTerm();
@@ -1268,7 +1304,7 @@ namespace Oblivia {
                                 return CompoundExpr(new ExFn {
                                     pars = ExTuple.Empty,
                                     result = new ExInvoke {
-                                        expr = fn,
+                                        target = fn,
                                         args = ExTuple.Expr(lhs)
                                     }
                                 });
@@ -1303,8 +1339,10 @@ namespace Oblivia {
                     }
                 case TokenType.at: {
                         inc();
-                        var term = NextTerm();
-                        return CompoundExpr(new ExCompose { items = (ExTuple)NextTupleOrLisp() });
+                        var term = NextExpr();
+
+                        return new ExInvokeBlock { type = term, source_block = new ExBlock { statements = [NextStatement()] } };
+                        //return CompoundExpr(new ExCompose { items = (ExTuple)NextTupleOrLisp() });
                     }
                 case TokenType.question: {
                         inc();
@@ -1320,18 +1358,27 @@ namespace Oblivia {
                                     inc();
                                     return new ExCriteria { item = lhs, cond = NextExpr() };
                                 }
-                            case TokenType.block_l: {
-                                    return CompoundExpr(new ExSwitch {
-                                        fn = new ExSwitchFn { branches = NextSwitch() },
-                                        item = lhs
-                                    });
-
-                                }
-                            case TokenType.array_l: {
+                            /*
+                        case TokenType.tuple_l:
+                            inc();
+                            var pars = NextArgTuple().ParTuple();
+                            switch(currTokenType) {
+                                case TokenType.colon:
+                                    inc();
+                                    break;
+                            }
+                            var r = new ExFn {
+                                pars = pars,
+                                result = NextTerm()
+                            };
+                            return r;
+                            */
+                            case TokenType.tuple_l:
+                                inc();
+                                return CompoundExpr(new ExInvoke { target = lhs, args = ExTuple.Expr(NextFn()) });
+							case TokenType.array_l: {
                                     inc();
                                     INode type = null;
-
-
                                     switch(currTokenType) {
                                         case TokenType.colon:
                                             inc();
@@ -1361,10 +1408,15 @@ namespace Oblivia {
                                                 });
                                             }
                                     }
-
 									goto Read;
 								}
-                            case TokenType.plus: {
+							case TokenType.block_l: {
+									return CompoundExpr(new ExSwitch {
+										fn = new ExSwitchFn { branches = NextSwitch() },
+										item = lhs
+									});
+								}
+							case TokenType.plus: {
                                     inc();
                                     switch(currTokenType) {
                                         case TokenType.plus:
@@ -1411,75 +1463,46 @@ namespace Oblivia {
                         }
                         break;
                     }
-                case TokenType.and:                     return Dyadic(ExDyadic.EFn.AND);
-				case TokenType.or:                      return Dyadic(ExDyadic.EFn.OR);
-				case TokenType.xor:                     return Dyadic(ExDyadic.EFn.XOR);
-				case TokenType.nand:                    return Dyadic(ExDyadic.EFn.NAND);
-				case TokenType.nor:                     return Dyadic(ExDyadic.EFn.NOR);
-				case TokenType.ceil:                    return Dyadic(ExDyadic.EFn.MAX);
-                case TokenType.floor:                   return Dyadic(ExDyadic.EFn.MIN);
-				case TokenType.existential_quantifier:  return Dyadic(ExDyadic.EFn.exists);
-				case TokenType.universal_quantifier:    return Dyadic(ExDyadic.EFn.for_all);
-                case TokenType.double_plus:             return Dyadic(ExDyadic.EFn.concat);
-				case TokenType.count:                   return Dyadic(ExDyadic.EFn.count);
-			}
-            ExDyadic Dyadic (ExDyadic.EFn fn) {
-                inc();
-				return new ExDyadic { fn = fn, lhs = lhs, rhs = NextTerm() };
+
+                case TokenType.not_eq:                  
+                case TokenType.and:                     return DyadicTerm(ExDyadic.EFn.and);
+				case TokenType.or:                      return DyadicTerm(ExDyadic.EFn.or);
+				case TokenType.xor:                     return DyadicTerm(ExDyadic.EFn.xor);
+				case TokenType.nand:                    return DyadicTerm(ExDyadic.EFn.nand);
+				case TokenType.nor:                     return DyadicTerm(ExDyadic.EFn.nor);
+				case TokenType.ceil:                    return DyadicTerm(ExDyadic.EFn.max);
+                case TokenType.floor:                   return DyadicTerm(ExDyadic.EFn.min);
+				case TokenType.existential_quantifier:  return DyadicTerm(ExDyadic.EFn.exists);
+				case TokenType.universal_quantifier:    return DyadicTerm(ExDyadic.EFn.for_all);
+                case TokenType.double_plus:             return DyadicTerm(ExDyadic.EFn.concat);
+				case TokenType.count:                   return DyadicTerm(ExDyadic.EFn.count);
+				case TokenType.log:                     return DyadicTerm(ExDyadic.EFn.log);
+                case TokenType.iota:                    return DyadicTerm(ExDyadic.EFn.index_of);
+				case TokenType.square_fill_l:           return DyadicTerm(ExDyadic.EFn.take);
+				case TokenType.square_fill_r:           return DyadicExpr(ExDyadic.EFn.drop);
+                case TokenType.deal:                    return DyadicTerm(ExDyadic.EFn.deal);
+
+
+				case TokenType.arrow_w:                 return DyadicExpr(ExDyadic.EFn.assign);
+
 			}
 
-            return lhs;
+			return lhs;
         }
-
-		List<(INode cond, INode yes)> NextSwitch () {
-			inc();
-			var items = new List<(INode cond, INode yes)> { };
-			ReadBranch:
-			switch(currTokenType) {
-				case TokenType.block_r:
-					inc();
-                    return items;
-			}
-            //To match multiple conds, use any()
-            var cond = NextExpr();
-			switch(currTokenType) {
-				case TokenType.colon:
-					inc();
-					var branch = NextExpr();
-                    items.Add((cond, branch));
-					goto ReadBranch;
-			}
-			switch(cond) {
-				case ExFn fn:
-					items.Add((fn.pars, fn.result));
-					goto ReadBranch;
-                default:
-                    throw new Exception("Unknown branch format");
-			}
-		}
 		INode NextTerm () {
-			ExMonadic Monadic(ExMonadic.EFn fn) {
-				inc();
-				return new ExMonadic {
-                    fn = fn,
-                    rhs = NextTerm()
-                };
-			}
 			Read:
             switch(currTokenType) {
-				case TokenType.empty:
-					inc();
-					return new ExVal { value = VEmpty.VALUE };
-				case TokenType.tautology:
-                    inc(); 
-                    return new ExVal { value = true };
-				case TokenType.contradiction: 
-                    inc(); 
-                    return new ExVal { value = false };
-				case TokenType.not:     return Monadic(ExMonadic.EFn.NOT);
-				case TokenType.floor:   return Monadic(ExMonadic.EFn.FLOOR);
-				case TokenType.ceil:    return Monadic(ExMonadic.EFn.CEILING);
-				case TokenType.iota:    return Monadic(ExMonadic.EFn.IOTA);
+				case TokenType.empty:           return Val(VEmpty.VALUE);
+				case TokenType.yes:             return Val(true);
+				case TokenType.no:              return Val(false);
+				case TokenType.not:             return MonadicTerm(ExMonadic.EFn.not);
+				case TokenType.floor:           return MonadicTerm(ExMonadic.EFn.floor);
+				case TokenType.ceil:            return MonadicTerm(ExMonadic.EFn.ceil);
+				case TokenType.iota:            return MonadicTerm(ExMonadic.EFn.iota);
+				case TokenType.log:             return MonadicTerm(ExMonadic.EFn.log);
+				case TokenType.index_descend:   return MonadicTerm(ExMonadic.EFn.index_descend);
+				case TokenType.index_ascend:    return MonadicTerm(ExMonadic.EFn.index_ascend);
+                case TokenType.roll:            return MonadicTerm(ExMonadic.EFn.roll);
 				/*
 			case TokenType.minus:{
 				inc();
@@ -1512,15 +1535,15 @@ namespace Oblivia {
 				case TokenType.caret:   return NextCaretSymbol();
 				case TokenType.str:     return NextString();
 				case TokenType.measure: return NextInteger();
-                case TokenType.question:return NextFn();
+                case TokenType.question:return NextQuestion();
                 case TokenType.amp:     return NextRef();
 				case TokenType.tuple_l: return NextTupleOrLisp();
 				case TokenType.array_l: return NextArrayOrLisp();
 				case TokenType.block_l: return NextBlock();
-                    /*
-                case TokenType.PERCENT:
-                    return new ExprSpread { value= NextExpression() };
-                    */
+                    
+                case TokenType.percent:
+                    inc();
+                    return new ExSpread { value= NextExpr() };
                 case TokenType.quote:
                     return NextAlias();
                 case TokenType.comma:
@@ -1531,8 +1554,47 @@ namespace Oblivia {
                     goto Read;
             }
             throw new Exception($"Unexpected token in expression: {currToken.type}");
-        }
-        ExRef NextRef () {
+
+			ExVal Val (object val) {
+				inc();
+				return new ExVal { value = val };
+			}
+			ExMonadic MonadicTerm (ExMonadic.EFn fn) {
+				inc();
+				return new ExMonadic {
+					fn = fn,
+					rhs = NextTerm()
+				};
+			}
+		}
+
+		List<(INode cond, INode yes)> NextSwitch () {
+			inc();
+			var items = new List<(INode cond, INode yes)> { };
+			ReadBranch:
+			switch(currTokenType) {
+				case TokenType.block_r:
+					inc();
+					return items;
+			}
+			//To match multiple conds, use any()
+			var cond = NextExpr();
+			switch(currTokenType) {
+				case TokenType.colon:
+					inc();
+					var branch = NextExpr();
+					items.Add((cond, branch));
+					goto ReadBranch;
+			}
+			switch(cond) {
+				case ExFn fn:
+					items.Add((fn.pars, fn.result));
+					goto ReadBranch;
+				default:
+					throw new Exception("Unknown branch format");
+			}
+		}
+		ExRef NextRef () {
             inc();
             return new ExRef { expr = NextExpr() };
         }
@@ -1706,23 +1768,10 @@ namespace Oblivia {
                     goto Check;
             }
         }
-        INode NextFn () {
+        INode NextQuestion () {
             inc();
             var t = currTokenType;
             switch(t) {
-                /*
-                case TokenType.question:
-                    inc();
-                    var branches = NextTerm();
-                    throw new Exception();
-                    */
-                /*
-            case TokenType.bang: {
-                    inc();
-                    var result = NextExpr();
-                    return new ExFn { pars = ExTuple.Empty, result = result };
-                }
-                */
                 case TokenType.block_l:
                     var branches = NextSwitch();
                     return CompoundExpr(new ExSwitchFn { branches = branches });
@@ -1731,21 +1780,28 @@ namespace Oblivia {
                     throw new Exception();
                 case TokenType.tuple_l:
                     inc();
-                    var pars = NextArgTuple().ParTuple();
-					switch(currTokenType) {
-						case TokenType.colon:
-							inc();
-							break;
-					}
-					var r = new ExFn {
-                        pars = pars,
-                        result = NextExpr()
-                    };
-                    return r;
+                    return NextFn();
                 default:
                     throw new Exception($"Unexpected token {t}");
             }
         }
+        INode NextFn () {
+			var pars = NextArgTuple().ParTuple();
+			switch(currTokenType) {
+				case TokenType.period:
+					inc();
+					return new ExFn {
+						pars = pars,
+						result = NextTerm()
+					};
+				case TokenType.star:
+				default:
+					return new ExFn {
+						pars = pars,
+						result = NextExpr()
+					};
+			}
+		}
         ExUpKey NextSymbol () {
             var name = currTokenStr;
             inc();
@@ -1800,7 +1856,6 @@ namespace Oblivia {
                 //Lambda
                 case TokenType.pipe:
                     throw new Exception();
-
                 case TokenType.block_r:
                     inc();
                     return new ExBlock { statements = ele };
@@ -1828,9 +1883,11 @@ namespace Oblivia {
 		public INode lhs = ExVal.Empty;
 		public INode rhs = ExVal.Empty;
 		public object Eval (IScope ctx) {
+            var l = lhs.Eval(ctx);
+            var r = rhs.Eval(ctx);
 			return new VFnInterface {
-				lhs = (IType[])lhs.Eval(ctx),
-				rhs = (IType)rhs.Eval(ctx)
+				lhs = (IType[])l,
+				rhs = (IType)r
 			};
 		}
 	}
@@ -2023,7 +2080,7 @@ namespace Oblivia {
                                 case ExUpKey { up: -1, key: { } k }:
                                     locals[k] = new object();
                                     break;
-                                case ExInvoke { expr: ExUpKey { up: -1, key: { } k } }:
+                                case ExInvoke { target: ExUpKey { up: -1, key: { } k } }:
                                     locals[k] = new object();
                                     break;
                             }
@@ -2209,14 +2266,14 @@ ${
 		}
 	}
 	public class ExInvoke : INode {
-        public INode expr;
+        public INode target;
         public ExTuple args;
         //public string Source => $"{expr.Source}{(args.Count > 1 ? $"({string.Join(", ", args.Select(a => a.Source))})" : args.Count == 1 ? $"*{args.Single().Source}" : $"!")}";
 
-        public static ExInvoke Fn (string symbol, INode arg) => new() { expr = new ExUpKey { key = symbol }, args = ExTuple.Expr(arg) };
+        public static ExInvoke Fn (string symbol, INode arg) => new() { target = new ExUpKey { key = symbol }, args = ExTuple.Expr(arg) };
 
         public object Eval (IScope ctx) {
-            var f = expr.Eval(ctx);
+            var f = target.Eval(ctx);
             switch(f) {
                 case VError ve:
                     throw new Exception(ve.msg);
@@ -2314,58 +2371,56 @@ ${
          InvokeFunc(ctx, lhs, () => args);
         public static object InvokeFunc (IScope ctx, object lhs, Func<VTuple> evalArgs) {
             switch(lhs) {
-                case VEmpty: {
-                        throw new Exception("Function not found");
-                    }
-                case VError ve: {
-                        throw new Exception(ve.msg);
-                    }
+                case VEmpty:
+                    throw new Exception("Function not found");
+                case VError ve:
+                    throw new Exception(ve.msg);
                 case VConstructor vc: {
-                        var v = evalArgs().items.Select(pair => pair.val).ToArray();
-                        var c = vc.t.GetConstructor(v.Select(arg => (arg as object).GetType()).ToArray());
-                        if(c == null) {
-                            throw new Exception("Constructor not found");
-                        }
-                        return c.Invoke(v);
+                    var v = evalArgs().items.Select(pair => pair.val).ToArray();
+                    var c = vc.t.GetConstructor(v.Select(arg => (arg as object).GetType()).ToArray());
+                    if(c == null) {
+                        throw new Exception("Constructor not found");
                     }
+                    return c.Invoke(v);
+                }
                 case VInstanceFn vim: {
-                        var v = evalArgs().items.Select(pair => pair.val).ToArray();
-                        return vim.Call(v);
-                    }
+                    var v = evalArgs().items.Select(pair => pair.val).ToArray();
+                    return vim.Call(v);
+                }
                 case ValStaticFn vsm: {
-                        var v = evalArgs().items.Select(pair => pair.val).ToArray();
-                        return vsm.Call(v);
-                    }
+                    var v = evalArgs().items.Select(pair => pair.val).ToArray();
+                    return vsm.Call(v);
+                }
                 case Type tl: {
-                        var v = evalArgs().items.Single().val;
-                        return new VType(tl).Cast(v, v?.GetType());
-                    }
+                    var v = evalArgs().items.Single().val;
+                    return new VType(tl).Cast(v, v?.GetType());
+                }
                 case VTuple vt: {
-                        //var parTypes = vt.items.OfType<Type>().ToArray();
-                        var v = evalArgs();
-                        var argTypes = v.items.Select(a => (Type)a.GetType()).ToArray();
-                        var tt = argTypes.Length switch {
-                            2 => typeof(ValueTuple<,>),
-                            3 => typeof(ValueTuple<,,>),
-                            4 => typeof(ValueTuple<,,,>),
-                            5 => typeof(ValueTuple<,,,,>),
-                            6 => typeof(ValueTuple<,,,,,>),
-                            7 => typeof(ValueTuple<,,,,,,>),
-                            8 => typeof(ValueTuple<,,,,,,,>),
-                        };
-                        var aa = (object)(v.items switch {
-                        [{}a,{}b] => (a,b),
-                        [{}a,{}b,{}c] => (a,b,c),
-                        [{}a,{}b,{}c,{}d] => (a,b,c,d),
-                        [{}a,{}b,{}c,{}d,{}e] => (a,b,c,d,e),
-                        [{}a,{}b,{}c,{}d,{}e,{}f] => (a,b,c,d,e,f),
-                        [{}a,{}b,{}c,{}d,{}e,{}f,{}g] => (a,b,c,d,e,f,g),
-						[{}a,{}b,{}c,{}d,{}e,{}f,{}g,{}h] => (a,b,c,d,e,f,h),
-						[{}a,{}b,{}c,{}d,{}e,{}f,{}g,{}h,{}i] => (a,b,c,d,e,f,h,i),
-						});
-                        var at = tt.MakeGenericType(argTypes);
-                        return new VType(tt.MakeGenericType(argTypes)).Cast(aa, at);
-                    }
+                    //var parTypes = vt.items.OfType<Type>().ToArray();
+                    var v = evalArgs();
+                    var argTypes = v.items.Select(a => (Type)a.GetType()).ToArray();
+                    var tt = argTypes.Length switch {
+                        2 => typeof(ValueTuple<,>),
+                        3 => typeof(ValueTuple<,,>),
+                        4 => typeof(ValueTuple<,,,>),
+                        5 => typeof(ValueTuple<,,,,>),
+                        6 => typeof(ValueTuple<,,,,,>),
+                        7 => typeof(ValueTuple<,,,,,,>),
+                        8 => typeof(ValueTuple<,,,,,,,>),
+                    };
+                    var aa = (object)(v.items switch {
+                    [{}a,{}b] => (a,b),
+                    [{}a,{}b,{}c] => (a,b,c),
+                    [{}a,{}b,{}c,{}d] => (a,b,c,d),
+                    [{}a,{}b,{}c,{}d,{}e] => (a,b,c,d,e),
+                    [{}a,{}b,{}c,{}d,{}e,{}f] => (a,b,c,d,e,f),
+                    [{}a,{}b,{}c,{}d,{}e,{}f,{}g] => (a,b,c,d,e,f,g),
+					[{}a,{}b,{}c,{}d,{}e,{}f,{}g,{}h] => (a,b,c,d,e,f,h),
+					[{}a,{}b,{}c,{}d,{}e,{}f,{}g,{}h,{}i] => (a,b,c,d,e,f,h,i),
+					});
+                    var at = tt.MakeGenericType(argTypes);
+                    return new VType(tt.MakeGenericType(argTypes)).Cast(aa, at);
+                }
                 case VFn vf: {
                         return vf.CallFunc(evalArgs);
                     }
@@ -2490,20 +2545,16 @@ ${
 			var f = new VDictScope(ctx, false);
 			object r = VEmpty.VALUE;
 			foreach(var s in statements) {
-				
 				switch(s) {
-                    case ExFnType { lhs:ExInvoke{ expr:ExUpKey{ allowDefine:true, key:{ }key } } } ft:
-                        //fix type
+                    case ExFnType { lhs:ExInvoke{ target:ExUpKey{ allowDefine:true, key:{ }key } }, rhs: { } rhs } ft:
 						StDefKey.Define(ctx, key, new VDeclared { name = key, type = ft });
                         continue;
                     case ExFnType { lhs: ExUpKey { allowDefine: true, key: { } key }, rhs:{ }rhs } ft:
-                        //Fix the type
-						StDefKey.Define(ctx, key, new VDeclared { name = key, type = ft });
-						continue;
+						var t = rhs.Eval(ctx);
+						StDefKey.Define(ctx, key, new VDeclared { name = key, type = t });
+                        continue;
 				}
-
 				r = s.Eval(f);
-
 				AutoKey(f, s, r);
 				switch(r) {
 					case VRet vr:  return vr.Up();
@@ -2551,7 +2602,7 @@ ${
 		}
 
         //Called during class def
-        public object StagedApply (IScope f) {
+        public object StagedApply (IScope ctx) {
             var def = () => { };
             var seq = new List<INode> { };
             var labels = new Dictionary<string, int>();
@@ -2564,16 +2615,16 @@ ${
 					}
 					*/
 					case StDefFn df when df.value is ExInvokeBlock { type: ExUpKey { key: "class" or "interface" } }: {
-                            df.Define(f);
+                            df.Define(ctx);
                             break;
                         }
                     case StDefKey { value: ExInvokeBlock { type: ExUpKey { key: "class", up: -1 }, source_block: { } block } } kv: {
-                            var _static = StDefKey.DeclareClass(f, block, kv.key);
+                            var _static = StDefKey.DeclareClass(ctx, block, kv.key);
                             def += () => block.StagedApply(_static);
                             break;
                         }
                     case StDefKey { value: ExInvokeBlock { type: ExUpKey { key: "interface", up: -1 }, source_block: { } block } } kv: {
-                            var _static = StDefKey.DeclareInterface(f, block, kv.key);
+                            var _static = StDefKey.DeclareInterface(ctx, block, kv.key);
                             def += () => block.StagedApply(_static);
                             break;
                         }
@@ -2593,13 +2644,13 @@ ${
 				var s = seq[i];
 				switch(s) {
 					case StDefKey { value: ExInvokeBlock { type: ExUpKey { key: "defer", up: -1 }, source_block: { } _block } }:
-						r = _block.EvalDefer(f);
+						r = _block.EvalDefer(ctx);
 						break;
 					default:
-						r = s.Eval(f);
+						r = s.Eval(ctx);
 						break;
 				}
-                AutoKey(f, s, r);
+                AutoKey(ctx, s, r);
 				switch(r) {
 					case VRet vr:
 						return vr.Up();
@@ -2620,10 +2671,10 @@ ${
 						}
 						return vg.Up();
 				}
-				f.SetLocal("__", r);
+				ctx.SetLocal("__", r);
 				i++;
             }
-			return f;
+			return ctx;
 		}
         public object EvalDefer (IScope ctx) {
             return null;
@@ -3016,6 +3067,13 @@ $(foo:int bar:int)
         public XElement ToXML () => new("KeyVal", new XAttribute("key", key), value.ToXML());
         public string Source => $"{key}:{value?.Source ?? "null"}";
         public object Eval (IScope ctx) {
+
+            if(value == null) {
+
+                Set(ctx, key, new VDeclared { name = key, type = type.Eval(ctx) });
+                return VEmpty.VALUE;
+            }
+
             var val = value.Eval(ctx);
             switch(val) {
                 case VError ve: throw new Exception(ve.msg);
@@ -3028,14 +3086,6 @@ $(foo:int bar:int)
             if(curr is not VError) {
                 throw new Exception();
             }
-            switch(val) {
-                case Type t:
-                    val = new VDeclared { type = t, name = key };
-                    break;
-                case VClass vc:
-                    val = new VDeclared { type = vc, name = key };
-                    break;
-            }
             Set(ctx, key, val);
             return VEmpty.VALUE;
         }
@@ -3045,7 +3095,7 @@ $(foo:int bar:int)
         public static VClass MakeClass (IScope f, ExBlock block) {
             var _static = block.MakeScope(f);
             block.StagedApply(_static);
-            var c = new VClass { name = "unknown", source_ctx = f, source_expr = block, _static = _static };
+            var c = new VClass { name = "unknown", parent_ctx = f, source_expr = block, _static = _static };
             _static.locals["_kind"] = ValKeyword.CLASS;
             _static.SetClass(c);
             return c;
@@ -3054,7 +3104,7 @@ $(foo:int bar:int)
             var _static = block.MakeScope(f);
             var c = new VClass {
                 name = key,
-                source_ctx = f,
+                parent_ctx = f,
                 source_expr = block,
                 _static = _static
             };
@@ -3135,7 +3185,7 @@ $(foo:int bar:int)
                 //Get extension member or internal member
                 switch(lhs) {
                     case IScope sc:
-						lhs = new ExInvoke { expr = new ExMemberKey { src = ExVal.From(lhs), key = op }, args = ExTuple.Expr(rhs) }.Eval(ctx);
+						lhs = new ExInvoke { target = new ExMemberKey { src = ExVal.From(lhs), key = op }, args = ExTuple.Expr(rhs) }.Eval(ctx);
                         break;
 					default:
                         var l = (dynamic)lhs;
@@ -3280,26 +3330,30 @@ $(foo:int bar:int)
             var r = rhs.Eval(ctx);
 
             switch(fn) {
-                case EFn.IOTA:
+                case EFn.iota:
                     return Enumerable.Range(0, (int)r);
-                case EFn.NOT:
+                case EFn.not:
                     return !(bool)r;
-				case EFn.FLOOR:
+				case EFn.floor:
 					return Math.Floor((dynamic)r);
-				case EFn.CEILING:
+				case EFn.ceil:
 					return Math.Ceiling((dynamic)r);
 				default:throw new Exception();
             }
 		}
 
 		public enum EFn {
-            ERR,
-            IOTA,
-            NOT,
-            FLOOR,
-            CEILING
-        }
-    }
+            err,
+            iota,
+            not,
+            floor,
+            ceil,
+            log,
+
+			index_ascend, index_descend,
+            roll
+		}
+	}
     public class ExDyadic : INode {
         public INode lhs;
         public INode rhs;
@@ -3338,21 +3392,21 @@ $(foo:int bar:int)
             };
 
 			switch(fn) {
-                case EFn.AND:
+                case EFn.and:
                     return and();
-				case EFn.OR:
+				case EFn.or:
                     return or();
-				case EFn.XOR:
+				case EFn.xor:
                     return xor();
-                case EFn.NAND:
+                case EFn.nand:
                     return !and();
-                case EFn.NOR:
+                case EFn.nor:
                     return !or();
-                case EFn.XNOR:
+                case EFn.xnor:
                     return !xor();
-                case EFn.MAX:
+                case EFn.max:
                     return Math.Max((dynamic)lhs.Eval(ctx), (dynamic)rhs.Eval(ctx));
-				case EFn.MIN:
+				case EFn.min:
 					return Math.Min((dynamic)lhs.Eval(ctx), (dynamic)rhs.Eval(ctx));
                 case EFn.for_all:
 
@@ -3366,14 +3420,21 @@ $(foo:int bar:int)
 			}
 		}
 		public enum EFn {
-            ERR,
-            AND, OR, XOR,
-            NAND, NOR, XNOR,
-            MAX, MIN,
-            FRONT, BACK,
+            err,
+            and, or, xor,
+            nand, nor, xnor,
+            max, min,
+            front, back,
 
-            for_all, exists, concat, count
+            for_all, exists, concat, count,
 
+            log,index_of,
+
+            take, drop,
+            deal, assign,
+
+            select_element,
+            insert_zero
             };
     }
     public class StDefFn : INode {
@@ -3611,7 +3672,9 @@ $(foo:int bar:int)
 				case VTuple vt:
 					if(symbols.Length == vt.items.Length) {
 						foreach(var i in Enumerable.Range(0, symbols.Length)) {
-							StAssignSymbol.AssignSymbol(ctx, symbols[i], () => vt.items[i].val);
+                            var k = symbols[i];
+                            var v = vt.items[i].val;
+							StAssignSymbol.AssignSymbol(ctx, k, () => v);
 						}
 						return VEmpty.VALUE;
 					} else {
@@ -3706,12 +3769,14 @@ $(foo:int bar:int)
             return tokens;
         }
         public IToken Next () {
-            if(index >= src.Length) {
+
+			string str (params char[] c) => string.Join("", c);
+			void inc () => index += 1;
+
+			Check:
+			if(index >= src.Length) {
                 return new StrToken { type = TokenType.eof };
             }
-            var str = (params char[] c) => string.Join("", c);
-            void inc () => index += 1;
-            Check:
             var c = src[index];
             switch(c) {
                 case '/': {
@@ -3832,7 +3897,8 @@ $(foo:int bar:int)
                                     goto Read;
 							}
 						}
-                        index = dest;
+						var s = src[index..(dest)];
+						index = dest;
                         return new MeasureToken { val = val, measure = "" };
                     }
                 case ((>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or '_' or (>= '0' and <= '9')): {
@@ -3877,9 +3943,12 @@ $(foo:int bar:int)
 				return new StrToken { type = _t, str = str(c) };
 			}
             throw new Exception();
-        }
-    }
-    public enum TokenType : ulong {
+		}
+		bool a = ('⟨' == '〈');
+	}
+
+
+	public enum TokenType : ulong {
         comma = ',',
         colon = ':',
 		block_l = '{',
@@ -3892,6 +3961,29 @@ $(foo:int bar:int)
         angle_r = '>',
 		brack_l = '⟨',
 		brack_r = '⟩',
+
+        i_beam = '⌶',
+
+
+		//•
+		//⟦ 	⟧ ⟨⟩	
+		//〈〉
+
+
+		kronecker_product = '⊗',
+		double_brack_l = '⟪',
+        double_brack_r = '⟫',
+        shell_brack_l = '⟬',
+        shell_brack_r = '⟭',
+        flat_paren_l = '⟮',
+        flat_paren_r = '⟯',
+
+        index_ascend = '⍋',
+        index_descend = '⍒',
+        //←
+
+        log = '⍟',
+
 		caret = '^',
         period = '.',
         equal ='=',
@@ -3913,7 +4005,7 @@ $(foo:int bar:int)
 		iota = 'ɩ',
         divide = '÷',
 
-        divides = '∣',
+		divides = '∣',
         ceil = '⌈',
 		floor = '⌊',
 
@@ -3935,6 +4027,8 @@ $(foo:int bar:int)
         guillemet_r = '›',
         guillemet_ll = '«',
         guillemet_rr = '»',
+
+
         manicule = '☞',
         pilcrow = '¶',
         copyright = '©',
@@ -4010,7 +4104,9 @@ $(foo:int bar:int)
         universal_quantifier = '∀',
         existential_quantifier = '∃',
 
-        nvdash = '⊬',
+		//∄
+
+		nvdash = '⊬',
         nvDash = '⊭',
         diamond = '◇',
         coloneqq = '≔',
@@ -4041,24 +4137,37 @@ $(foo:int bar:int)
         maps_to = '↦',
         is_proportional_to = '∝',
         such_that = '∋',
-        dice = '⚄',
+        roll = '⚄',
+        deal = '⧂',
 
 		therefore = '∴',
         because = '∵',
 
-        tautology = '⊤',
-        contradiction = '⊥',
+        yes = '⊤',
+        no = '⊥',
 
 
 		proves = '⊢',
         entails = '⊨',
 
 		not = '¬',
+
+
+		//∩ ∪
+		//⋂ ⋃	
+		//and = '⋀',
+		//or = '⋁',
+
 		or = '∨',
-        nor = '⍱',
 		and = '∧',
+		nor = '⍱',
         nand = '⍲',
 		xor = '⊻',
+
+        square_fill_l = '◧',
+        square_fill_r = '◨',
+
+
 
 		intersection = '∩',
         union = '∪',

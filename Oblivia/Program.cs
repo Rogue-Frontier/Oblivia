@@ -149,6 +149,7 @@ namespace Oblivia {
 
                     ["sat"] = 
 ValKeyword.SAT,
+                    ["fall"] = ValKeyword.FALL,
                     ["default"] = ValKeyword.DEFAULT,
                     ["class"] = ValKeyword.CLASS,
                     ["interface"] = ValKeyword.INTERFACE,
@@ -1479,8 +1480,8 @@ ValKeyword.SAT,
                         break;
                     }
 
-                case TokenType.not_eq:                  
-                case TokenType.and:                     return DyadicTerm(ExDyadic.EFn.and);
+                case TokenType.not_eq: return DyadicTerm(ExDyadic.EFn.neq);
+				case TokenType.and:                     return DyadicTerm(ExDyadic.EFn.and);
 				case TokenType.or:                      return DyadicTerm(ExDyadic.EFn.or);
 				case TokenType.xor:                     return DyadicTerm(ExDyadic.EFn.xor);
 				case TokenType.nand:                    return DyadicTerm(ExDyadic.EFn.nand);
@@ -1682,6 +1683,7 @@ ValKeyword.SAT,
 		INode NextTupleOrLisp () {
             inc();
             var op = ReadLispOp();
+            //handle empty tuple
             var expr = NextExpr();
             switch(currTokenType) {
                 case TokenType.tuple_r: {
@@ -2283,6 +2285,22 @@ ${
             switch(cond) {
                 case true:
                     r = positive.Eval(ctx);
+
+                    if(r is ValKeyword.BREAK) {
+                        return VEmpty.VALUE;
+                    }
+                    if(r is ValKeyword.CONTINUE) {
+
+                    }
+                    if(r is VYield vy) {
+
+                    }
+                    if(r is VRet vr) {
+                        return vr.Up();
+                    }
+                    if(r is VGo vg) {
+                        return vg;
+                    }
                     goto Step;
                 case false: return r;
                 default:    throw new Exception("Boolean expected");
@@ -2981,7 +2999,7 @@ $(foo:int bar:int)
                     return res;
 				}
 			}
-			throw new Exception("Fell out of match expression");
+			throw new Exception("Failed to match");
 			bool Is (object pattern) {
                 return ExIs.Is(val, pattern);
 			}
@@ -3457,7 +3475,9 @@ $(foo:int bar:int)
 
             bool and(){
                 foreach(var b in (INode[])[lhs, rhs]) {
-                    switch(b.Eval(ctx)) {
+                    var r = b.Eval(ctx);
+
+					switch(r) {
                         case false:
                             return false;
                         case true:continue;
@@ -3486,7 +3506,9 @@ $(foo:int bar:int)
             };
 
 			switch(fn) {
-                case EFn.and:
+                case EFn.neq:
+                    return !ExIs.Is((dynamic)lhs.Eval(ctx), (dynamic)rhs.Eval(ctx));
+				case EFn.and:
                     return and();
 				case EFn.or:
                     return or();
@@ -3519,6 +3541,7 @@ $(foo:int bar:int)
 		}
 		public enum EFn {
             err,
+            neq,
             and, or, xor,
             nand, nor, xnor,
 
@@ -3963,9 +3986,9 @@ $(foo:int bar:int)
                                     'n' => '\n',
                                     't' => '\t',
                                     '\\' => '\\',
-                                    '"' => '"',
-                                    '\'' => '\''
-                                };
+                                    '\"' => '\"',
+									'\'' => '\'',
+								};
                                 dest++;
 							} else if(src[dest] == '"') {
                                 break;

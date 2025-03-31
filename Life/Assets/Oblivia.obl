@@ -36,13 +36,17 @@
         geq:"≥" leq:"≤"
 		arrow_w:"←" arrow_e:"→" arrow_s:"↓" arrow_n:"↑"
         measure:"measure"
+
+        keyboard:"⌨"
+        not_eq:"≠"
     }
+    pr:Console/WriteLine
 	main(args:str):{
-		Console/WriteLine(args),
+		pr(args),
         tokenizer: Tokenizer { src:=File/ReadAllText("Assets/Oblivia.obl") },
         tokens: List.IToken/ctor(),
         (tokenizer/Next()=sat(?(token) not(token/type="eof")): t)?++{
-	        Console/WriteLine(cat[t/type " " t/text])
+	        pr(cat[t/type " " t/text])
             tokens/Add(t)
         }
 
@@ -65,12 +69,15 @@
         }
         GetAllTokens (): {
             tokens:List.IToken/ctor(),
-            #(Next()={ type=not(TokenType/eof):t })?++tokens/add(t),
+            (tokenizer/Next()=sat(?(token) not(token/type="eof")): t)?++{
+	            pr(cat[t/type " " t/text])
+                tokens/Add(t)
+            }
             ^: tokens
         }
         Next():{
             str(c:Row.char): str/Join("" c)
-            inc(): {index:=(+:_ 1)}
+            inc():{index:=(+:_ 1)}
             alphanumeric:
                 sat(?(c:char)
                     ((c≥⌨"a")∧(c≤⌨"z"))∨
@@ -78,7 +85,10 @@
                     ((c≥⌨"0")∧(c≤⌨"9"))∨
                     (c=⌨"_")
                     )
-            Check:label,
+            numeric:sat(?(n:char)(n≥⌨"0")∧(n≤⌨"9"))
+            Check:label
+
+            #pr("Check")
             index≥(src/Length)?+{
                 ^^: StrToken {
                     type:=TokenType/eof
@@ -90,12 +100,12 @@
                     src((+:index 1))?{
                         ⌨"/":{
                             inc() inc(),
-                            (<:index src/Length)∧(src.index≠⌨"\n")?++inc()
+                            (<:index src/Length)∧(src.index/Get()≠⌨"\n")?++inc()
                             go.Check
                         }
                         ⌨"*":{
                             inc() inc(),
-                            (<:index src/Length)∧(src.index≠⌨"\n")?++inc()
+                            (<:index src/Length)∧(src.index/Get()≠⌨"\n")?++inc()
                             checkStop:false,
                             (<:index src/Length)?++{
                                 (src.index=⌨"*")?+{
@@ -108,40 +118,51 @@
                             }
                             go.Check
                         }
+                        _:{^^:fall}
                     }
                 }
                 ⌨"#":{
                     inc(),
-                    (<:index src/Length)∧(src.index≠⌨"\n")?+inc()
+                    (<:index src/Length)∧(src.index/Get()≠⌨"\n")?+inc()
                     go.Check
                 }
                 ⌨"~":{
                     inc(),
-                    (<:index src/Length)∧(src.index≠⌨"~")?+inc()
+                    (<:index src/Length)∧(src.index/Get()≠⌨"~")?+inc()
                     inc()   go.Check
                 }
                 ⌨"\"":{
                     dest:(+:index 1)
                     v:"",
+                    #pr(src(dest)()),
                     (<:dest src/Length)?++{
-                        (src.dest=⌨"\\")?+{
-                            dest:=(+:_ 1)
-                            v:=(+:_ src(dest)?{
-                                ⌨"r": "\r"
-                                ⌨"n": "\n"
-                                ⌨"t": "\t"
-                                ⌨"\\": "\\"
-                                ⌨"\"": "\""
-                            })
-                            dest:=(+:_ 1)
-                        }?-(src.dest=⌨"\"")?+{
-                            break
-                        }?-{
-                            v:=(+:v src.dest)
-                            dest:=(+:dest 1)
+                        src.dest()?{
+                            ⌨"\\":{
+
+                                dest:=(+:_ 1)
+                                v:=cat[_ src(dest)?{
+                                    ⌨"r": "\r"
+                                    ⌨"n": "\n"
+                                    ⌨"t": "\t"
+                                    ⌨"\\": "\\"
+                                    ⌨"\"": "\""
+                                    ⌨"\'": "\'"
+                                }]
+                                dest:=(+:_ 1)
+                            }
+                            ⌨"\"":{
+                                go.Stop
+                            }
+                            _:{
+                                v:=(+:v src.dest/Get())
+                                dest:=(+:dest 1)
+                            }
                         }
                     }
-                    dest:=(+:_ 1)
+                    Stop:label
+                    #pr(cat["index " index])
+
+                    dest:=(+:dest 1)
                     index:=dest
                     ^^:StrToken{
                         type:=TokenType/str
@@ -152,13 +173,13 @@
                     inc()
                     go.Check
                 }
-                sat(?(n:char)(>:n ⌨"0")∧(<:n ⌨"9")):{
+                numeric:{
                     dest:index val:0
                     Read:label,
                     (<:dest src/Length)?+{
                         ch:src.dest
                         ch?{
-                            sat(?(c:char)(c≥0)∧(c≤9)):{
+                            numeric:{
                                 val:=(+:(*:_ 10),(-:ch ⌨"0"))
                                 dest:=(+:_ 1)
                                 go.Read
@@ -167,6 +188,7 @@
                                 dest:=(+:_ 1)
                                 go.Read
                             }
+                            _:{}
                         }
                     }
                     s:src/Substring(index,(-:dest index))

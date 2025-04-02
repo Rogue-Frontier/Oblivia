@@ -7,7 +7,13 @@ Any code snippets presented are to be fully supported by Oblivia.
 - `import(module)` embeds the object into the current scope.
 ```
 # From misc, import bar as foo
-import*module("misc.obl")/{ foo:bar }
+import*module."misc.obl"/{ foo:bar }
+# Import foo and bar
+import*module."misc.obl"/{ foo bar }
+# Import all
+import*module."misc.obl"
+# Import misc as Misc
+Misc:module."misc.obl)
 ```
 
 # Control flow

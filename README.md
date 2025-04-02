@@ -29,65 +29,63 @@ The following code implements a Conway's Game of Life and updates until the coun
 
 ```
 {
+    print:Console/WriteLine
     Life:class {
-        width:int height:int grid:Grid.bool
-        adj(n:int max:int): modi(lt(n 0) ?+ addi(n max) ?- n max)
-        at(x:int y:int): array_at(grid adj.|[(x width),(y height)] |:int ?(i:int) i)    
-        get(x:int y:int): at(x y)/Get!
-        set(x:int y:int b:bool): at(x y)/Set.b
-        new(width:int height:int): Life {
-            (width height) := ^^(width height)
-            grid := Grid.bool/ctor(width height)
-            debug!
+        #@dbg["width:" w]
+        w->i4
+        #@dbg["height:" h]
+        h->i4
+        grid->Grid(bit)
+        mod(n:i4 max:i4):(%: (<: n 0) ?+ (+:n max) ?- n max)
+        # xy: (x:i4 y:i4)
+        # %xy
+        at(x:i4 y:i4):grid(mod.|[x:w y:h]|i4)
+        get(x:i4 y:i4):at(x y)/Get()
+        set(x:i4 y:i4 b:bit):at(x y)/Set(b)
+        new(w:i4 h:i4): Life {
+            print*cat["args: " _0 ", " _1],
+            (w h) := ^^/(w h),
+            grid := Grid(bit)/ctor(w h)
+            debug()
         }
-        debug!: {
-            print*cat["width: " width]
-            print*cat["height: " height]
-        }
-        activeCount:0
-        txt: StringBuilder/ctor!
-        update!: {
-            activeCount := 0
-            g: get
-            txt/Clear!
-            range(0 height) | ?(y:int) {
-                range(0 width) | ?(x:int) {
-                    w:subi(x 1) n:addi(y 1) e:addi(x 1) s:subi(y 1)
-                    c: count(g.|[
-                        (w n),(x n),(e n),
-                        (w y),      (e y),
-                        (w s),(x s),(e s),
-                    ] true)
-                    active:g(x y)
-                    active:= _ ?+ {
-                        lt(c 2) ?+ false ?-
-                        gt(c 3) ?+ false ?- _
-                    } ?- {
-                        eq(c 3) ?+ true ?- _
-                    }
+        debug(): print*|cat*|[["width: " w],["height: " h]]
+        activeNum:0
+        txt:StrBuild/ctor()
+        update(): {
+            activeNum := 0
+            g:get
+            txt/Clear()
+            ta: txt/Append,
+            ɩh | ?(y:i4){
+                ɩw | ?(x:i4){
+                    w:(-:x 1) n:(+:y 1) e:(+:x 1) s:(-:y 1)
+                    c:count(g.|[w:n x:n e:n w:y e:y w:s x:s e:s] ⊤)
+                    active: g(x y) ?+ not((<:c 2)∨(>:c 3)) ?- eq(c 3)
                     set(x y active)
-                    activeCount := active ?+ addi(_ 1) ?- _
-                    str_append(txt active ?+ "+" ?- "-")
+                    active ?+ { activeNum := (+:_ 1) }
+                    ta(active ?+ "*" ?- " ")
                 }
-                str_append(txt newline)
+                ta(newline)
             }
-            print*cat["active: " activeCount]
+            print*cat["active: " activeNum]
         }
     }
-    main(args:string): int* {
+    main(args:str) -> i4: {
         life:Life/new(32 32)
-        print*array_at(life/grid, [:int 0 0])/Get!
-        range(0 life/width) | ?(x:int) range(0 life/height) | ?(y:int)
-            life/set(x y rand_bool!)
-        count:1 prevCount:0 run:true
-        Console/Clear!
-        run ?% { 
-            life/update!
-            prevCount := count
-            count := life/activeCount
-            run := neq(count prevCount)
-            Console/SetCursorPosition(0 0)
-            print*str*life/txt
+        print*life/grid[:i4 0 0]/Get(),
+        ɩ(life/w) | ?(x:i4)ɩ(life/h) | ?(y:i4) life/set(x y rand_bool())
+        num:1 prevNum:0 run:⊤ i:1
+        Console/Clear()
+        run ?++ {
+            life/update()
+            prevNum := num
+            num := life/activeNum
+            run := neq(num prevNum)
+            print*cat["time: " i]
+            Console/{
+                SetCursorPosition(0 0)
+                Write*life/txt/ToString()
+            }
         }
         ^: 0
     }

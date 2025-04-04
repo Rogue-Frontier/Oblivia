@@ -25,6 +25,30 @@ namespace Oblivia {
 		static Std () {
 			T _<T> (T t) => t;
 			Type MakeGeneric (Type gen, params object[] item) => gen.MakeGenericType(item.Select(i => i switch { Type t => t, _ => typeof(object) }).ToArray());
+
+            var modules = new Dictionary<string, VDictScope>();
+
+            var module = (string s) => {
+
+                if(modules.TryGetValue(s, out var d)) {
+                    return d;
+                }
+
+                var tokenizer = new Tokenizer(File.ReadAllText(s));
+                var tokens = new List<IToken> { };
+                while(tokenizer.Next() is { type: not TokenType.eof } t) {
+                    tokens.Add(t);
+                }
+                var parser = new Parser(tokens);
+                var scope = parser.NextBlock();
+
+                var result = new VDictScope { parent = std };
+                result = (VDictScope)scope.StagedApply(result);
+
+
+                return modules[s] = result;
+            };
+
             std = new VDictScope {
                 locals = new() {
                     ["File"] = typeof(File),
@@ -188,8 +212,11 @@ ValKeyword.SAT,
                     ["json"] = ValKeyword.JSON,
                     ["math"] = ValKeyword.MATH,
 
+                    ["module"] = module,
+					["import"] = ValKeyword.IMPORT,
+					["embed"] = ValKeyword.EMBED,
 
-                    ["ɩ"] = _((int i) => Enumerable.Range(0, i))
+					["ɩ"] = _((int i) => Enumerable.Range(0, i))
                 }
             };
 		}
@@ -239,6 +266,8 @@ ValKeyword.SAT,
         CLASS,INTERFACE,ENUM,
         GET,SET,PROP,
 
+        UP,
+
         FALL,
 
         GO_ELSE,
@@ -270,6 +299,10 @@ ValKeyword.SAT,
         VAR,
         STAGE,
         ANY,ALL,
+
+        ANYTHING,
+        NOTHING,
+
         TYPE,
         FN,
         MAKE,
@@ -298,6 +331,8 @@ ValKeyword.SAT,
         //immutable
         VAL,
 
+        MODULE,
+        IMPORT,
         EMBED,
 
         //Create a label
@@ -361,6 +396,10 @@ ValKeyword.SAT,
         public object val;
         public bool ready;
     }
+    public class VUp {
+        public int up;
+        public VRet Ret (object data) => new VRet(data, up);
+    }
     public class ValAuto { }
     public class FnTicket {
         public int argCount;
@@ -396,6 +435,11 @@ ValKeyword.SAT,
 	public record VGo {
         public VLabel target;
 	}
+
+    public record VRetFrom {
+        public IScope home;
+        public object data;
+    }
     public record VLabel {
         public int index;
         public VDictScope home;
@@ -456,7 +500,13 @@ ValKeyword.SAT,
         public INode expr;
         public object Eval (IScope ctx) => new VAlias { ctx = ctx, expr = expr };
     }
-    public record ExRef : INode {
+
+	public record ExStructurePattern : INode {
+		public object Eval (IScope ctx) {
+			throw new NotImplementedException();
+		}
+	}
+	public record ExRef : INode {
         public INode expr;
         public object Eval (IScope ctx) => null;
     }
@@ -1115,9 +1165,9 @@ ValKeyword.SAT,
 
 			switch(lhs) {
 				case ExFnType { lhs: ExUpKey { } k, rhs: { }t } efn:
-					return new StDefKey { key = k.key, type = t };
+					return new StDefKey { key = k.key, criteria = t };
 				case ExFnType { lhs: ExInvoke { } m, rhs: ExUpKey { } t } efn:
-					return new StDefKey { key = (m.target as ExUpKey).key, type = new ExFnType { lhs = m.args, rhs = t } };
+					return new StDefKey { key = (m.target as ExUpKey).key, criteria = new ExFnType { lhs = m.args, rhs = t } };
 
                     case ExFnType efn:
 
@@ -1523,7 +1573,6 @@ ValKeyword.SAT,
 				case TokenType.index_descend:   return MonadicTerm(ExMonadic.EFn.index_descend);
 				case TokenType.index_ascend:    return MonadicTerm(ExMonadic.EFn.index_ascend);
                 case TokenType.roll:            return MonadicTerm(ExMonadic.EFn.roll);
-
                 case TokenType.keyboard:        return MonadicTerm(ExMonadic.EFn.keyboard);
 				/*
 			case TokenType.minus:{
@@ -1562,12 +1611,12 @@ ValKeyword.SAT,
 				case TokenType.tuple_l: return NextTupleOrLisp();
 				case TokenType.array_l: return NextArrayOrLisp();
 				case TokenType.block_l: return NextBlock();
-                    
                 case TokenType.percent:
                     inc();
                     return new ExSpread { value= NextExpr() };
                 case TokenType.quote:
                     return NextAlias();
+                case TokenType.cash: return NextStructurePattern();
                 case TokenType.comma:
                     inc();
                     goto Read;
@@ -1576,7 +1625,6 @@ ValKeyword.SAT,
                     goto Read;
             }
             throw new Exception($"Unexpected token in expression: {currToken.type}");
-
 			ExVal Val (object val) {
 				inc();
 				return new ExVal { value = val };
@@ -1589,7 +1637,6 @@ ValKeyword.SAT,
 				};
 			}
 		}
-
 		List<(INode cond, INode yes)> NextSwitch () {
 			inc();
 			var items = new List<(INode cond, INode yes)> { };
@@ -1624,6 +1671,39 @@ ValKeyword.SAT,
 			inc();
 			return new ExAlias { expr = NextExpr() };
 		}
+        public ExStructurePattern NextStructurePattern() {
+            inc();
+			throw new Exception();
+			var expr = NextExpr();
+            switch(expr) {
+                case ExTuple et:
+					throw new Exception();
+				case ExSeq es:
+					throw new Exception();
+				case ExBlock eb:
+					throw new Exception();
+					foreach(var st in eb.statements) {
+                        switch(st) {
+                            case StDefKey sdk: {
+									var lhs = sdk.key;
+									var key = sdk.key;
+									var rhs = sdk.criteria;
+									throw new Exception();
+								}
+                            case ExIs eis: {
+									var lhs = eis.lhs;
+									var key = eis.key;
+									var rhs = eis.rhs;
+                                    throw new Exception();
+								}
+						}
+                    }
+
+
+                case ExInvokeBlock eib:
+                    throw new Exception();
+            }
+        }
 		string ReadLispOp () {
 			var start = index;
 			var d = new Dictionary<string, int> {
@@ -2054,14 +2134,12 @@ ValKeyword.SAT,
                         return ExTuple.SpreadVal(args).EvalTuple(ctx);
 				}
 			};
-
             switch(t) {
                 case VEmpty: throw new Exception("Type not found");
                 case Type tt: {
                         var v = getResult();
                         var r = new VType(tt).Cast(v, v?.GetType());
                         return r;
-                        return new VCast { type = v?.GetType(), val = r };
                     }
                 case VClass vc: {
                         return vc.VarBlock(ctx, source_block);
@@ -2099,12 +2177,10 @@ ValKeyword.SAT,
                 case ValKeyword.ENUM: {
 						var keyToVal = new ConcurrentDictionary<string, dynamic>();
 						var valToKey = new ConcurrentDictionary<dynamic, string>();
-
 						var keys = new string[source_block.statements.Count];
 						var vals = new object[source_block.statements.Count];
-                        int i = 0;
+                        var i = 0;
 						foreach(var st in source_block.statements) {
-
                             void Add(string k, dynamic v) {
 								keyToVal[k] = v;
 								valToKey[v] = k;
@@ -2113,11 +2189,11 @@ ValKeyword.SAT,
 							}
                             switch(st) {
                                 case ExUpKey { up: -1, key: { } k }:{
-                                    var v = new object();
+                                    var v = k;
                                     Add(k, v);
                                     break;
                                 }
-                                case ExInvoke { target: ExUpKey { up: -1, key: { } k } }: {
+                                case ExInvoke {target:ExUpKey{up:-1,key:{}k}}:{
                                     var v = new object();
                                     Add(k, v);
                                     break;
@@ -2138,16 +2214,13 @@ ValKeyword.SAT,
 					}
 				default:
 					return ExInvoke.InvokeFunc(ctx, t, getArgs);
-
 			}
 			throw new Exception("Type expected");
-            //return result;
         }
     }
     public class ExEqual : INode {
         public INode lhs;
         public INode rhs;
-
         public bool invert;
         public object Eval (IScope scope) {
             var l = lhs.Eval(scope);
@@ -2160,7 +2233,6 @@ ValKeyword.SAT,
         }
     }
 	public class ExIsAssign : INode {
-
         public INode lhs;
         public INode rhs;
 		public object Eval (IScope ctx) {
@@ -2168,26 +2240,29 @@ ValKeyword.SAT,
 		}
 	}
     /*
-
 ${
     foo = int:bar
     baz = int
-    qux:int
+    qux()
+    thing(0) = 5
+
+    test = ${
+        
+    }
 }
     */
-    public class StructurePattern { }
 	public class ExIs : INode {
         public INode lhs;
         public INode rhs;
-        public string? key;
+        public string key;
         public object Eval(IScope ctx) {
-            var l = lhs.Eval(ctx);
-            var r = rhs.Eval(ctx);
+			var r = rhs.Eval(ctx);
+			var l = lhs.Eval(ctx);
 			ctx.SetLocal("_lhs", l);
 			ctx.SetLocal("_rhs", r);
-            if(Is(l, r)) {
-                if(key != null) {
-                    ctx.SetLocal(key, l);
+            if(Is(l,r)) {
+                if(key is{}k) {
+                    ctx.SetLocal(k,l);
                 }
                 return true;
             } else {
@@ -2197,19 +2272,11 @@ ${
         public static bool Is(object item, object kind) {
 			switch(item, kind) {
 				case (var v, Type t): {
-						if(v is object o && t.IsAssignableFrom(o.GetType())) {
-							return true;
-						} else {
-							return false;
-						}
-					}
+                    return (v is { } o && t.IsAssignableFrom(o.GetType()));
+				}
 				case (var v, VClass vc): {
-						if(v is VDictScope vds && vds.HasClass(vc)) {
-							return true;
-						} else {
-							return false;
-						}
-					}
+                    return (v is VDictScope vds && vds.HasClass(vc));
+				}
                 case (var v, VComplement co):
                     return !Is(v, co.on);
                 case (var v, VInterType vmp):
@@ -2219,16 +2286,16 @@ ${
 				case (var v, VCriteria vcr):
                     return vcr.Accept(v);
 				case (var v, VInterface vi): {
-						if(v is VDictScope vds && vds.HasInterface(vi)) {
-							return true;
-						} else {
-							return false;
-						}
-					}
+                    return (v is VDictScope vds && vds.HasInterface(vi));
+				}
 				case (var v, null):
 					return v == null;
 				case (null, var t):
 					return false;
+				case (var v, ValKeyword.ANYTHING):
+                    return true;
+				case (var v, ValKeyword.NOTHING):
+                    return false;
 				case (var v, var k):
 					return Equals(v, k);
 				default:
@@ -2335,9 +2402,7 @@ ${
         public INode target;
         public ExTuple args;
         //public string Source => $"{expr.Source}{(args.Count > 1 ? $"({string.Join(", ", args.Select(a => a.Source))})" : args.Count == 1 ? $"*{args.Single().Source}" : $"!")}";
-
         public static ExInvoke Fn (string symbol, INode arg) => new() { target = new ExUpKey { key = symbol }, args = ExTuple.Expr(arg) };
-
         public object Eval (IScope ctx) {
             var f = target.Eval(ctx);
             switch(f) {
@@ -2345,7 +2410,6 @@ ${
                     throw new Exception(ve.msg);
                 case ValKeyword.MAGIC:      return new ValMagic();
                 case ValKeyword.GO: {
-
                         var ar = args.Eval(ctx);
 						return new VGo { target = (VLabel)ar };
 					}
@@ -2398,7 +2462,25 @@ ${
                         }
                         return VEmpty.VALUE;
                     }
-                case ValKeyword.EMBED: {
+                case ValKeyword.IMPORT: {
+                        var root = ctx;
+                        while(ctx.parent is { } par) root = par;
+						var arg = args.EvalTuple(ctx);
+						foreach(var (k, v) in arg.items) {
+							switch(v) {
+								case VDictScope _vds: {
+										foreach(var other in _vds.locals.Keys) {
+											StDefKey.Define(root, other, new VAlias { ctx = _vds, expr = new ExUpKey { key = other, up = 1 } });
+										}
+										break;
+									}
+								default: throw new Exception("Class expected");
+							}
+						}
+						return VEmpty.VALUE;
+
+					}
+				case ValKeyword.EMBED: {
                         var vds = (VDictScope)ctx;
                         var arg = args.EvalTuple(ctx);
                         foreach(var (k, v) in arg.items) {
@@ -2408,6 +2490,9 @@ ${
                                     break;
                                 case VDictScope _vds: {
                                         foreach(var other in _vds.locals.Keys) {
+                                            if(other.StartsWith("_")) {
+                                                continue;
+                                            }
                                             StDefKey.Define(ctx, other, new VAlias { ctx = _vds, expr = new ExUpKey { key = other, up = 1 } });
                                         }
                                         break;
@@ -2986,8 +3071,7 @@ $(foo:int bar:int)
         public static object Match(IScope ctx, List<(INode cond, INode yes)> branches, object val) {
 			//To do: Add recursive call
 			var inner_ctx = ctx.MakeTemp(val);
-			inner_ctx.locals["_default"] = val;
-
+			inner_ctx.locals["_"] = val;
 			foreach(var (cond, yes) in branches) {
                 //TODO: Allow lambda matches
 				var b = cond.Eval(inner_ctx);
@@ -3154,14 +3238,14 @@ $(foo:int bar:int)
     public class StDefKey : INode {
         public string key;
         public INode value;
-        public INode type;
+        public INode criteria;
         public bool first = true;
         public XElement ToXML () => new("KeyVal", new XAttribute("key", key), value.ToXML());
         public string Source => $"{key}:{value?.Source ?? "null"}";
         public object Eval (IScope ctx) {
 
             if(value == null) {
-                var val = new VDeclared { name = key, type = type.Eval(ctx) };
+                var val = new VDeclared { name = key, type = criteria.Eval(ctx) };
                 if(first) {
                     Define(ctx, key, val);
 					first = false;
@@ -3771,8 +3855,6 @@ $(foo:int bar:int)
         public ExUpKey[] symbols;
         public INode value;
         public object Eval (IScope ctx) {
-
-
             return deconstruct ? AssignDestructure(ctx, symbols, value.Eval(ctx)) : AssignTuple(ctx, symbols, value.Eval(ctx));
         }
         public static object AssignDestructure(IScope ctx, ExUpKey[] symbols, object val) {

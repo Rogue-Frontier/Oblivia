@@ -1,0 +1,217 @@
+﻿{
+    
+    #@private
+	TokenType:enum{
+        eof:"eof"   str:"str"   name:"name"
+        comma:  "," semicolon:  ";" colon:  ":"
+		block_l:"{" block_r:"}" tuple_l:"(" tuple_r:")"
+        array_l:"[" array_r:"]" angle_l:"<" angle_r:">"
+		caret:  "^" period: "." bang:   "!" question:   "?"
+		plus:   "+" minus:  "-" star:   "*" slash:  "/"
+		equal:  "=" at:     "@" amp:    "&" pipe:   "|"
+        quote:  "\'"
+        cash:   "$" percent:"%" hash:   "#"
+        repeat: "¨" 
+		times:  "×" divide: "÷"
+		iota:   "ɩ" 
+		divides:"∣" 
+        floor:  "⌊" ceil:   "⌈"
+        brack_l:"⟨" brack_r:"⟩" double_brack_l: "⟪" double_brack_r: "⟫"
+        shell_brack_l:  "⟬" shell_brack_r:  "⟭" flat_paren_l:   "⟮" flat_paren_r:   "⟯"
+        index_ascend:   "⍋" index_descend:  "⍒"
+        i_beam: "⌶"
+		//•
+		//⟦ 	⟧ ⟨⟩	
+		//〈〉
+		kronecker_product:      "⊗"
+        //←
+        log:    "⍟" 
+        or:"∨"  and:"∧" nor:"⍱" nand:"⍲"    xor:"⊻"
+        sum:"∑" product:"∏" increment:"∆"
+        geq:"≥" leq:"≤"
+		arrow_w:"←" arrow_e:"→" arrow_s:"↓" arrow_n:"↑"
+        measure:"measure"
+
+        keyboard:"⌨"
+        not_eq:"≠"
+    }
+    IToken:interface{
+    
+    }
+    StrToken:class{impl(IToken)
+        type -> obj:TokenType/eof
+        text -> str:""
+    }
+    MeasureToken:class{impl(IToken)
+        type:TokenType/measure
+        val->i4:0   measure->str:""     text:get{cat[val measure]}
+    }
+    Tokenizer:class {
+        src->str:""     index->i4:0
+        new(src:str): _class {
+            src:=^^src
+        }
+        GetAllTokens (): {
+            tokens: List.IToken/ctor(),
+            (Next()=sat(?(token) not(token/type="eof")): t)?++{
+	            Console/WriteLine(cat[t/type " " t/text])
+                tokens/Add(t)
+            }
+            ^: tokens
+        }
+        Next():{
+            str(c:Row.char): str/Join("" c)
+            inc():{index:=(+:_ 1)}
+            alphanumeric:sat(?(c:char)((c≥⌨"a")∧(c≤⌨"z"))∨((c≥⌨"A")∧(c≤⌨"Z"))∨(c = numeric)∨(c=⌨"_"))
+            numeric:sat(?(n:char)(n≥⌨"0")∧(n≤⌨"9"))
+            Check:label
+            #pr("Check")
+            index≥(src/Length)?+{
+                ^^: StrToken {
+                    type:=TokenType/eof
+                }
+            }
+            c:src(index)
+            c?{
+                ⌨"/":{
+                    src((+:index 1))?{
+                        ⌨"/":{
+                            inc() inc(),
+                            (<:index src/Length)∧(src.index/Get()≠⌨"\n")?++inc()
+                            go.Check
+                        }
+                        ⌨"*":{
+                            inc() inc(),
+                            (<:index src/Length)∧(src.index/Get()≠⌨"\n")?++inc()
+                            checkStop:no,
+                            (<:index src/Length)?++{
+                                (src.index=⌨"*")?+{
+                                    inc()   checkStop:=yes
+                                } ?- (src.index=⌨"/")∧checkStop?+{
+                                    inc()   go.Check
+                                } ?- {
+                                    inc()   checkStop:=no
+                                }
+                            }
+                            go.Check
+                        }
+                        _:{^^:fall}
+                    }
+                }
+                ⌨"#":{
+                    inc(),
+                    (<:index src/Length)∧(src.index/Get()≠⌨"\n")?+inc()
+                    go.Check
+                }
+                ⌨"~":{
+                    inc(),
+                    (<:index src/Length)∧(src.index/Get()≠⌨"~")?+inc()
+                    inc()   go.Check
+                }
+                ⌨"\"":{
+                    dest:(+:index 1)    v:"",
+                    #pr(src(dest)()),
+                    (<:dest src/Length)?++{
+                        src.dest()?{
+                            ⌨"\\":{
+                                dest:=(+:_ 1)
+                                v:=cat[_ src(dest)?{
+                                    ⌨"r": "\r"
+                                    ⌨"n": "\n"
+                                    ⌨"t": "\t"
+                                    ⌨"\\": "\\"
+                                    ⌨"\"": "\""
+                                    ⌨"\'": "\'"
+                                }]
+                                dest:=(+:_ 1)
+                            }
+                            ⌨"\"":go.Stop
+                            _:{
+                                v:=(+:v src.dest/Get())
+                                dest:=(+:_ 1)
+                            }
+                        }
+                    }
+                    Stop:label
+                    #pr(cat["index " index])
+                    dest:=(+:_ 1)
+                    index:=dest
+                    ^^:StrToken{
+                        type:=TokenType/str
+                        text:=^^v
+                    }
+                }
+                any(⌨" " ⌨"\r" ⌨"\n" ⌨"\t"):{
+                    inc()
+                    go.Check
+                }
+                numeric:{
+                    dest:index val:0
+                    Read:label,
+                    (<:dest src/Length)?+{
+                        ch:src.dest
+                        ch?{
+                            numeric:{
+                                val:=(+:(*:_ 10),(-:ch ⌨"0"))
+                                dest:=(+:_ 1)
+                                go.Read
+                            }
+                            ⌨"_":{
+                                dest:=(+:_ 1)
+                                go.Read
+                            }
+                            _:{}
+                        }
+                    }
+                    s:src/Substring(index,(-:dest index))
+                    index:=dest
+                    ^^:MeasureToken{
+                        val:=^^val 
+                        measure:=""
+                    }
+                }
+                alphanumeric:{
+                    dest:index  escape:no   v:""
+                    Read:label,
+                    (<:dest src/Length)?+{
+                        ch:src(dest)
+                        ch?{
+                            alphanumeric:{
+                                v:=(+:v ch)
+                                dest:=(+:_ 1)
+                                go.Read
+                            }
+                            ⌨"\\":{
+                                dest:=(+:_ 1)
+                                escape:=yes
+                                go.Read
+                            }
+                            _:{
+                                escape?+{
+                                    v:=(+:v ch)
+                                    escape:=false
+                                    dest:=(+:_ 1)
+                                    go.Read
+                                } ?- go.Done
+                            }
+                        }
+                    }
+                    Done:label
+                    index:=dest
+                    ^^:StrToken{
+                        type:=TokenType/name
+                        text:=^^v
+                    }
+                }
+                sat(?(c:char) TokenType/_valToKey(c/ToString())/can_get):{
+                    _t:TokenType/_valToKey(c/ToString())
+                    index:=(+:_ 1)
+                    ^^:StrToken{
+                        type:=_t
+                        text:=c/ToString()
+                    }
+                }
+            }
+        }
+	}
+}

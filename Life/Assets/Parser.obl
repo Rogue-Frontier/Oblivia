@@ -1,0 +1,465 @@
+{
+    embed*module."Assets/Tokenizer.obl"
+    Parser:class{
+        index->i4:0
+        tokens:List.IToken/ctor()
+        new(tokens:List.IToken):_class{tokens:=^^tokens}
+
+        #@static
+        FromFile(path:str):{
+            tokenizer:Tokenizer/new(File/ReadAllText(path))
+            ^:Parser/new(tokenizer/GetAllTokens())/NextBlock()
+        }
+
+        inc():{index:=(+:_ 1)}
+        dec():{index:=(-:_ 1)}
+        currToken:'tokens.index
+        currTokenType:'currToken/type
+        currTokenStr:'StrToken(currToken)/str
+        NextStatement():{
+            currTokenType?{
+                TokenType/at:{
+                    inc()
+                    att:NextTerm()
+                    ^^:ExInvokeBlock{
+                        type := att
+                        source_block := ExBlock{ statements := [NextStatement()] }
+                    }
+                }
+            }
+            lhs:NextExpr()
+            currTokenType?{
+                TokenType/colon:{
+                    inc()
+                    lhs?{
+                        ExBlock:{
+                            eb:_
+                            currTokenType?{
+                                TokenType/equal:{
+                                    inc()
+                                    symbols:List.ExUpKey/ctor()
+                                    eb/statements | ?(item)
+                                        item = ExUpKey:s ?+ symbols/Add(s) ?- {
+                                        
+                                        }
+                                    ^^^^:StAssignMulti { symbols:=^^symbols/ToArray() value:=NextExpr() deconstruct:=yes }
+                                }
+                                _:{
+                                    inc()
+                                    symbols:List.string/ctor()
+                                    eb/statements | ?(item)
+                                        item?{
+                                            ExUpKey:{
+                                                s:_
+                                                symbols/Add(s/key)
+                                            }
+                                            _:{
+                                                ERROR
+                                            }
+                                        }
+                                    ^^^^:StDefMulti{ lhs:=symbols/ToArray() rhs:=NextExpr() deconstruct:=yes }
+                                }
+                            }
+                        }
+                        ExTuple:{
+                            et:_
+                            currTokenType?{
+                                TokenType/equal:{
+                                    inc()
+                                    symbols:List.ExUpKey/ctor()
+                                    et/vals |?(item)
+                                        item?{
+                                            ExUpKey:{
+                                                s:_
+                                                symbols/Add(s)
+                                            }
+                                        }
+                                    ^^^^:StAssignMulti{symbols:=^^symbols/ToArray() value:=NextExpr()}
+                                }
+                                _:{
+                                    symbols:List.str/ctor()
+                                    et/vals | ?(item)
+                                        and[item=ExUpKey item/key=str:key abs(item/up)=1] ?+ {
+                                            
+                                        }
+                                    ^^^^:StDefMulti{lhs:=symbols/ToArray() rhs:=NextExpr()}
+                                }
+                            }
+                        }
+                        ExUpKey:{
+                            es:_
+                            currTokenType?{
+                                TokenType/equal:{
+                                    inc()
+                                    ^^^^:StAssignSymbol{symbol:=es value:=NextExpr()}
+                                }
+                                _:{
+                                    es/up?{
+                                        any((-:0 1) 1):{
+                                            ^^^^^:StDefKey{key:=es/key value:=NextExpr()}
+                                        }
+                                        _:{
+                                            ERROR("Can only define in current scope")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        /*
+                        ExInvoke${ target = ExUpKey:uk}:{
+                            ei:_
+                            uk/up?{
+                                any((-:0 1) 1):{
+                                    ^^^^:StDefFn{key:=uk/key pars:=ei/args/ParTuple() value:=NextExpr()}
+                                }
+                                _:{
+                                    ERROR("Cannot define non-local function")
+                                }
+                            }
+                        }
+                        ExInvoke${target:$ExSelf{up:any((-:0 1) 1)} args=ExTuple:et}:{
+                            ^^^^:StDefFn{key:="_call" pars:=et value:=NextExpr()}
+                        }
+                        ExSelf${up:obj}:{
+                            ^^^^:StReturn{val:=NextExpr() up:=^^up}
+                        }
+                        */
+                        ExFnType:{
+                            eft:_
+                            eft/lhs?{
+                                ExUpKey:{
+                                    es:_
+                                    currTokenType?{
+                                        TokenType/equal:{
+                                            inc()
+                                            ^^^^^:StAssignSymbol{symbol:=es value:=NextExpr()}
+                                        }
+                                        _:{
+                                            es/up?{
+                                                any((-:0 1), 1):{
+                                                    ^^^^^^:StAssignSymbol{symbol:=es value:=NextExpr()}
+                                                }
+                                                default:ERROR("Cannot define non-local")
+                                            }
+                                        }
+                                    }
+                                }
+                                /*
+                                ExInvoke${target=ExUpKey:uk}:{
+                                    ei:_
+                                    uk/up?{
+                                        any((-:0 1) 1):{
+                                            ^^^^^:StDefFn{key:=uk/key pars:=ei/args/ParTuple() value:=NextExpr()}
+                                        }
+                                        _:ERROR("Cannot define non-local")
+                                    }
+                                }
+                                ExInvoke${target=ExSelf${up=any((-:0 1)1) args=ExTuple:et}:{
+                                    ^^^^: StDefFn{
+                                        key:="_call"
+                                        pars:=et
+                                        value:=NextExpr()
+                                    }
+                                }
+                                ExSelf${up=obj:up}:{
+                                    ^^^^: StReturn{val:=NextExpr() up:=^^^up}
+                                }
+                                */
+                            }
+                        }
+                        ExMemberExpr:{}
+                        ExMemberBlock:{}
+                        ExMap${ expr=true map=ExUpKey:euk}:{}
+                        _:{}
+                    }
+                }
+            }
+
+            lhs?{
+                ExFnType${lhs=ExUpKey:k rhs=obj:t}:{^^^^:StDefKey{k:=k/key criteria:=t}}
+                ExFnType${lhs=ExInvoke:m rhs=ExUpKey:t}:{
+                    ^^^^:StDefKey{key:=ExUpKey(m/target)/key criteria:=ExFnType{lhs:=m/args rhs:=t}}
+                }
+                ExFnType:{}
+            }
+
+            lhs:=CompoundExpr(lhs)
+            ^:lhs
+        }
+        NextExpr():{
+            lhs:NextTerm()
+            ^:CompoundExpr(lhs)
+        }
+        CompoundExpr(lhs:INode):{
+            T:TokenType
+            EFn:EDyadic/Efn
+            DyadicTerm(fn:EFn):Dyadic(fn NextTerm)
+            DyadicExpr(fn:Efn):Dyadic(fn NextExpr)
+            Dyadic(fn:Efn n:()->INode):{
+                inc()
+                ^:CompoundExpr(ExDyadic{fn:=^^fn lhs:=^^^lhs rhs:=n()})
+            }
+            Start:label
+            currTokenType?{
+                T/space:{
+                    inc()
+                    go.Start
+                }
+                T/angle_l:{
+                    inc()
+                    currTokenType?{
+                        T/minus:{
+                            inc()
+                            ^^^^^:DyadicExpr(EFn/assign)
+                        }
+                        _:ERROR("Invalid")
+                    }
+                }
+                T/minus:{
+                    inc()
+                    currTokenType?{
+                        T/angle_r:{
+                            inc()
+                            currTokenType?{
+                                any(T/tuple_r T/block_r T/array_r T/angle_r):{
+                                    ^^^^^^:ExFnType{lhs:=^^^^^lhs}
+                                }
+                                _:{
+                                    rhs:NextExpr()
+                                    ^^^^^^:CompoundExpr(ExFnType{lhs:=^^^^^lhs rhs:=^^rhs})
+                                }
+                            }
+                        }
+                        _:{
+                            NextExpr()
+                            ^^^^^:CompoundExpr(ExRange{lhs:=^^^^lhs rhs:=^^rhs})
+                        }
+                    }
+                }
+                T/block_l:{
+                    ^^^^:CompoundExpr(ExInvokeBlock{type:=lhs source_block:=NextBlock()})
+                }
+                T/pipe:{
+                    inc()
+                    currTokenType?{
+                        T/star:{
+                            inc()
+                            ^^^^^:CompoundExpr(ExMap{src:=lhs map:=ExInvoke{target:=ExSelf{up:=1} args:=ExTuple/Expr(NextExpr())} expr:=yes})
+                        }
+                        T/period:{
+                            inc()
+                            ^^^^^:CompoundExpr(ExMap{src:=lhs map:=ExInvoke{target:=ExSelf{up:=1} args:=ExTuple/Expr(NextTerm())} expr:=yes})
+                        }
+                        T/slash:{
+                            inc()
+                            ^^^^^:CompoundExpr(ExMap{src:=lhs map:=NextExpr() expr:=true})
+                        }
+                        _:{
+                            cond->INode
+                            type->INode
+                            currTokenType?{
+                                T/angle_l:{
+                                    inc()
+                                    cond:=NextExpr()
+                                    currTokenType?{
+                                        T/angle_r:{
+                                            inc()
+                                        }
+                                        _:ERROR("Closing expected")
+                                    }
+                                }
+                            },
+                            (currTokenType=T/colon) ?+{
+                                inc()
+                                type:=NextExpr()
+                            }
+                            ^^^^^:CompoundExpr(ExMap{src:=lhs cond:=^^cond type:=^^type map:=NextTerm()})
+                        }
+                    }
+                }
+                T/star:{
+                    inc()
+                    currTokenType?{
+                        T/pipe:{
+                            inc()
+                            ^^^^^:CompoundExpr(ExMap{src:=NextExpr() map:=lhs})
+                        }
+                        _:{
+                            ^^^^^:CompoundExor(ExInvoke{target:=lhs args:=ExTuple/SpreadExpr(NextExpr())})
+                        }
+                    }
+                }
+                T/period:{
+                    inc()
+                    currTokenType?{
+                        T/pipe:{
+                            inc()
+                            ^^^^^:CompoundExpr(ExMap{src:=NextTerm() map:=lhs})
+                        }
+                        T/period:{
+                            inc()
+                            ^^^^:CompoundExpr(ExTemp{lhs:=^^^lhs rhs:=NextExpr()})
+                        }
+                        _:{
+                            ^^^^:CompoundExpr(ExInvoke{target:=lhs args:=ExTuple/SpreadExpr(NextTerm())})
+                        }
+                    }
+                }
+                T/bang:{
+                    inc()
+                    ^^^:CompoundExpr(ExInvoke{target:=lhs args:=ExTuple/Empty})
+                }
+                T/percent:{
+                    inc()
+                    currTokenType?{
+                        T/plus:{^^^^:CompoundExpr(ExSeqOp{fn:=lhs op:=ExSeqOp/EOp/Reduce})}
+                        T/minus:{^^^^:CompoundExpr(ExSeqOp{fn:=lhs op:=ExSeqOp/EOp/SlidingWindow})}
+                        _:{^^^^:CompoundExpr(ExSpread{value:=lhs})}
+                    }
+                }
+                T/equal:{
+                    inc()
+                    Eq(invert:bit):CompoundExpr(ExEqual{lhs:=^^^lhs rhs:=NextTerm() invert:=^^invert})
+                    currTokenType?{
+                        T/plus:{
+                            inc()
+                            ^^^^:Eq(no)
+                        }
+                        T/minus:{
+                            inc()
+                            ^^^^:Eq(yes)
+                        }
+                        T/angle_r:{
+                            inc()
+                            ^^^^:CompoundExpr(ExFn{pars:=ExTuple(lhs) result:=rhs})
+                        }
+                        T/colon:{
+                            rhs:NextTerm()
+                            ^^^^:CompoundExpr(ExIsAssign{lhs:=^^^^lhs rhs:=^^rhs})
+                        }
+                        _:{
+                            pattern:NextExpr()
+                            currTokenType?{
+                                T/colon:{
+                                    inc()
+                                    symbol:NextSymbol()
+                                    ^^^^^:CompoundExpr(ExIs{lhs:=^^^^^lhs rhs:=pattern key:=symbol/key})
+                                }
+                                _:{
+                                    ^^^^^:CompoundExpr(ExIs{lhs:=^^^^^lhs rhs:=pattern key:="_"})
+                                }
+                            }
+                        }
+                    }
+                }
+                T/slash:{
+                    inc()
+                    currTokenType?{
+                        T/pipe:{
+                            inc()
+                            fn:NextTerm()
+                            ^^^^:CompoundExpr(ExFn{
+                                pars:=ExTuple/Empty
+                                result:=ExInvoke{target:=fn args:=ExTuple/Expr(lhs)}
+                            })
+                        }
+                        T/slash:{
+                            inc()
+                            ^^^^:CompoundExpr(ExAt{src:=lhs index:=[NextTerm()]})
+                        }
+                        T/star:{
+                            inc()
+                            ^^^^:CompoundExpr(ExAt{src:=lhs index:=[NextExpr()]})
+                        }
+                        T/period:{
+                            inc()
+                            ^^^^:CompoundExpr(ExAt{src:=lhs index:=[NextTerm()]})
+                        }
+
+                        T/name:{
+                            name:currTokenStr
+                            inc()
+                            ^^^^:CompoundExpr(ExMemberKey{src:=lhs key:=name})
+                        }
+                        T/measure:{
+                            num:MeasureToken(currToken)/val
+                            inc()
+                            ^^^^:CompoundExpr(ExMemberNumber{src:=lhs num:=^^num})
+                        }
+                        T/block_l:{
+                            ^^^^:CompoundExpr(ExMemberBlock{lhs:=^^^lhs rhs:=ExBlock(NextExpr()) local:=no})
+                        }
+                        _:{
+                            ^^^^:CompoundExpr(ExMemberExpr{lhs:=^^^lhs rhs:=NextExpr() local:=yes})
+                        }
+                    }
+                }
+                T/array_l:{
+                    arr:ExSeq(NextArrayOrLisp())
+                    CompoundExpr(ExAt{src:=lhs index:=arr/items})
+                }
+                T/at:{
+                    inc()
+                    term:NextExpr()
+                    ^^^:ExInvokeBlock{type:=term source_block:=ExBlock{statements:=[NextStatement()]}}
+                }
+                T/question:{
+                    inc()
+                    currTokenType?{
+                        T/pipe:{
+                            rhs:NextExpr()
+                            ^^^^:CompoundExpr(ExFilter{lhs:=lhs rhs:=rhs})
+                        }
+                        T/percent:{
+                            inc()
+                            ^^^^:CompoundExpr{ExLoop{condition:=lhs positive:=NextExpr()}}
+                        }
+                        T/colon:{
+                            inc()
+                            ^^^^:ExCriteria{item:=lhs cond:=NextExpr()}
+                        }
+                        T/tuple_l:{
+                            inc()
+                            ^^^^:CompoundExpr(ExInvoke{target:=lhs args:=ExTuple/Expr(NextFn())})
+                        }
+                        T/array_l:{
+                            inc()
+                            type->INode
+                            currTokenType?{
+                                T/colon:{
+                                    inc()
+                                    type:=NextExpr()
+                                }
+                            }
+                            items:List((cond:INode yes:INode no:INode))
+                            Read:label
+                        }
+                    }
+                }
+            }
+        }
+        NextBlock():{
+            inc()
+            ele:List.INode/ctor()
+            Check:label
+            currTokenType?{
+                TokenType/block_r:{
+                    inc()
+                    ^^:ExBlock{ statements := ele }
+                }
+                TokenType/comma:{
+                    inc()
+                    go.Check
+                }
+                _:{
+                    ele/Add(NextStatement())
+                    go.Check
+                }
+            }
+        }
+    }
+
+    INode:interface{}
+
+}

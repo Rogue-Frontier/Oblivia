@@ -1,17 +1,17 @@
 ﻿{
     print:Console/WriteLine
     Life:class {
-        #@dbg["width:" w]
+        //@dbg["width:" w]
         w→i4
-        #@dbg["height:" h]
+        //@dbg["height:" h]
         h→i4
-
-
-        aaa -> i4
         grid→Grid(bit)
+
+        a→i4
+
         mod(n:i4 max:i4):(%:(n<0)?+(n+max)?-n max)
-        # xy: (x:i4 y:i4)
-        # %xy
+        // xy: (x:i4 y:i4)
+        // %xy
         at(x:i4 y:i4):grid(mod.|[x:w y:h]|i4)
         get(x:i4 y:i4):at(x y)/Get()
         set(x:i4 y:i4 b:bit):at(x y)/Set(b)
@@ -36,7 +36,7 @@
                     active: g(x y) ?+ ¬((c<2)∨(c>3)) ?- (c=3)
                     set(x y active)
                     active ?+ activeNum←(_+1)
-                    ta(active?+"*"?-" ")
+                    ta(active ?+ "*" ?- " ")
                 }
                 ta(newline)
             }

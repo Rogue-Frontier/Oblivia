@@ -1000,7 +1000,9 @@ ValKeyword.SAT,
         public static ExBlock FromFile (string path) {
             var tokenizer = new Tokenizer(File.ReadAllText(path));
             var tokens = tokenizer.GetAllTokens();
-            //File.WriteAllText(path, string.Join("", tokens.Select(t => (char)t.type)));
+            var src = string.Join("", tokens.Select(t => t.src));
+            File.WriteAllText(path, src);
+            tokens.RemoveAll(t => t.type is TokenType.space or TokenType.comment);
 			return new Parser(tokens).NextBlock();
         }
         void inc () => index++;
@@ -1794,7 +1796,7 @@ ValKeyword.SAT,
                 case TokenType.angle_l:
                 case TokenType.angle_r:
                 case TokenType.period:
-					op += currTokenStr;
+					op += currToken.src;
 					inc();
 					goto ReadOp;
 				case TokenType.colon:
@@ -4106,8 +4108,12 @@ $(foo:int bar:int)
 					tokens.Insert(i, new Token { type = TokenType.arrow_w });
                     continue;
 				}
+				if(g(2) is [TokenType.colon, TokenType.equal]) {
+					tokens.RemoveRange(i, 2);
+					tokens.Insert(i, new Token { type = TokenType.coloneqq });
+					continue;
+				}
 			}
-
             return tokens;
         }
 
@@ -4118,7 +4124,7 @@ $(foo:int bar:int)
 
 			Check:
 			if(index >= src.Length) {
-                return new StrToken { type = TokenType.eof };
+                return new Token { type = TokenType.eof };
             }
 
             var c = src[index];
@@ -4126,17 +4132,22 @@ $(foo:int bar:int)
                 case '/': {
 
                         if(src[index + 1] == '/') {
+                            var start = index;
+
                             inc();
                             inc();
 
 							while(index < src.Length && src[index] != '\n') {
 								inc();
 							}
-							goto Check;
-                        } else if(src[index + 1] == '*') {
-                            inc();
-                            inc();
 
+                            var st = src[start..index];
+
+							return new StrToken { str = st, src = st, type = TokenType.comment };
+                        } else if(src[index + 1] == '*') {
+                            var start = index;
+                            inc();
+                            inc();
 							bool checkStop = false;
 							while(index < src.Length) {
 								if(src[index] == '*') {
@@ -4144,17 +4155,26 @@ $(foo:int bar:int)
 									checkStop = true;
 								} else if(src[index] == '/' && checkStop) {
 									inc();
+                                    var st = src[start..index];
+									return new StrToken { str = st, src = st, type = TokenType.comment };
 									goto Check;
 								} else {
 									inc();
 									checkStop = false;
 								}
 							}
+                            {
+                                var st = src[start..index];
+                                return new StrToken { str = st, src = st, type = TokenType.comment };
+                            }
 							goto Check;
                         }
                         break;
                     }
+                    /*
                 case ('#'): {
+
+                        var start = index;
                         inc();
                         /*
                         if(src[index] == '<') {
@@ -4175,11 +4195,11 @@ $(foo:int bar:int)
                             }
                             goto Check;
                         }
-                        */
+                        *//*
                         while(index < src.Length && src[index] != '\n') {
                             inc();
                         }
-                        goto Check;
+                        return new StrToken { str = src[start..index], type = TokenType.comment };
                     }
                 case ('~'): {
                         inc();
@@ -4189,20 +4209,16 @@ $(foo:int bar:int)
                         inc();
                         goto Check;
                     }
+                    */
                 case ('"'): {
                         int dest = index + 1;
-                        var v = "";
+                        var st = "";
                         while(dest < src.Length) {
                             if(src[dest] == '\\') {
-
-
 								var ss = src[(dest - 10)..(dest + 10)];
-
 								dest += 1;
                                 var ch = src[dest];
-
-
-								v += ch switch {
+								st += ch switch {
                                     'r' => '\r',
                                     'n' => '\n',
                                     't' => '\t',
@@ -4214,25 +4230,25 @@ $(foo:int bar:int)
 							} else if(src[dest] == '"') {
                                 break;
                             } else {
-                                v += src[dest];
+                                st += src[dest];
                                 dest += 1;
                             }
                         }
                         dest += 1;
                         index = dest;
-                        return new StrToken { type = TokenType.str, str = v };
+                        return new StrToken { type = TokenType.str, str = st, src=$"\"{st}\"" };
                     }
                     /*
                 case '\t':
                     throw new Exception("Illegal token");
                     */
                 case (' ' or '\r' or '\n' or '\t'): {
+                        var st = $"{c}";
                         inc();
-                        goto Check;
+                        return new StrToken { str = st, src = st, type = TokenType.space };
                     }
                 case (>= '0' and <= '9'): {
                         int dest = index;
-
 						int val = 0;
 						Read:
                         if(dest < src.Length) {
@@ -4254,7 +4270,6 @@ $(foo:int bar:int)
                 case ((>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or '_' or (>= '0' and <= '9')): {
                         int dest = index;
                         bool escape = false;
-
                         string v = "";
                         Read:
                         if(dest < src.Length) {
@@ -4281,16 +4296,13 @@ $(foo:int bar:int)
                         }
                         Done:
                         index = dest;
-                        return new StrToken { type = TokenType.name, str = v };
+                        return new StrToken { type = TokenType.name, str = v, src = v };
                     }
             }
-
-            
 			if(Enum.IsDefined(typeof(TokenType), (ulong)c)) {
-
-				var _t = (TokenType)(ulong)c;
-				index += 1;
-				return new StrToken { type = _t, str = str(c) };
+				var _t = (TokenType)c;
+                inc();
+				return new Token { type = _t };
 			}
             throw new Exception();
 		}
@@ -4440,7 +4452,7 @@ $(foo:int bar:int)
         PTR_L = '◄',
         interrobang = '‽',
         double_bang = '‼',
-		space = ' ',
+		
 
         member_of = '∈',
         not_member_of = '∉',
@@ -4534,29 +4546,39 @@ $(foo:int bar:int)
         keyboard = '⌨',
 
 
+
+
 		name = 0xFFFFFFFFFFFFFFF0,
+        space,
 		str,
         measure,
 		eof,
-    }
+		comment,
+	}
     //≣
     //«µ»əɅʌΘ∕❮❯❰❱
     //
     //Ⱶⱻ♪♫↔↕↨∟
 
-    public interface IToken { TokenType type { get; } }
+    public interface IToken { TokenType type { get; } string src { get; } }
 	public class StrToken:IToken {
+        
         public TokenType type { get; set; }
         public string str;
+        public string src { get; set; }
         public string ToString () => $"[{type}] {str}";
     }
+
     public class Token : IToken {
         public TokenType type { get; set; }
+        public string src => $"{(char)type}";
 		public string ToString () => $"[{type}] {(char)type}";
 	}
     public class MeasureToken:IToken {
         public TokenType type => TokenType.measure;
         public int val;
         public string measure;
+
+        public string src => $"{val}{measure}";
     }
 }

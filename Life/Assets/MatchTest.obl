@@ -1,0 +1,19 @@
+/*
+Option(T):enum{
+	None
+	Some(T)
+}
+foo:Option(str)/Some("test")
+*/
+IpAddr:enum{
+    V4(u8, u8, u8, u8),
+    V6(String),
+}
+home:IpAddr/V4(127, 0, 0, 1);
+loopback:IpAddr/V6("foo");
+/*
+home ?{
+	V4$(a b c d) ?:(a = 1):print(a)
+	V6$(addr): print(addr)
+}
+*/

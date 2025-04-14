@@ -1,5 +1,5 @@
 {
-    embed*module."Assets/Tokenizer.obl"
+    import*module."Assets/Tokenizer.obl"
     Parser:class{
         index->i4:0
         tokens:List.IToken/ctor()

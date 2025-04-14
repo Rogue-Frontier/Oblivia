@@ -1,5 +1,6 @@
 ﻿{
-    embed*module*"Assets/Parser.obl"
+    import*module*"Assets/Parser.obl"
+    import*module*"Assets/Parser.obl"
     pr:Console/WriteLine
     main(args:str):{
 		pr(args),

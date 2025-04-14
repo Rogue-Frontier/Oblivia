@@ -2,72 +2,15 @@
 using System.Collections;
 using System.Text;
 using Oblivia;
-/*
-
-range(1, grid.width) | (x:int): int {
-},
- */
-/*
-
-^^/result
-
-/*
-?@
-*/
-var tokenizer = new Tokenizer(File.ReadAllText("Assets/Parser.obl"));
-var tokens = new List<IToken> { };
-while(tokenizer.Next() is { type: not TokenType.eof } t) {
-	tokens.Add(t);
-}
-var parser = new Parser(tokens);
-var scope = parser.NextBlock();
+var scope = Parser.FromFile("Assets/Life.obl");
 T Val<T> (T t) => t;
 var global = new VDictScope();
 global.locals = new() {
-	["class"] = ValKeyword.CLASS,
-	["void"] = typeof(void),
-	["bool"] = typeof(bool),
-	["int"] = typeof(int),
-	["double"] = typeof(double),
-	["string"] = typeof(string),
-	["object"] = typeof(object),
-
 	["File"] = typeof(File),
-
-
-	["addi"] = Val((int a, int b) => a + b),
-	["subi"] = Val((int a, int b) => a - b),
-	["muli"] = Val((int a, int b) => a * b),
-	["divi"] = Val((int a, int b) => a / b),
-	["modi"] = Val((int a, int b) => a % b),
-	["xori"] = Val((int a, int b) => a ^ b),
-
-	["addf"] = Val((double a, double b) => a + b),
-	["subf"] = Val((double a, double b) => a - b),
-	["mulf"] = Val((double a, double b) => a * b),
-	["divf"] = Val((double a, double b) => a / b),
-
 	["count"] = Val((IEnumerable data, object value) => data.Cast<object>().Count(d => {
 		var result = d.Equals(value);
 		return result;
 	})),
-
-	["gt"] = Val((double a, double b) => a > b),
-	["geq"] = Val((double a, double b) => a >= b),
-	["lt"] = Val((double a, double b) => a < b),
-	["leq"] = Val((double a, double b) => a <= b),
-	["eq"] = Val((double a, double b) => a == b),
-	["neq"] = Val((double a, double b) => a != b),
-
-	["true"] = true,
-	["false"] = false,
-
-	["print"] = Val((object o) => Console.WriteLine(o)),
-	["clear"] = Val(Console.Clear),
-	["set_cursor"] = Val(Console.SetCursorPosition),
-
-	["Console"] = typeof(Console),
-
 	["cat"] = Val((object[] o) => string.Join(null, o)),
 	["range"] = Val((int a, int b) => Enumerable.Range(a, b - a).ToArray()),
 	["newline"] = "\n",

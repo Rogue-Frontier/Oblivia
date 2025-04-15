@@ -174,7 +174,7 @@ Things that represent a location.
 - Variable struct `{ a b c }`
 - Member access `a/b`
 - Function call `a/b()`
-- Alias of Locator
+- Alias of Locatable
 
 A literal such as `7` is not a locator.
 
@@ -186,10 +186,10 @@ Things that can be assigned to
 
 # Keyable values
 Things for which we can implicitly generate a key
-- Variable name `{a} = {a:a}`, `{'a} = {a:'a}`
+- Variable name `{a b c} = {a:a b:b c:c}`, `{'a 'b 'c} = {a:'a b:'b c:'c}`
 - Tuple of keys `{(a b c)} = {a:a b:b c:c}`, `{('a 'b 'c)} = {a:'a b:'b c:'c}` (maybe require spread?)
 - Struct of keys `{{a b c}} = {a:a b:b c:c}`, `{{'a 'b 'c}} = {a:'a b:'b c:'c}` (maybe require spread?)
-- Member access `{a/b} = {b:a/b}`, `{'a/b} = {b:'a/b}`
+- Member access `{c/a a/b b/c} = {a:c/a b:a/b c:b/c}`, `{'c/a 'a/b 'b/c} = {a:'c/a b:'a/b c:'b/c}`
 - Alias of keyable
   - `{'a} = {a:'a}`
   - `{('a 'b 'c)} = {a:'a b:'b c:'c}`

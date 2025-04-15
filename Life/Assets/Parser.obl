@@ -40,7 +40,7 @@
                                     symbols:List.ExUpKey/ctor()
                                     eb/statements | ?(item)
                                         item = ExUpKey:s ?+ symbols/Add(s) ?- {
-                                        
+
                                         }
                                     ^^^^:StAssignMulti { symbols:=^^symbols/ToArray() value:=NextExpr() deconstruct:=yes }
                                 }
@@ -118,7 +118,7 @@
                                 }
                             }
                         }
-                        ExInvoke${target:$ExSelf{up:any((-:0 1) 1)} args=ExTuple:et}:{
+                        ExInvoke${target:ExSelf${up:any((-:0 1) 1)} args=ExTuple:et}:{
                             ^^^^:StDefFn{key:="_call" pars:=et value:=NextExpr()}
                         }
                         ExSelf${up:obj}:{

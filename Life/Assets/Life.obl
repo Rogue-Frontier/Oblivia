@@ -1,13 +1,11 @@
 ﻿{
     print:Console/WriteLine
     Life:class {
-        //@dbg["width:" w]
+        //@(Debug["width:" w])
         w→i4
-        //@dbg["height:" h]
+        //@(Debug("height:{w}"))
         h→i4
         grid→Grid(bit)
-
-        a→i4
 
         mod(n:i4 max:i4):(%:(n<0)?+(n+max)?-n max)
         // xy: (x:i4 y:i4)

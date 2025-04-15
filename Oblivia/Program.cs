@@ -1,5 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
@@ -52,7 +51,16 @@ namespace Oblivia {
                     ["File"] = typeof(File),
                     ["Console"] = typeof(Console),
 
-                    ["char"] = typeof(char),
+
+                    ["Debug"] = _((object o) => {
+                        return new VAttribute { name = "Debug" };
+                    }),
+
+					["pub"] = new VAttribute { name = "Public" },
+					["priv"] = new VAttribute { name = "Private" },
+
+
+					["char"] = typeof(char),
 
                     ["Pt"] = typeof((int, int)),
 
@@ -219,6 +227,7 @@ ValKeyword.SAT,
             };
 		}
 	}
+    public class VAttribute { public string name; }
     public class ValMagic();
 	public class VError {
         public string msg;
@@ -433,7 +442,6 @@ ValKeyword.SAT,
 	public record VGo {
         public VLabel target;
 	}
-
     public record VRetFrom {
         public IScope home;
         public object data;
@@ -486,10 +494,10 @@ ValKeyword.SAT,
         public INode expr;
         public object Eval (IScope ctx) {
             var val = expr.Eval(ctx);
-            return new ValPointer { value = val };
+            return new VPointer { value = val };
 		}
     }
-    public record ValPointer {
+    public record VPointer {
 
         public object type;
         public object value;
@@ -498,7 +506,6 @@ ValKeyword.SAT,
         public INode expr;
         public object Eval (IScope ctx) => new VAlias { ctx = ctx, expr = expr };
     }
-
 	public record ExStructurePattern : INode {
 		public object Eval (IScope ctx) {
 			throw new NotImplementedException();
@@ -508,7 +515,7 @@ ValKeyword.SAT,
         public INode expr;
         public object Eval (IScope ctx) => null;
     }
-	public record ValLazy {
+	public record VLazy {
 		public INode expr;
 		public IScope ctx;
         public bool done = false;
@@ -609,7 +616,7 @@ ValKeyword.SAT,
         public void Register (VDictScope target) {
             foreach(var (k, v) in _static.locals) {
                 switch(k) {
-                    case "_classSet" or "_interfaceSet" or "_kind":
+                    case "__classSet__" or "__interfaceSet__" or "__kind__":
                         continue;
                 }
                 if(!target.locals.ContainsKey(k)) {
@@ -638,7 +645,7 @@ ValKeyword.SAT,
 		public void Embed (VDictScope target) {
 			foreach(var (k, v) in _static.locals) {
 				switch(k) {
-					case "_classSet" or "_interfaceSet" or "_kind":
+					case "__classSet__" or "__interfaceSet__" or "__kind__":
 						continue;
 				}
                 StDefKey.Define(target, k, v);
@@ -904,8 +911,8 @@ ValKeyword.SAT,
         public bool inherit = false;
         public IScope parent { get; set; } = null;
         public ConcurrentDictionary<string, dynamic> locals = new() {};
-        public HashSet<VClass> ClassSet => locals.GetOrAdd("_classSet", new HashSet<VClass>() );
-		public HashSet<VInterface> InterfaceSet => locals.GetOrAdd("_interfaceSet", new HashSet<VInterface>());
+        public HashSet<VClass> ClassSet => locals.GetOrAdd("__classSet__", new HashSet<VClass>() );
+		public HashSet<VInterface> InterfaceSet => locals.GetOrAdd("__interfaceSet__", new HashSet<VInterface>());
 		public void SetClass (VClass vc) {
             locals["_class"] = vc;
             locals["_proto"] = this;
@@ -938,7 +945,7 @@ ValKeyword.SAT,
         /*
         public void Inherit(ValDictScope other) {
             foreach(var(k,v) in other.locals) {
-                if(k is "_classSet" or "_interfaceSet") {
+                if(k is "__classSet__" or "__interfaceSet__") {
                     continue;
                 }
                 StmtDefKey.Init(this, k, new ValGetter { ctx = other, expr = new ExprSymbol { key = k, up = 1 } });
@@ -1216,7 +1223,21 @@ ValKeyword.SAT,
             
 			return lhs;
 		}
-        public INode NextPattern () => NextExpr();
+
+        public void NextMatchBranch () {
+            var branch = new Branch();
+            var hasBind = false;
+
+            var pattern = NextMatchPattern();
+            if(pattern.binds.Count > 0) {
+                hasBind = true;
+            }
+
+        }
+        public Pattern NextMatchPattern () {
+            var pattern = new Pattern();
+            return pattern;
+        }
         public INode NextExpr () {
             var lhs = NextTerm();
             return CompoundExpr(lhs);
@@ -2189,6 +2210,9 @@ ValKeyword.SAT,
 			};
             switch(t) {
                 case VEmpty: throw new Exception("Type not found");
+                case VAttribute va:
+                    var obj = getResult();
+                    throw new Exception();
                 case Type tt: {
                         var v = getResult();
                         var r = new VType(tt).Cast(v, v?.GetType());
@@ -2292,18 +2316,6 @@ ValKeyword.SAT,
             return null;
 		}
 	}
-    /*
-${
-    foo = int:bar
-    baz = int
-    qux()
-    thing(0) = 5
-
-    test = ${
-        
-    }
-}
-    */
 	public class ExIs : INode {
         public INode lhs;
         public INode rhs;
@@ -2958,7 +2970,6 @@ ${
     public class ExFindFn {
 
     }
-
 	public class ExMemberKey : INode, LVal {
         public INode src;
         public string key;
@@ -3094,7 +3105,6 @@ ${
             return arr;
         }
     }
-
     public class ExSwitchFn : INode {
         public object Eval(IScope ctx) {
             return new VFn {
@@ -3140,6 +3150,19 @@ $(foo:int bar:int)
                 return ExIs.Is(val, pattern);
 			}
 		}
+    }
+
+    public class Branch {
+        List<Pattern> patterns;
+        INode block;
+        bool has_wildcard;
+        INode guard;
+
+    }
+
+    public class Pattern {
+        Dictionary<string, ExUpKey> binds;
+
     }
     public class ExSwitch : INode {
         public INode item;
@@ -3373,7 +3396,7 @@ $(foo:int bar:int)
             var _static = block.MakeScope(f);
             block.StagedApply(_static);
             var c = new VClass { name = "unknown", parent_ctx = f, source_expr = block, _static = _static };
-            _static.locals["_kind"] = ValKeyword.CLASS;
+            _static.locals["__kind__"] = ValKeyword.CLASS;
             _static.SetClass(c);
             return c;
         }
@@ -3386,7 +3409,7 @@ $(foo:int bar:int)
                 _static = _static
             };
             f.SetLocal(key, c);
-			_static.locals["_kind"] = ValKeyword.CLASS;
+			_static.locals["__kind__"] = ValKeyword.CLASS;
 			_static.SetClass(c);
             return _static;
         }
@@ -3394,7 +3417,7 @@ $(foo:int bar:int)
             var _static = block.MakeScope(f);
             var vi = new VInterface {_static = _static};
             f.SetLocal(key, vi);
-			_static.locals["_kind"] = ValKeyword.INTERFACE;
+			_static.locals["__kind__"] = ValKeyword.INTERFACE;
 			_static.AddInterface(vi);
             return _static;
         }
@@ -4059,11 +4082,13 @@ $(foo:int bar:int)
 		}
 	}
     public record Var {
-		public bool pub;
-		public bool mut;
-        public bool init;
-        public object type;
-        public object val;
+
+        public List<VAttribute> attributes = [];
+		public bool pub = true;
+		public bool mut = true;
+        public bool ready = false;
+        public object type = typeof(int);
+        public object val = 0;
         public void Init(VCast vc) {
             this.type = vc.type;
             this.val = vc.val;
@@ -4250,6 +4275,8 @@ $(foo:int bar:int)
                 case (>= '0' and <= '9'): {
                         int dest = index;
 						int val = 0;
+
+                        var measure = "";
 						Read:
                         if(dest < src.Length) {
                             var ch = src[dest];
@@ -4261,11 +4288,15 @@ $(foo:int bar:int)
                                 case '_':
                                     dest++;
                                     goto Read;
+                                case var ch_ when char.IsAsciiLetter(ch_):
+                                    measure += ch;
+                                    dest++;
+                                    goto Read;
 							}
 						}
 						var s = src[index..(dest)];
 						index = dest;
-                        return new MeasureToken { val = val, measure = "" };
+                        return new MeasureToken { val = val, measure = measure };
                     }
                 case ((>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or '_' or (>= '0' and <= '9')): {
                         int dest = index;

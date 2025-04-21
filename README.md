@@ -1,6 +1,5 @@
 # Oblivia: Object-Building Language Intended for Very Idiosyncratic Articulations
 Oblivia (OBL) is an esolang that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
-
 - **Terse syntax**:
   - A small set of primitive operations are given the most terse syntax.
   - Casting values is as easy as `A(B)` with type `A` and value `B`.
@@ -14,9 +13,16 @@ Oblivia (OBL) is an esolang that aims to do with objects what Lisp does with lis
 - **Same syntax everywhere**:
   - `:` is the define operator
   - `A(B), A[B], A{C}` is a function call.
-  - Patterns can be stored in objects
+  - Patterns can be stored in variables: `Some$(val)`
 - **Classes are objects too**: Classes can have a static `companion` (or not) that implements interfaces and behaves just like regular singleton objects.
-- **Term and Expression scoping**:
+- **Term and Expression scoping**: The right hand side of an operator has either term scope or expression scope. A term is a single item and an expression is a sequence of terms connected by operators. A term is one of the following.
+  - A name
+  - A number
+  - A string
+  - A tuple
+  - An array
+  - An object
+  - A monadic function and its operands
 
 ## Inspiration
 

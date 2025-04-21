@@ -104,6 +104,14 @@ Oblivia has 3 basic structures.
 - Block: Contains a set of variables with string keys. Supports advanced operations such as `ret`
 
 ### Arithmetic
+Infix arithmetic is available for common operations:
+- `A + B`
+- `A - B`
+- `A × B`
+- `A ÷ B`
+- `A > B`
+- `A < B`
+
 Lisp-like arithmetic allows you to spread operands. Operators are converted to reductions e.g. `[+: a b c] = a/\+(b)/\+(c) = reduce([a b c] ?(a b) a/\+(b))`
 - `[+: a b]`
 - `[-: a b]`
@@ -123,18 +131,17 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `[|: a b]`
 - `[&&: a b]`
 - `[||: a b]`
-
 ### Define
 - `A:B`: field A has value B. If `B` is a type, then the value is a *placeholder*
 - `A -> B`: Declare field A with type B
 - `A() -> B`: Declare method A has type B`
-- `A -> B: C`
-- `A() -> B: C`
+- `A -> B: C`:
+- `A() -> B: C`:
 - `A!:B`: function A with no args has output B
 - `A(B, C): D`: function A with args B,C has output D
-- `A[B C]: D`
-- `A{B C}: D`
-### Statement
+- `A[B C]: D`:
+- `A{B C}: D`:
+### Assign
 - `A := B`: reassign field A to B (same type). You can use `_` for the current value of `A`
 - `^: A`: Return `A` from the current scope.
 - `^^: A`: Return `A` from the parent scope.
@@ -205,8 +212,7 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `A = B`: Returns true if `A` matches pattern `B`
 - `A = B:C`: Returns true if `A` matches pattern `B` and assigns the value to `C`
 - `A =: B`: if `A = typeof(B)`, then sets `A := B` and returns true
-
-- `$A(B)`
+### Pattern
 - `$(A:B)`
 - `$[A B C]`: Array
 - `$[A:B C:D]`: 
@@ -214,8 +220,35 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `${ A = B }`: Object member `A` of type `B`
 - `${ A = B:C }`: Object member `A` of type `B`; make local `C:B(A)`
 - `${ A:B }`: Object member `A` of type `B`; define `A:B`
-
-
+### Constants
+- `⟙`: True
+- `⟘`: False
+- `∅`: Empty
+- `empty`: Automatically removed when added to a tuple or array
+### Monadic functions
+- `↕A`: Returns `[0 1 2 ... A]`
+- `⍋A`: Returns `[n n+1 n+2 ... m]` where `[A(n) A(n+1) A(n+2) ... A(m)] = sorted(A)`
+- `⍒A`: Returns `[n n+1 n+2 ... m]` where `[A(m) ... A(n+2) A(n+1) A(n)] = sorted(A)`
+- `⌈A`: `ceil(A)`
+- `⌊A`: `floor(A)`
+- `A⋖`: First element of `A`
+- `A⋗`: Last element of `A`
+- `A⌗`: Returns length of `A`
+- `⚄A`: Returns a random item from `[0 1 2 ... A]`
+- `⌨A`: Returns the value of the first char of `A`
+- `¬A`: Returns `not(A)`
+### Dyadic functions
+- `A⌗B`: Returns count of `B` in `A`
+- `A∀B`: Returns `A ?| B⌗ = A⌗`
+- `A∃B`: Returns `A ?| B⌗ > 0`
+- `A∄B`: Returns `A |? B⌗ = 0`
+- `A⫷B`: Constructs class `A` with data `B`
+- `A∨B`: Returns `[||:A B]`
+- `A∧B`: Returns `[&&:A B]`
+- `A⋃B`: Returns `any(A B)`
+- `A⋂B`: Returns `all(A B)`
+- `A≤B`:
+- `A≥B`:
 ## Design philosophy
 - Whitespace is the simplest operator.
   - Two adjacent identifiers `A B` simply means that `A` occurs before `B` in a sequence. Identifiers are never grouped together outside of tuples and arrays. `{ A B:C D } = { A:A, B:C, D:D }`, `{ (A B):(C D) } = { A:C, B:D }` 
@@ -226,8 +259,6 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 
 ## Rejected features.
 OBL emphasizes **generality** and **terseness**, rejecting features that are not versatile enough to justify the syntax cost.
-- Infix arithmetic: Fails when you need to reduce an array, making the procedure unnecessarily verbose.
-  - `(+: a b)` Lisp-like arithmetic solves this by making arithmetic spreadable.
 - Partial application / *whatever-priming* (Raku): Scope-constrained to simple expressions. Cannot control argument order.
   - `?(<par>) <expr>` Lambdas solve this problem by forward declaring arguments and allowing any size scope.
 - `=`-based assignment: This function is often confused between assignments and boolean comparisons.

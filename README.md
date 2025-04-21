@@ -221,6 +221,8 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `${ A = B:C }`: Object member `A` of type `B`; make local `C:B(A)`
 - `${ A:B }`: Object member `A` of type `B`; define `A:B`
 ### Constants
+- `yes`: True
+- `no`: False
 - `⟙`: True
 - `⟘`: False
 - `∅`: Empty

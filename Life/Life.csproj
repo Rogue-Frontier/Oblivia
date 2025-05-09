@@ -15,4 +15,14 @@
     <ProjectReference Include="..\Oblivia\Oblivia.csproj" />
   </ItemGroup>
 
+
+	<ItemGroup>
+	  <None Update="Assets\Parser.obl">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	  <None Update="Assets\Tokenizer.obl">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	</ItemGroup>
+
 </Project>

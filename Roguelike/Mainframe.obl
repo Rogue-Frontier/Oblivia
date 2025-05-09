@@ -16,32 +16,9 @@
     parse_d(s:string):f8/Parse.s
     trunc:int_from
     FastAlphaMult(alpha:i4 red:i4):{
-        
         alpha := ori(_ sl(alpha 8))
         red := muli(_ alpha)
         red := int_from*addu(uint_from._ _0x8080U)
-        /*
-        [+: 1 2 3 4 5]
-        [-: 1 2]
-        [*: 1 2]
-        [/: 1 2]
-        [%: 1 2]
-        [^: 1 2]
-        [&: 1 2]
-        [|: 1 2]
-        [&&: 1 2]
-        [||: 1 2]
-        [>>: 1 2]
-        [<<: 1 2]
-        [>: 1 2]
-        [<: 1 2]
-        [++: 1]
-        [--: 1]
-        [**: 1 2]
-        [int: 2 3 4 5]
-        [add: 2 3 4 5]
-        */
-
         ^:sr(red 16)
     }
     SlowAlphaMult(alpha:int red:int): {

@@ -10,30 +10,35 @@
         mod(n:i4 max:i4):(%:(n<0)?+(n+max)?-n max)
         // xy: (x:i4 y:i4)
         // %xy
-        at(x:i4 y:i4):grid(mod.|[x:w y:h]|i4)
+        at(x:i4 y:i4):{
+            ^:grid(%mod.|[x:w y:h]|i4)
+        }
         get(x:i4 y:i4):at(x y)/Get()
         set(x:i4 y:i4 b:bit):at(x y)/Set(b)
         new(w:i4 h:i4):Life{
             print*cat["args: "_0","_1],
-            {w h}≔^^,
-            grid≔Grid(bit)/ctor(w h)
+            {w h} ≔ _arg,
+            grid ≔ Grid(bit)/ctor(w h),
             debug()
         }
         debug():print*|cat*|[["width: "w],["height: "h]]
         activeNum:0
         txt:StrBuild/ctor()
         update(): {
-            activeNum≔0,
+            print("start")
+            activeNum ≔ 0,
             g:get,
             txt/Clear(),
             ta: txt/Append,
+            nextGrid:Grid(bit)/ctor(w h),
             ↕h|?(y:i4){
                 ↕w|?(x:i4){
+                    print("update")
                     w:x-1 n:y+1 e:x+1 s:y-1
-                    c:count(g.|[w:n x:n e:n w:y e:y w:s x:s e:s] ⊤)
+                    c:g.|[w:n x:n e:n w:y e:y w:s x:s e:s]⌗⟙
                     active: g(x y) ?+ ¬((c<2)∨(c>3)) ?- (c=3)
                     set(x y active)
-                    active ?+ activeNum←(_+1)
+                    active ?+ { activeNum := (_ + 1) }
                     ta(active ?+ "*" ?- " ")
                 }
                 ta(newline)
@@ -42,27 +47,36 @@
         }
     }
     main(args:str)→i4: {
-        arr:[1 2 3 4],
-        a:arr(0),
+        Either(L, R):enum{
+            Left(val:L),
+            Right(val:R)
+        }
+        foo: Either(i4 str)/Left(5)
+        print(foo)
+        print*foo = Either(i4 str)/Left
+        Bar:class{ a:0 }
+        print*Bar{ a := 1 } = Bar${ a:1 }
         print(a)
-        /*
+        print(5 = $(boo:i4))
+
+        print(boo)
+        ^:{}
         life:Life/new(32 32)
-        print*life/grid[:i4 0 0]/Get(),
+        print*life/grid(0 0)/Get(),
         ↕(life/w)|?(x:i4):↕(life/h)|?(y:i4):life/set(x y rand_bool())
-        num:1 prevNum:0 run:⊤ i:1
+        num:1 prevNum:0 run:⟙ i:1
         Console/Clear()
         run ?++ {
-            life/update()
-            prevNum≔num
-            num≔life/activeNum
-            run≔(num≠prevNum)
+            life/update(),
+            prevNum ≔ num,
+            num ≔ life/activeNum,
+            run ≔ (num ≠ prevNum),
             print*cat["time: " i]
             Console/{
                 SetCursorPosition(0 0)
                 Write*life/txt/ToString()
             }
         }
-        */
         ^: 0
     }
 }

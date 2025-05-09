@@ -1,9 +1,12 @@
 ﻿{
     
-    #@private
+    //@private
 	TokenType:enum{
+        backslash:"\\\\"
         eof:"eof"   str:"str"   name:"name"
-        comma:  "," semicolon:  ";" colon:  ":"
+        comma:  ","
+        semicolon:  ";"
+        colon:  ":"
 		block_l:"{" block_r:"}" tuple_l:"(" tuple_r:")"
         array_l:"[" array_r:"]" angle_l:"<" angle_r:">"
 		caret:  "^" period: "." bang:   "!" question:   "?"
@@ -19,12 +22,8 @@
         brack_l:"⟨" brack_r:"⟩" double_brack_l: "⟪" double_brack_r: "⟫"
         shell_brack_l:  "⟬" shell_brack_r:  "⟭" flat_paren_l:   "⟮" flat_paren_r:   "⟯"
         index_ascend:   "⍋" index_descend:  "⍒"
-        i_beam: "⌶"
-		//•
-		//⟦ 	⟧ ⟨⟩	
-		//〈〉
+        i_beam: "⌶"	
 		kronecker_product:      "⊗"
-        //←
         log:    "⍟" 
         or:"∨"  and:"∧" nor:"⍱" nand:"⍲"    xor:"⊻"
         sum:"∑" product:"∏" increment:"∆"
@@ -38,11 +37,13 @@
     IToken:interface{
     
     }
-    StrToken:class{impl(IToken)
+    StrToken:class{
+        impl(IToken)
         type -> obj:TokenType/eof
         text -> str:""
     }
-    MeasureToken:class{impl(IToken)
+    MeasureToken:class{
+        impl(IToken)
         type:TokenType/measure
         val->i4:0   measure->str:""     text:get{cat[val measure]}
     }
@@ -65,7 +66,7 @@
             alphanumeric:sat(?(c:char)((c≥⌨"a")∧(c≤⌨"z"))∨((c≥⌨"A")∧(c≤⌨"Z"))∨(c = numeric)∨(c=⌨"_"))
             numeric:sat(?(n:char)(n≥⌨"0")∧(n≤⌨"9"))
             Check:label
-            #pr("Check")
+            //pr("Check")
             index≥(src/Length)?+{
                 ^^: StrToken {
                     type:=TokenType/eof
@@ -98,11 +99,6 @@
                         _:{^^:fall}
                     }
                 }
-                ⌨"#":{
-                    inc(),
-                    (<:index src/Length)∧(src.index/Get()≠⌨"\n")?+inc()
-                    go.Check
-                }
                 ⌨"~":{
                     inc(),
                     (<:index src/Length)∧(src.index/Get()≠⌨"~")?+inc()
@@ -110,7 +106,7 @@
                 }
                 ⌨"\"":{
                     dest:(+:index 1)    v:"",
-                    #pr(src(dest)()),
+                    //pr(src(dest)()),
                     (<:dest src/Length)?++{
                         src.dest()?{
                             ⌨"\\":{
@@ -133,7 +129,7 @@
                         }
                     }
                     Stop:label
-                    #pr(cat["index " index])
+                    //pr(cat["index " index])
                     dest:=(+:_ 1)
                     index:=dest
                     ^^:StrToken{
@@ -181,7 +177,7 @@
                                 dest:=(+:_ 1)
                                 go.Read
                             }
-                            ⌨"\\":{
+                            ⌨"\\\\":{
                                 dest:=(+:_ 1)
                                 escape:=yes
                                 go.Read

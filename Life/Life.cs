@@ -2,7 +2,7 @@
 using System.Collections;
 using System.Text;
 using Oblivia;
-var scope = Parser.FromFile("Assets/Life.obl");
+var scope = Parser.FromFile("Assets/Parser.obl");
 T Val<T> (T t) => t;
 var global = new VDictScope();
 global.locals = new() {

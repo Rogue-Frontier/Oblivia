@@ -12,6 +12,7 @@ using System.Reflection.Emit;
 using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks.Dataflow;
 using System.Xml;
 using System.Xml.Linq;
 using System.Xml.Serialization;
@@ -27,22 +28,21 @@ namespace Oblivia {
 
             var modules = new Dictionary<string, VDictScope>();
 
-            var module = (string s) => {
-
+            VDictScope module(string s) {
                 if(modules.TryGetValue(s, out var d)) {
                     return d;
                 }
 
-                var tokenizer = new Tokenizer(File.ReadAllText(s));
-                
+                var src = File.ReadAllText(s);
+
+
+				//throw new Exception(src);
+				var tokenizer = new Tokenizer(src);
                 var tokens = tokenizer.GetAllTokens();
                 var parser = new Parser(tokens);
                 var scope = parser.NextBlock();
-
                 var result = new VDictScope { parent = std };
                 result = (VDictScope)scope.StagedApply(result);
-
-
                 return modules[s] = result;
             };
 
@@ -52,12 +52,12 @@ namespace Oblivia {
                     ["Console"] = typeof(Console),
 
 
-                    ["Debug"] = _((object o) => {
+                    ["dbg"] = _((object o) => {
                         return new VAttribute { name = "Debug" };
                     }),
 
-					["pub"] = new VAttribute { name = "Public" },
-					["priv"] = new VAttribute { name = "Private" },
+					["mut"] = VKeyword.MUT,
+					["val"] = VKeyword.VAL,
 
 
 					["char"] = typeof(char),
@@ -73,9 +73,8 @@ namespace Oblivia {
                     ["i4_u1"] = _((int i) => (byte)i),
 
                     ["void"] = typeof(void),
-                    ["char"] = typeof(char),
+                    ["chr"] = typeof(char),
                     ["bit"] = typeof(bool),
-
                     ["i8"] = typeof(long),
                     ["i4"] = typeof(int),
                     ["i2"] = typeof(short),
@@ -89,20 +88,12 @@ namespace Oblivia {
                     ["str"] = typeof(string),
                     ["obj"] = typeof(object),
 
-                    ["_else"] = ValKeyword.GO_ELSE,
+                    ["_else"] = VKeyword.GO_ELSE,
 
                     ["yes"] = true,
                     ["no"] = false,
-
-                    ["parse_char"] = _((string s) => char.Parse(s)),
-
                     ["empty"] = VEmpty.VALUE,
                     ["default"] = _((Type t) => t.IsValueType ? Activator.CreateInstance(t) : null),
-                    ["addi"] = _((int a, int b) => a + b),
-                    ["addu"] = _((uint a, uint b) => a + b),
-                    ["subi"] = _((int a, int b) => a - b),
-                    ["muli"] = _((int a, int b) => a * b),
-                    ["divi"] = _((int a, int b) => a / b),
                     ["modi"] = _((int a, int b) => a % b),
                     ["xori"] = _((int a, int b) => a ^ b),
                     ["mini"] = _((int a, int b) => Math.Min(a, b)),
@@ -128,16 +119,6 @@ namespace Oblivia {
                         var result = d.Equals(value);
                         return result;
                     })),
-                    ["gt"] = _((double a, double b) => a > b),
-                    ["geq"] = _((double a, double b) => a >= b),
-                    ["lt"] = _((double a, double b) => a < b),
-                    ["leq"] = _((double a, double b) => a <= b),
-
-                    ["bt"] = _((double a, double b, double c) => a > b && a < c),
-                    ["beq"] = _((double a, double b, double c) => a >= b && a <= c),
-
-                    ["eq"] = _((object a, object b) => Equals(a, b)),
-                    ["neq"] = _((object a, object b) => !Equals(a, b)),
 
                     ["cat"] = _((object[] o) => string.Join(null, o)),
                     ["range"] = _((int a, int b) => Enumerable.Range(a, b - a).ToArray()),
@@ -177,50 +158,56 @@ namespace Oblivia {
                     ["Fn"] = typeof(VFn),
                     ["PQ"] = _((object a, object b) => MakeGeneric(typeof(PriorityQueue<,>), a, b)),
 
-                    ["sat"] = 
-ValKeyword.SAT,
-                    ["fall"] = ValKeyword.FALL,
-                    ["default"] = ValKeyword.DEFAULT,
-                    ["class"] = ValKeyword.CLASS,
-                    ["interface"] = ValKeyword.INTERFACE,
-                    ["ext"] = ValKeyword.EXTEND,
-                    ["enum"] = ValKeyword.ENUM,
-                    ["get"] = ValKeyword.GET,
-                    ["set"] = ValKeyword.SET,
-                    ["impl"] = ValKeyword.IMPLEMENT,
-                    ["inherit"] = ValKeyword.INHERIT,
-                    ["cut"] = ValKeyword.BREAK,
-                    ["skip"] = ValKeyword.CONTINUE,
-                    ["cancel"] = ValKeyword.CANCEL,
-                    ["ret"] = ValKeyword.RETURN,
-                    ["var"] = ValKeyword.VAR,
-                    ["yield"] = ValKeyword.YIELD,
-                    ["unmask"] = ValKeyword.UNALIAS,
-                    ["declare"] = ValKeyword.DECLARE,
-                    ["complement"] = ValKeyword.COMPLEMENT,
-                    ["any"] = ValKeyword.ANY,
-                    ["all"] = ValKeyword.ALL,
-                    ["fmt"] = ValKeyword.FMT,
-                    ["regex"] = ValKeyword.REGEX,
-                    ["replace"] = ValKeyword.REPLACE,
-                    ["macro"] = ValKeyword.MACRO,
-                    ["magic"] = ValKeyword.MAGIC,
+                    ["sat"] = VKeyword.SAT,
+                    ["fall"] = VKeyword.FALL,
+                    ["default"] = VKeyword.DEFAULT,
+                    ["class"] = VKeyword.CLASS,
+                    ["interface"] = VKeyword.INTERFACE,
+                    ["ext"] = VKeyword.EXTEND,
+                    ["enum"] = VKeyword.ENUM,
+                    ["get"] = VKeyword.GET,
+                    ["set"] = VKeyword.SET,
+                    ["impl"] = VKeyword.IMPLEMENT,
+                    ["inherit"] = VKeyword.INHERIT,
+                    ["cut"] = VKeyword.BREAK,
+                    ["skip"] = VKeyword.CONTINUE,
+                    ["cancel"] = VKeyword.CANCEL,
+                    ["ret"] = VKeyword.RETURN,
+                    ["var"] = VKeyword.VAR,
+                    ["yield"] = VKeyword.YIELD,
+                    ["unmask"] = VKeyword.UNALIAS,
+                    ["declare"] = VKeyword.DECLARE,
+                    ["complement"] = VKeyword.COMPLEMENT,
+                    ["any"] = VKeyword.ANY,
+                    ["all"] = VKeyword.ALL,
+                    ["fmt"] = VKeyword.FMT,
+                    ["regex"] = VKeyword.REGEX,
+                    ["replace"] = VKeyword.REPLACE,
+                    ["macro"] = VKeyword.MACRO,
+                    ["magic"] = VKeyword.MAGIC,
 
-                    ["go"] = ValKeyword.GO,
+                    ["go"] = VKeyword.GO,
 
-                    ["pub"] = ValKeyword.PUB,
-                    ["priv"] = ValKeyword.PRIV,
-                    ["static"] = ValKeyword.STATIC,
+                    ["keys_of"] = VKeyword.KEYS_OF,
 
-                    ["fmt"] = ValKeyword.FMT,
-                    ["leaf"] = ValKeyword.LEAF,
-                    ["xml"] = ValKeyword.XML,
-                    ["json"] = ValKeyword.JSON,
-                    ["math"] = ValKeyword.MATH,
+                    ["pub"] = VKeyword.PUB,
+                    ["priv"] = VKeyword.PRIV,
+                    ["instance"] = VKeyword.INSTANCE,
+                    ["static"] = VKeyword.STATIC,
 
-                    ["module"] = module,
-					["import"] = ValKeyword.IMPORT,
-					["embed"] = ValKeyword.EMBED,
+                    ["fmt"] = VKeyword.FMT,
+                    ["leaf"] = VKeyword.LEAF,
+                    ["xml"] = VKeyword.XML,
+                    ["json"] = VKeyword.JSON,
+                    ["math"] = VKeyword.MATH,
+
+                    ["module"] = _(module),
+					["import"] = VKeyword.IMPORT,
+					["embed"] = VKeyword.EMBED,
+
+                    ["ctx"] = VKeyword.CTX,
+
+                    ["attr"] = VKeyword.ATTR,
 
 					["ɩ"] = _((int i) => Enumerable.Range(0, i))
                 }
@@ -269,7 +256,7 @@ ValKeyword.SAT,
         public object Up () => up == 1 ? data : this with { up = up - 1 };
     }
     public record VYield(object data);
-    public enum ValKeyword {
+    public enum VKeyword {
         CLASS,INTERFACE,ENUM,
         GET,SET,PROP,
 
@@ -313,7 +300,7 @@ ValKeyword.SAT,
         TYPE,
         FN,
         MAKE,
-        PUB, PRIV, STATIC, MACRO, TEMPLATE,
+        PUB, PRIV, MUT, INSTANCE, STATIC, MACRO, TEMPLATE,
 
         FIELDS_OF,METHODS_OF,MEMBERS_OF,
         ATTR,
@@ -342,6 +329,8 @@ ValKeyword.SAT,
         IMPORT,
         EMBED,
 
+        CTX,
+
         //Create a label
         LABEL,
         //Go to label
@@ -359,7 +348,7 @@ ValKeyword.SAT,
         //Provides multiple values for tuple
         DECONSTRUCT,
         //Gets all keys from the target for deconstruct-assign
-        STRUCT_KEYS,
+        KEYS_OF,
 
 		XML,
         JSON,
@@ -377,24 +366,36 @@ ValKeyword.SAT,
         public VFn predicate;
         public bool Accept (object args) => predicate.CallData([args]) is true;
     }
-    public class VInterType {
+    public class VInterType : IPattern {
         public object[] items;
-        public bool all = false;
+        public bool intersect = false;
         public bool Accept (object val) {
-            if(all) {
+            if(intersect) {
 				return items.All(i => ExIs.Is(val, i));
 			} else {
                 var r = items.Any(i => ExIs.Is(val, i));
 				return r;
 			}
         }
+        public void Bind(IScope ctx, object o) {
+            if(intersect) {
+                foreach(var i in items) {
+                    if(i is IPattern ip) {
+                        ip.Bind(ctx, o);
+                    }
+                }
+            } else {
+                foreach(var i in items) {
+                    if(i is IPattern ip && ExIs.Is(i, o)) {
+                        ip.Bind(ctx, o);
+                        return;
+                    }
+                }
+            }
+        }
     }
     public class VEmpty {
         public static readonly VEmpty VALUE = new();
-    }
-    public class VDeclared {
-        public string name;
-        public object type;
     }
     public class Variable {
         public string name;
@@ -430,13 +431,11 @@ ValKeyword.SAT,
             return scope;
         }
     }
-    //Any methods called will return the complement of the result
     public class VComplement {
         public object on;
     }
     public record VFnPattern {
         public VFn filter;
-
     }
     public record ValPattern { }
 	public record VGo {
@@ -498,7 +497,6 @@ ValKeyword.SAT,
 		}
     }
     public record VPointer {
-
         public object type;
         public object value;
     }
@@ -506,11 +504,129 @@ ValKeyword.SAT,
         public INode expr;
         public object Eval (IScope ctx) => new VAlias { ctx = ctx, expr = expr };
     }
-	public record ExStructurePattern : INode {
-		public object Eval (IScope ctx) {
-			throw new NotImplementedException();
+    public interface IPattern {
+        public bool Accept (object o);
+        public void Bind (IScope ctx, object o);
+    }
+    public class VStructurePattern : IPattern {
+		public bool rest;
+		public List<(string lhs, object rhs, string key)> binds;
+		public bool Accept (object o) {
+			if(o is VDictScope vd) {
+				for(var i = 0; i < binds.Count; i++) {
+					var b = binds[i];
+                    var lhs = b.lhs;
+					var val = vd.GetAt(lhs, 1) switch {
+                        VMember vm => vm.val
+                    };
+					var rhs = b.rhs ?? VKeyword.ANYTHING;
+					if(!ExIs.Is(val, rhs)) {
+						return false;
+					}
+				}
+				return true;
+			}
+			return false;
+		}
+		public void Bind (IScope ctx, object o) {
+			var vd = (VDictScope)o;
+			for(var i = 0; i < binds.Count; i++) {
+				var b = binds[i];
+				var lhs = b.lhs;
+				var val = vd.GetAt(lhs, 1);
+
+                string key = b.key;
+                if(key is { }) {
+                    ctx.SetLocal(key, val);
+                }
+				var type = b.rhs;
+				if(type is IPattern ip) {
+					ip.Bind(ctx, val);
+				}
+			}
 		}
 	}
+    public class ExStructurePattern : INode {
+        public bool rest;
+        public List<(string lhs, INode rhs, string key)> binds;
+		public object Eval (IScope ctx) {
+			List<(string lhs, object rhs, string key)> bound = [];
+			foreach(var b in binds) {
+				var rhs = b.rhs is { } v ? v.Eval(ctx) : VKeyword.ANYTHING;
+				bound.Add((b.lhs, rhs, b.key));
+			}
+			return new VStructurePattern { binds = bound, rest = rest };
+		}
+	}
+    public class VTuplePattern : IPattern {
+        public bool rest;
+        public List<(string key, object type)> binds;
+        public bool Accept(object o) {
+            if(binds.Count == 1) {
+                return ExIs.Is(o, binds[0].type);
+            }
+			if(o is VTuple vt) {
+                for(var i = 0; i < binds.Count; i++) {
+                    var b = binds[i];
+					var val = vt.items[i].val;
+					var type = b.type;
+					if(!ExIs.Is(val, type)) {
+						return false;
+					}
+				}
+                return true;
+			}
+            return false;
+		}
+        public void Bind(IScope ctx, object o) {
+
+			if(binds.Count == 1) {
+				var b = binds[0];
+				var val = o;
+				if(b.key is { } key) {
+					ctx.SetLocal(key, val);
+				}
+				if(b.type is IPattern ip) {
+					ip.Bind(ctx, val);
+				}
+                return;
+			}
+			var vt = (VTuple)o;
+			for(var i = 0; i < binds.Count; i++) {
+				var b = binds[i];
+				var val = vt.items[i].val;
+				if(b.key is { }key) {
+					ctx.SetLocal(key, val);
+				}
+				if(b.type is IPattern ip) {
+                    ip.Bind(ctx, val);
+                }
+			}
+		}
+    }
+    public class ExTuplePattern : INode {
+        public bool rest;
+		public List<(string key, INode? type)> binds;
+        public object Eval(IScope ctx) {
+			List<(string key, object type)> bound = [];
+			foreach(var b in binds) {
+				var rhs = b.type is { } v ? v.Eval(ctx) : VKeyword.ANYTHING;
+				bound.Add((b.key, rhs));
+			}
+            return new VTuplePattern { binds = bound, rest = rest };
+		}
+    }
+
+    public class ExWildcardPattern : INode {
+        public string key;
+        public object Eval (IScope ctx) => new VWildcardPattern { key = key };
+    }
+	public class VWildcardPattern : IPattern {
+        public string key;
+        public bool Accept (object o) => true;
+        public void Bind (IScope ctx, object o) => ctx.SetLocal(key, o);
+	}
+
 	public record ExRef : INode {
         public INode expr;
         public object Eval (IScope ctx) => null;
@@ -533,6 +649,8 @@ ValKeyword.SAT,
         public int Length => list.Count;
         public Dictionary<string, object> dict = new();
         public List<object> list = new();
+
+        public object[] items => list.ToArray();
     }
     public record VFn {
         public INode expr;
@@ -544,7 +662,7 @@ ValKeyword.SAT,
         private void InitPars(IScope ctx) {
 			foreach(var (k, v) in pars.items) {
 				StDefKey.Define(ctx, k, v switch {
-					VClass or Type => new VDeclared { name = k, type = v },
+					VClass or Type => new VMember { name = k, type = v, mut = true, pub = true, ready = false },
 					_ => v
 
                 });
@@ -905,6 +1023,12 @@ ValKeyword.SAT,
          parent != null ? parent.SetNearest(key, val) :
          new VError($"Unknown variable {key}");
     }
+
+
+    public class VAttCtx {
+        public IScope ctx;
+    }
+
     public record VDictScope : IScope {
         public bool temp = false;
 
@@ -913,15 +1037,12 @@ ValKeyword.SAT,
         public ConcurrentDictionary<string, dynamic> locals = new() {};
         public HashSet<VClass> ClassSet => locals.GetOrAdd("__classSet__", new HashSet<VClass>() );
 		public HashSet<VInterface> InterfaceSet => locals.GetOrAdd("__interfaceSet__", new HashSet<VInterface>());
+		public List<string> KeyList => locals.GetOrAdd("__keyList__", new List<string>());
 		public void SetClass (VClass vc) {
             locals["_class"] = vc;
             locals["_proto"] = this;
             ClassSet.Add(vc);
         }
-
-
-
-
         public bool HasClass (VClass vc) => ClassSet.Contains(vc);
 		public void AddInterface (VInterface vi) => InterfaceSet.Add(vi);
         public bool HasInterface (VInterface vi) => InterfaceSet.Contains(vi);
@@ -957,7 +1078,6 @@ ValKeyword.SAT,
         public object Get(string key, int up = -1) =>
          up == -1 ? GetNearest(key) : GetAt(key, up);
         */
-
         public bool GetLocal(string key, out object v) =>
             (locals.TryGetValue(key, out v));
         public object GetAt (string key, int up) {
@@ -970,8 +1090,8 @@ ValKeyword.SAT,
                     return new VError($"Unknown variable {key}");
             }
             return
-             parent != null ? parent.GetAt(key, temp ? up : up - 1) :
-             new VError($"Unknown variable {key}");
+                parent != null ? parent.GetAt(key, temp ? up : up - 1) :
+                new VError($"Unknown variable {key}");
         }
         public object GetNearest (string key) =>
           locals.TryGetValue(key, out var v) ? v :
@@ -1022,19 +1142,16 @@ ValKeyword.SAT,
 				case TokenType.at:
 					inc();
 					var att = NextTerm();
-					return new ExInvokeBlock { type = att, source_block = new ExBlock { statements = [NextStatement()] } };
+					return new ExInvokeBlock { type = att, attribute = true, source_block = new ExBlock { statements = [NextStatement()] } };
 			}
             var lhs = NextExpr();
             switch(currTokenType) {
                 case TokenType.coloneqq:
-
 					inc();
-
                     switch(lhs) {
                         case ExUpKey euk:
 							return new StAssignSymbol { symbol = euk, value = NextExpr() };
                         case ExTuple et:{
-								inc();
 								List<ExUpKey> symbols = [];
 								foreach(var item in et.vals) {
 									if(item is ExUpKey s) {
@@ -1046,7 +1163,6 @@ ValKeyword.SAT,
 								return new StAssignMulti { symbols = symbols.ToArray(), value = NextExpr() };
 							}
                         case ExBlock eb: {
-								inc();
 								List<ExUpKey> symbols = [];
 								foreach(var item in eb.statements) {
 									if(item is ExUpKey s) {
@@ -1240,6 +1356,9 @@ ValKeyword.SAT,
         }
         public INode NextExpr () {
             var lhs = NextTerm();
+
+            if(index == tokens.Count)
+                return lhs;
             return CompoundExpr(lhs);
         }
 		public INode CompoundExpr (INode lhs) {
@@ -1247,6 +1366,10 @@ ValKeyword.SAT,
 			INode DyadicExpr (ExDyadic.EFn fn) => Dyadic(fn, NextExpr);
 			INode Dyadic (ExDyadic.EFn fn, Func<INode> n) {
 				inc();
+                if(currTokenType == TokenType.pipe) {
+                    return CompoundExpr(new ExDyadicSeq { fn = fn, lhs = lhs, rhs = n() });
+                }
+
 				return CompoundExpr(new ExDyadic { fn = fn, lhs = lhs, rhs = n() });
 			}
 			Start:
@@ -1476,12 +1599,14 @@ ValKeyword.SAT,
                         var arr = (ExSeq)NextArrayOrLisp();
                         return CompoundExpr(new ExAt { src = lhs, index = arr.items });
                     }
+                    /*
                 case TokenType.at: {
                         inc();
                         var term = NextExpr();
                         return new ExInvokeBlock { type = term, source_block = new ExBlock { statements = [NextStatement()] } };
                         //return CompoundExpr(new ExCompose { items = (ExTuple)NextTupleOrLisp() });
                     }
+                    */
                 case TokenType.question: {
                         inc();
                         switch(currTokenType) {
@@ -1598,20 +1723,20 @@ ValKeyword.SAT,
                         }
                         break;
                     }
-
+                case TokenType.cash:    
+                    return CompoundExpr(new ExDyadic { lhs = lhs, rhs = NextPattern(), fn = ExDyadic.EFn.intersect });
+                case TokenType.ellipsis:return DyadicTerm(ExDyadic.EFn.range);
                 case TokenType.neq:     return DyadicTerm(ExDyadic.EFn.neq);
 				case TokenType.and:     return DyadicTerm(ExDyadic.EFn.and);
 				case TokenType.or:      return DyadicTerm(ExDyadic.EFn.or);
 				case TokenType.xor:     return DyadicTerm(ExDyadic.EFn.xor);
 				case TokenType.nand:    return DyadicTerm(ExDyadic.EFn.nand);
 				case TokenType.nor:     return DyadicTerm(ExDyadic.EFn.nor);
-
-
-				case TokenType.plus:    return DyadicTerm(ExDyadic.EFn.add);
+				case TokenType.plus:
+                    return DyadicTerm(ExDyadic.EFn.add);
 				//case TokenType.minus: return DyadicTerm(ExDyadic.EFn.sub);
 				case TokenType.times:   return DyadicTerm(ExDyadic.EFn.mul);
 				case TokenType.divide:  return DyadicTerm(ExDyadic.EFn.div);
-
 				case TokenType.gt:      return DyadicTerm(ExDyadic.EFn.gt);
 				//case TokenType.lt:    return DyadicTerm(ExDyadic.EFn.lt);
 				case TokenType.geq:     return DyadicTerm(ExDyadic.EFn.geq);
@@ -1624,13 +1749,16 @@ ValKeyword.SAT,
                 //case TokenType.double_plus:             return DyadicTerm(ExDyadic.EFn.concat);
 				case TokenType.count:   return DyadicTerm(ExDyadic.EFn.count);
 				case TokenType.log:     return DyadicTerm(ExDyadic.EFn.log);
-                case TokenType.range:   return DyadicTerm(ExDyadic.EFn.index_of);
+                case TokenType.range:   return DyadicTerm(ExDyadic.EFn.range);
 				case TokenType.square_fill_l:   return DyadicTerm(ExDyadic.EFn.take);
 				case TokenType.square_fill_r:   return DyadicExpr(ExDyadic.EFn.drop);
                 case TokenType.deal:    return DyadicTerm(ExDyadic.EFn.deal);
 				case TokenType.arrow_w: return DyadicExpr(ExDyadic.EFn.assign);
+				case TokenType.first: inc(); return CompoundExpr(new ExMonadic { rhs = lhs, fn = ExMonadic.EFn.first });
+				case TokenType.last: inc(); return CompoundExpr(new ExMonadic { rhs = lhs, fn = ExMonadic.EFn.last });
+                case TokenType.construct:   return DyadicTerm(ExDyadic.EFn.construct);
+                case TokenType.compose:      return DyadicExpr(ExDyadic.EFn.compose);
 			}
-
 			return lhs;
         }
 		INode NextTerm () {
@@ -1644,8 +1772,6 @@ ValKeyword.SAT,
 				case TokenType.ceil:    return MonadicTerm(ExMonadic.EFn.ceil);
 				case TokenType.range:   return MonadicTerm(ExMonadic.EFn.range);
                 case TokenType.count:   return MonadicTerm(ExMonadic.EFn.count);
-
-
 				case TokenType.log:             return MonadicTerm(ExMonadic.EFn.log);
 				case TokenType.index_descend:   return MonadicTerm(ExMonadic.EFn.index_descend);
 				case TokenType.index_ascend:    return MonadicTerm(ExMonadic.EFn.index_ascend);
@@ -1685,6 +1811,7 @@ ValKeyword.SAT,
 				case TokenType.measure: return NextInteger();
                 case TokenType.question:return NextQuestion();
                 case TokenType.amp:     return NextRef();
+                case TokenType.square_brack_l: return NextLisp();
 				case TokenType.tuple_l: return NextTupleOrLisp();
 				case TokenType.array_l: return NextArrayOrLisp();
 				case TokenType.block_l: return NextBlock();
@@ -1692,15 +1819,17 @@ ValKeyword.SAT,
                     inc();
                     return new ExSpread { value= NextExpr() };
                 case TokenType.quote:   return NextAlias();
-                case TokenType.cash:    return NextStructurePattern();
+                case TokenType.cash:    return NextPattern();
                 case TokenType.comma:
                     inc();
                     goto Read;
                 case TokenType.space:
                     inc();
                     goto Read;
+                case TokenType.comment:inc();
+                    goto Read;
             }
-            throw new Exception($"Unexpected token in expression: {currToken.type}");
+            throw new Exception($"Unexpected token {currToken.type} in expression at index {index}");
 			ExVal Val (object val) {
 				inc();
 				return new ExVal { value = val };
@@ -1744,36 +1873,50 @@ ValKeyword.SAT,
 			inc();
 			return new ExAlias { expr = NextExpr() };
 		}
-        public ExStructurePattern NextStructurePattern() {
+        public INode NextPattern() {
             inc();
-			throw new Exception();
-			var expr = NextExpr();
+			var expr = NextTerm();
             switch(expr) {
-                case ExTuple et:
-					throw new Exception();
+                case ExVal {value:string{ }str } ev:
+                    return new ExVal { value = new Regex(str) };
+				case ExTuple et:
+                    var binds = et.items.Select(p => (p.key, (INode?)p.value)).ToList();
+					return new ExTuplePattern {
+                        rest = true,
+                        binds = binds
+                    };
 				case ExSeq es:
-					throw new Exception();
+                    throw new Exception();
 				case ExBlock eb:
-					throw new Exception();
-					foreach(var st in eb.statements) {
-                        switch(st) {
-                            case StDefKey sdk: {
-									var lhs = sdk.key;
-									var key = sdk.key;
-									var rhs = sdk.criteria;
-									throw new Exception();
-								}
-                            case ExIs eis: {
-									var lhs = eis.lhs;
-									var key = eis.key;
-									var rhs = eis.rhs;
-                                    throw new Exception();
-								}
-						}
-                    }
+					return new ExStructurePattern {
+						rest = true,
+						binds = eb.statements.Select(p => p switch {
+                            ExIs ei => ((ei.lhs as ExUpKey).key, ei.rhs, ei.key),
+                            StDefKey sdk => (sdk.key, sdk.value, sdk.key),
+                        }).ToList()
+					};
+				/*
+				foreach(var st in eb.statements) {
+					switch(st) {
+						case StDefKey sdk: {
+								var lhs = sdk.key;
+								var key = sdk.key;
+								var rhs = sdk.criteria;
+								throw new Exception();
+							}
+						case ExIs eis: {
+								var lhs = eis.lhs;
+								var key = eis.key;
+								var rhs = eis.rhs;
+								throw new Exception();
+							}
+					}
+				}
+				*/
 
 
-                case ExInvokeBlock eib:
+				case ExInvokeBlock eib:
+                default:
                     throw new Exception();
             }
         }
@@ -1821,9 +1964,8 @@ ValKeyword.SAT,
 					inc();
 					goto ReadOp;
 				case TokenType.colon:
-					if(op == "") {
+					if(op == "")
 						return "";
-					}
 					inc();
 					return op;
 				default:
@@ -1831,10 +1973,29 @@ ValKeyword.SAT,
 					return "";
 			}
 		}
+        INode NextLisp () {
+            inc();
+            var items = new List<INode>();
+            Read:
+            switch(currTokenType) {
+                case TokenType.square_brack_r:
+                    inc();
+                    throw new Exception();
+                default:
+                    items.Add(NextExpr());
+                    goto Read;
+            }
+        }
 		INode NextTupleOrLisp () {
             inc();
             var op = ReadLispOp();
             //handle empty tuple
+            switch(currTokenType) {
+                case TokenType.tuple_r:
+                    inc();
+                    return new ExVal { value = VEmpty.VALUE };
+            }
+
             var expr = NextExpr();
             switch(currTokenType) {
                 case TokenType.tuple_r: {
@@ -1948,13 +2109,50 @@ ValKeyword.SAT,
             switch(t) {
                 case TokenType.block_l:
                     var branches = NextSwitch();
-                    return CompoundExpr(new ExSwitchFn { branches = branches });
-                    throw new Exception();
+                    return new ExSwitchFn { branches = branches };
                 case TokenType.array_l:
                     throw new Exception();
                 case TokenType.tuple_l:
                     inc();
                     return NextFn();
+                case TokenType.str:
+                    var str = currTokenStr;
+                    inc();
+
+                    List<INode> parts = [];
+
+                    var text = "";
+                    var i = 0;
+
+                    Read:
+                    if (i < str.Length) {
+
+                        switch(str[i]) {
+                            case '{':
+                                parts.Add(new ExVal { value = text });
+                                i++;
+								text = "";
+                                ReadChar:
+								if(i < str.Length && str[i] is char _c and not '}') {
+                                    text += _c;
+									i++;
+                                    goto ReadChar;
+								} else {
+                                    i++;
+                                }
+                                parts.Add(new Parser(new Tokenizer(text).GetAllTokens()).NextExpr());
+								text = "";
+								goto Read;
+                            case char c:
+                                text += c;
+                                i++;
+                                goto Read;
+
+                        }
+                    } else {
+						parts.Add(new ExVal { value = text });
+					}
+					return new ExInterpolate { parts = parts };
                 default:
                     throw new Exception($"Unexpected token {t}");
             }
@@ -2034,13 +2232,16 @@ ValKeyword.SAT,
             var ele = new List<INode>();
             Check:
             switch(currTokenType) {
-                //Lambda
                 case TokenType.pipe:
                     throw new Exception();
                 case TokenType.block_r:
                     inc();
                     return new ExBlock { statements = ele };
                 case TokenType.comma:
+                    inc();
+                    goto Check;
+                case TokenType.space:
+                case TokenType.comment:
                     inc();
                     goto Check;
                 default:
@@ -2060,6 +2261,16 @@ ValKeyword.SAT,
             return rhs.Eval(sc);
 		}
 	}
+    public class ExInterpolate : INode {
+        public List<INode> parts;
+        public object Eval(IScope ctx) {
+            var result = "";
+            foreach(var p in parts) {
+                result += p.Eval(ctx);
+            }
+            return result;
+        }
+    }
 	public class ExFnType : INode {
 		public INode lhs = ExVal.Empty;
 		public INode rhs = ExVal.Empty;
@@ -2145,6 +2356,8 @@ ValKeyword.SAT,
 						return new VSpread { value = t };
 					case Array a:
 						return new VSpread { value = a };
+                    case Args args:
+                        return new VSpread { value = args };
 					case VAlias va:
                         //TODO: fix
                         return Handle(va.Get());
@@ -2167,6 +2380,12 @@ ValKeyword.SAT,
                         it.Add((null, item));
                     }
                     break;
+                case Args args:{
+                        foreach(var item in args.list) {
+                            it.Add((null, item));
+                        }
+                        break;
+                    }
                 default:
                     it.Add((key, value));
                     break;
@@ -2192,15 +2411,15 @@ ValKeyword.SAT,
     public class ExInvokeBlock : INode {
         public INode type;
         public ExBlock source_block;
+        public bool attribute;
         public XElement ToXML () => new("VarBlock", new XAttribute("type", type), source_block.ToXML());
         public string Source => $"{type} {source_block.Source}";
         public object MakeScope (VDictScope ctx) => source_block.MakeScope(ctx);
         public object Eval (IScope ctx) {
-            var getResult = () => source_block.Eval(ctx);
+            var evalSrc = () => source_block.Eval(ctx);
             var t = type.Eval(ctx);
-
             var getArgs = () => {
-				var args = getResult();
+				var args = evalSrc();
 				switch(args) {
 					case VDictScope vds:
                         return new VTuple { items = vds.locals.Select(pair => (pair.Key, pair.Value)).ToArray() };
@@ -2210,11 +2429,63 @@ ValKeyword.SAT,
 			};
             switch(t) {
                 case VEmpty: throw new Exception("Type not found");
-                case VAttribute va:
-                    var obj = getResult();
-                    throw new Exception();
-                case Type tt: {
-                        var v = getResult();
+                case VAttribute va: {
+                        attribute = true;
+						var obj = (VDictScope)evalSrc();
+						foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..] && l.Value is VMember)) {
+							((VMember)l.Value).attributes.Add(va);
+						};
+						return obj;
+					}
+                case VKeyword.CTX: {
+						attribute = true;
+						var o = (IScope)source_block.Eval(ctx);
+                        return new VAttCtx { ctx = o };
+                    }
+                case VAttCtx att_ctx: {
+                        return source_block.Eval(att_ctx.ctx);
+                    }
+                case VKeyword.STATIC: {
+                        attribute = true;
+                        return evalSrc();
+                    }
+				case VKeyword.PUB: {
+						attribute = true;
+						var obj = (VDictScope)evalSrc();
+						foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..] && l.Value is VMember)) {
+                            ((VMember)l.Value).pub = true;
+						};
+						return obj;
+					}
+				case VKeyword.PRIV: {
+
+						attribute = true;
+						var obj = (VDictScope)evalSrc();
+						foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..] && l.Value is VMember)) {
+							((VMember)l.Value).pub = false;
+						};
+						return obj;
+					}
+				case VKeyword.VAL: {
+
+						attribute = true;
+						var obj = (VDictScope)evalSrc();
+						foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..] && l.Value is VMember)) {
+							((VMember)l.Value).mut = false;
+						};
+						return obj;
+					}
+                case VKeyword.MUT: {
+
+						attribute = true;
+						var obj = (VDictScope)evalSrc();
+						foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..] && l.Value is VMember)) {
+							((VMember)l.Value).mut = true;
+						};
+						return obj;
+					}
+				case Type tt: {
+                        var v = evalSrc();
                         var r = new VType(tt).Cast(v, v?.GetType());
                         return r;
                     }
@@ -2233,29 +2504,31 @@ ValKeyword.SAT,
                         default:
 							return new ExtendObject { call = ex, src = source_block }.Init(ctx);
 					}
-                case ValKeyword.GET: {
+                case VKeyword.GET: {
                         return new VGet { ctx = ctx, get = source_block };
                     }
-                case ValKeyword.SET: {
+                case VKeyword.SET: {
                         return new VSet { ctx = ctx, set = source_block };
                     }
-                case ValKeyword.RETURN: {
-                        return new VRet(getResult(), 1);
+                case VKeyword.RETURN: {
+                        return new VRet(evalSrc(), 1);
                     }
-                case ValKeyword.CLASS: {
+                case VKeyword.CLASS: {
                         return StDefKey.MakeClass(ctx, source_block);
                     }
-                case ValKeyword.INTERFACE: {
-                        if(getResult() is VDictScope s) {
+                case VKeyword.INTERFACE: {
+                        if(evalSrc() is VDictScope s) {
                             return new VInterface { _static = s, source = source_block };
                         }
                         throw new Exception("Object expected");
                     }
-                case ValKeyword.ENUM: {
+                case VKeyword.ENUM: {
 						var keyToVal = new ConcurrentDictionary<string, dynamic>();
 						var valToKey = new ConcurrentDictionary<dynamic, string>();
 						var keys = new string[source_block.statements.Count];
 						var vals = new object[source_block.statements.Count];
+
+                        var type = new VDictScope();
                         var i = 0;
 						foreach(var st in source_block.statements) {
                             void Add(string k, dynamic v) {
@@ -2265,17 +2538,20 @@ ValKeyword.SAT,
 								vals[i] = v;
 							}
                             switch(st) {
-                                case ExUpKey { up: -1, key: { } k }:{
+                                case ExUpKey{up:-1,key:{}k}:{
                                     var v = k;
                                     Add(k, v);
                                     break;
                                 }
-                                case ExInvoke {target:ExUpKey{up:-1,key:{}k}}:{
-                                    var v = new object();
-                                    Add(k, v);
-                                    break;
-                                }
-                                case StDefKey { key: { } k, value: { } val }: {
+                                case ExInvoke{target:ExUpKey{up:-1,key:{}k}, args:{}args}: {
+                                        var pars = args.EvalTuple(ctx);
+
+                                        var arg = ExTuple.SpreadExpr(new ExUpKey { key = "_arg", up = 1 });
+                                        var v = new VFn { pars = pars, expr = new ExEnumTuple { type = type, val = arg  } };
+                                        Add(k, v);
+                                        break;
+                                    }
+                                case StDefKey{key:{}k,value:{}val}: {
                                     var v = val.Eval(ctx);
                                     Add(k, v);
                                     break;
@@ -2287,7 +2563,11 @@ ValKeyword.SAT,
 						keyToVal["_valToKey"] = valToKey;
 						keyToVal["_keys"] = keys;
 						keyToVal["_vals"] = vals;
-						return new VDictScope { locals = keyToVal, parent = ctx, temp = false };
+
+                        type.locals = keyToVal;
+                        type.parent = ctx;
+                        type.temp = false;
+						return type;
 					}
 				default:
 					return ExInvoke.InvokeFunc(ctx, t, getArgs);
@@ -2325,14 +2605,18 @@ ValKeyword.SAT,
 			var l = lhs.Eval(ctx);
 			ctx.SetLocal("_lhs", l);
 			ctx.SetLocal("_rhs", r);
-            if(Is(l,r)) {
-                if(key is{}k) {
-                    ctx.SetLocal(k,l);
+            return Match(ctx, l, r);
+        }
+        public static bool Match(IScope ctx, object lhs, object rhs) {
+            if(Is(lhs, rhs)) {
+                switch(rhs) {
+                    case IPattern ip:
+                        ip.Bind(ctx, lhs);
+                        return true;
                 }
                 return true;
-            } else {
-                return false;
             }
+            return false;
         }
         public static bool Is(object item, object kind) {
 			switch(item, kind) {
@@ -2357,10 +2641,12 @@ ValKeyword.SAT,
 					return v == null;
 				case (null, var t):
 					return false;
-				case (var v, ValKeyword.ANYTHING):
+				case (var v, VKeyword.ANYTHING):
                     return true;
-				case (var v, ValKeyword.NOTHING):
+				case (var v, VKeyword.NOTHING):
                     return false;
+				case (var v, IPattern ip):
+					return ip.Accept(v);
 				case (var v, var k):
 					return Equals(v, k);
 				default:
@@ -2392,7 +2678,7 @@ ValKeyword.SAT,
             switch(cond) {
                 case true:
                     var r = positive.Eval(ctx);
-                    if(r is ValKeyword.GO_ELSE) {
+                    if(r is VKeyword.GO_ELSE) {
                         return negative.Eval(ctx);
                     }
 					return r;
@@ -2418,10 +2704,10 @@ ValKeyword.SAT,
                 case true:
                     r = positive.Eval(ctx);
 
-                    if(r is ValKeyword.BREAK) {
+                    if(r is VKeyword.BREAK) {
                         return VEmpty.VALUE;
                     }
-                    if(r is ValKeyword.CONTINUE) {
+                    if(r is VKeyword.CONTINUE) {
 
                     }
                     if(r is VYield vy) {
@@ -2473,20 +2759,35 @@ ValKeyword.SAT,
             switch(f) {
                 case VError ve:
                     throw new Exception(ve.msg);
-                case ValKeyword.MAGIC:      return new ValMagic();
-                case ValKeyword.GO: {
+
+                case VKeyword.ATTR: {
+                        var v = (ExUpKey)args.vals.First();
+                        var dest = (VMember)ctx.Get(v.key, v.up);
+                        return dest.attributes;
+
+                        throw new Exception();
+                    }
+                case VKeyword.CTX: {
+
+                        var arg = args.Eval(ctx);
+						return new VAttCtx { ctx = (VDictScope)arg };
+                        throw new Exception();
+
+                    }
+                case VKeyword.MAGIC:      return new ValMagic();
+                case VKeyword.GO: {
                         var ar = args.Eval(ctx);
 						return new VGo { target = (VLabel)ar };
 					}
-                case ValKeyword.SET:        return new VSet { ctx= ctx, set = args };
-                case ValKeyword.GET:        return new VGet { ctx = ctx, get = args };
-                case ValKeyword.ANY:
+                case VKeyword.SET:        return new VSet { ctx= ctx, set = args };
+                case VKeyword.GET:        return new VGet { ctx = ctx, get = args };
+                case VKeyword.ANY:
                     var at = args.EvalTuple(ctx);
-					return new VInterType { items = at.vals, all = false };
-                case ValKeyword.ALL:        return new VInterType { items = args.EvalTuple(ctx).vals, all = true };
-                case ValKeyword.EXTEND:     return new ExtendTicket { on = args.EvalExpression(ctx), inherit = true };
-                case ValKeyword.COMPLEMENT: return new VComplement { on = args.EvalExpression(ctx) };
-                case ValKeyword.UNALIAS:{
+					return new VInterType { items = at.vals, intersect = false };
+                case VKeyword.ALL:        return new VInterType { items = args.EvalTuple(ctx).vals, intersect = true };
+                case VKeyword.EXTEND:     return new ExtendTicket { on = args.EvalExpression(ctx), inherit = true };
+                case VKeyword.COMPLEMENT: return new VComplement { on = args.EvalExpression(ctx) };
+                case VKeyword.UNALIAS:{
                         foreach(var(k,v) in args.items) {
                             if(v is ExUpKey es) {
                                 if(es.Get(ctx) is VAlias va) {
@@ -2498,9 +2799,9 @@ ValKeyword.SAT,
                         }
                         throw new Exception();
                     }
-                case ValKeyword.REPLACE:
+                case VKeyword.REPLACE:
                     return InvokePars(ctx, (object lhs, object rhs) => (object item) => item == lhs ? rhs : item, args);
-                case ValKeyword.FMT:
+                case VKeyword.FMT:
                     string Repl(string str) {
 						foreach(Match m in Regex.Matches(str, "{(?<code>.*)}")) {
                             
@@ -2512,9 +2813,9 @@ ValKeyword.SAT,
                         string str => Repl(str),
                         _ => throw new Exception()
                     };
-				case ValKeyword.RETURN: return new VRet(args.EvalExpression(ctx), 1);
-                case ValKeyword.YIELD:  return new VYield(args.EvalExpression(ctx));
-                case ValKeyword.IMPLEMENT: {
+				case VKeyword.RETURN: return new VRet(args.EvalExpression(ctx), 1);
+                case VKeyword.YIELD:  return new VYield(args.EvalExpression(ctx));
+                case VKeyword.IMPLEMENT: {
                         var vds = (VDictScope)ctx;
                         var arg = args.EvalTuple(ctx);
                         foreach(var (k, v) in arg.items) {
@@ -2527,7 +2828,7 @@ ValKeyword.SAT,
                         }
                         return VEmpty.VALUE;
                     }
-                case ValKeyword.IMPORT: {
+                case VKeyword.IMPORT: {
                         var root = ctx;
                         while(ctx.parent is { } par) root = par;
 						var arg = args.EvalTuple(ctx);
@@ -2545,7 +2846,7 @@ ValKeyword.SAT,
 						return VEmpty.VALUE;
 
 					}
-				case ValKeyword.EMBED: {
+				case VKeyword.EMBED: {
                         var vds = (VDictScope)ctx;
                         var arg = args.EvalTuple(ctx);
                         foreach(var (k, v) in arg.items) {
@@ -2567,7 +2868,7 @@ ValKeyword.SAT,
                         }
                         return VEmpty.VALUE;
                     }
-				case ValKeyword.INHERIT: {
+				case VKeyword.INHERIT: {
                         throw new Exception();
                         foreach(var(k, v) in args.EvalTuple(ctx).items) {
                             switch(v) {
@@ -2578,11 +2879,23 @@ ValKeyword.SAT,
                         }
                         return VEmpty.VALUE;
                     }
-                case ValKeyword.SAT:
+                case VKeyword.SAT:
                     var a = args.Eval(ctx);
 
 					return new VPredicate { predicate = (VFn)a};
-                case ValKeyword.FN:
+				case VKeyword.KEYS_OF: {
+                        var a_ = args.Eval(ctx);
+						var obj = (VDictScope)a_;
+
+						List<string> keys = [];
+						foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..] && l.Value is VMember)) {
+							keys.Add(l.Key);
+						};
+						return keys;
+					}
+
+				case VKeyword.FN:
+
                 default:    return InvokePars(ctx, f, args);
             }
         }
@@ -2607,6 +2920,8 @@ ValKeyword.SAT,
                     }
                     return c.Invoke(v);
                 }
+                case VMember vm:
+                    return InvokeFunc(ctx, vm.val, evalArgs);
                 case VInstanceFn vim: {
                     var v = evalArgs().items.Select(pair => pair.val).ToArray();
                     return vim.Call(v);
@@ -2651,7 +2966,8 @@ ValKeyword.SAT,
                 case Delegate de: {
                         var args = evalArgs();
 						var v = args.items.Select(pair => pair.val).ToArray();
-                        var r = de.DynamicInvoke(v);
+						//•⟦⟧⟨⟩〈〉←
+						var r = de.DynamicInvoke(v);
                         if(de.Method.ReturnType == typeof(void))
                             return VEmpty.VALUE;
                         return r;
@@ -2682,7 +2998,7 @@ ValKeyword.SAT,
                             case null:
 								return null;
                         }
-                        throw new Exception();
+                        throw new Exception("Cannot implement interface");
                     }
                 case VIndex vi: {
 						var args = evalArgs();
@@ -2695,7 +3011,7 @@ ValKeyword.SAT,
 						}
 					}
                 case ExtendObject ext:
-                    throw new Exception();
+                    throw new Exception("Cannot call ExtendObject");
                 case VFnScope vfs: {
 						return vfs.func.CallFunc(evalArgs);
 					}
@@ -2703,7 +3019,8 @@ ValKeyword.SAT,
                         if(s.locals.TryGetValue("_call", out var f) && f is VFn vf) {
                             return vf.CallFunc(evalArgs);
                         }
-                        throw new Exception("Illegal");
+
+						throw new Exception("Illegal");
                     }
                 case VObjScope vos: {
                         return InvokeFunc(ctx, vos.o, evalArgs);
@@ -2732,9 +3049,9 @@ ValKeyword.SAT,
 						return ind switch {
 							int i => new VIndex {
                                 Get = () => e.Cast<object>().ElementAt(i),
-                                Set = o => throw new Exception()
+                                Set = o => throw new Exception("IEnumerable??")
 							},
-							_ => throw new Exception(),
+							_ => throw new Exception("IEnumerable?"),
 						};
 					}
 				case Args a: {
@@ -2749,7 +3066,7 @@ ValKeyword.SAT,
 								string s => a[s],
 								int i => a[i],
 								VObjScope vos => Get(vos.o),
-								_ => throw new Exception(),
+								_ => throw new Exception("12344"),
 							};
 						}
 					}
@@ -2795,7 +3112,7 @@ ValKeyword.SAT,
                 AutoKey(f, s, r);
                 switch(r) {
                     case VRet vr: return vr.Up();
-                    case VYield vy: throw new Exception();
+                    case VYield vy: throw new Exception("164");
                     case VGo vg:
                         if(vg.target.home == f) {
                             i = vg.target.index;
@@ -2803,7 +3120,7 @@ ValKeyword.SAT,
                         } else {
                             return vg;
                         }
-                        throw new Exception();
+                        throw new Exception("267");
                 }
                 f.locals["__"] = r;
             }
@@ -2822,7 +3139,7 @@ ValKeyword.SAT,
 				switch(r) {
                     case VRet vr:  return vr.Up();
                     case VGo vg:
-                        throw new Exception();
+                        throw new Exception("754");
 				}
 				f.SetLocal("__", r);
 			}
@@ -2845,6 +3162,12 @@ ValKeyword.SAT,
 				case ExUpKey { key: { } key } es:
 					StDefKey.Define(f, key, r);
 					break;
+                case ExInvokeBlock {attribute:true } eib: {
+                    foreach(var l in (r as VDictScope).locals.Where(l => l.Key is not ['_', '_', ..])) {
+                            f.SetLocal(l.Key, l.Value);
+                        }
+                    break;
+                }
 			}
 		}
 
@@ -2932,18 +3255,23 @@ ValKeyword.SAT,
         public bool allowDefine => up is -1 or 1;
         public int up = -1;
         public string key;
+
+        public bool publicOnly;
         public XElement ToXML () => new("Symbol", new XAttribute("key", key), new XAttribute("level", $"{up}"));
         public string Source => $"{new string('^', up)}{key}";
         public object Eval (IScope ctx) => GetValue(ctx);
         public object Get (IScope ctx) => ctx.Get(key, up);
 		public object GetValue(IScope ctx) {
 			var r = ctx.Get(key, up);
-			return r switch {
-				VGet vg => vg.Get(),
-                VIndex vi => vi.Get(),
-				VAlias va => va.Get(),
-				_ => r,
-			};
+            return Deref(r);
+            object Deref (object r) =>
+                r switch {
+                    VGet vg => Deref(vg.Get()),
+                    VIndex vi => Deref(vi.Get()),
+                    VAlias va => Deref(va.Get()),
+                    VMember vm => Deref(vm.val),
+                    _ => r,
+                };
 		}
         public object Assign(IScope ctx, Func<object> getNext) {
             return StAssignSymbol.Assign(ctx, key, up, getNext);
@@ -2979,11 +3307,20 @@ ValKeyword.SAT,
 			var source = src.Eval(ctx);
             object f (IScope ctx) {
                 var v = ctx.GetLocal(key);
-                return v switch {
-                    VGet vg => vg.Get(),
-                    VAlias va => va.Get(),
-                    _ => v
-                };
+
+
+                if(publicOnly && v is VMember { pub: false }) {
+                    throw new Exception("6885");
+                }
+
+                return Deref(v);
+                object Deref(object v) => 
+                    v switch {
+                        VGet vg => Deref(vg.Get()),
+                        VAlias va => Deref(va.Get()),
+                        //VMember vm => Deref(vm.val),
+                        _ => v
+                    };
 			}
 			switch(source) {
                 case VError ve: throw new Exception(ve.msg);
@@ -3070,8 +3407,8 @@ ValKeyword.SAT,
                                 var v = yes.Eval(ctx);
                                 switch(v) {
                                     case VEmpty:              continue;
-									case ValKeyword.CONTINUE:   continue;
-									case ValKeyword.BREAK:      goto Done;
+									case VKeyword.CONTINUE:   continue;
+									case VKeyword.BREAK:      goto Done;
 									case VRet vr:          return vr.Up();
 									default:
                                         lis.Add(v);
@@ -3085,8 +3422,8 @@ ValKeyword.SAT,
                                 var v = no.Eval(ctx);
                                 switch(v) {
                                     case VEmpty:              continue;
-									case ValKeyword.CONTINUE:   continue;
-									case ValKeyword.BREAK:      goto Done;
+									case VKeyword.CONTINUE:   continue;
+									case VKeyword.BREAK:      goto Done;
 									case VRet vr:          return vr.Up();
                                     default:
                                         lis.Add(v);
@@ -3108,12 +3445,13 @@ ValKeyword.SAT,
     public class ExSwitchFn : INode {
         public object Eval(IScope ctx) {
             return new VFn {
+                pars = new VTuple { items = [("arg", null)] },
                 expr = new ExSwitch {
                     fn = this,
-                    item = new ExUpKey {
+                    item = ExTuple.SpreadExpr(new ExUpKey {
                         key = "_arg",
                         up = 1
-                    }
+                    })
                 }
             };
         }
@@ -3130,25 +3468,24 @@ $Some(data)
 ${foo = int:bar}
 $(foo:int bar:int)
         */
-        public static object Match(IScope ctx, List<(INode cond, INode yes)> branches, object val) {
+        public static object Match(IScope ctx, List<(INode cond, INode yes)> branches, object lhs) {
 			//To do: Add recursive call
-			var inner_ctx = ctx.MakeTemp(val);
-			inner_ctx.locals["_"] = val;
+			var inner_ctx = ctx.MakeTemp(lhs);
+			inner_ctx.locals["_"] = lhs;
 			foreach(var (cond, yes) in branches) {
                 //TODO: Allow lambda matches
 				var b = cond.Eval(inner_ctx);
-				if(Is(b) || b is ValKeyword.DEFAULT) {
+				if(Is(b) || b is VKeyword.DEFAULT) {
                     var res = yes.Eval(inner_ctx);
-                    if(res is ValKeyword.FALL) {
+                    if(res is VKeyword.FALL) {
                         continue;
                     }
                     return res;
 				}
 			}
 			throw new Exception("Failed to match");
-			bool Is (object pattern) {
-                return ExIs.Is(val, pattern);
-			}
+            bool Is (object rhs) =>
+                ExIs.Match(ctx, lhs, rhs);
 		}
     }
 
@@ -3161,9 +3498,31 @@ $(foo:int bar:int)
     }
 
     public class Pattern {
-        Dictionary<string, ExUpKey> binds;
 
+        public class DictPair {
+            public INode key;
+            public Pattern value_pattern;
+
+        }
+        public bool rest_used = false;
+        public List<DictPair> dictionary = [];
+        public Dictionary<string, ExMemberKey> binds = [];
+        public List<Pattern> array = [];
     }
+
+
+/*
+point ?{
+    $[0 0]:print("origin")
+    $[$_ 0]:print()
+    $[0 $_]:print()
+    $[$x $y] ?:(y = x):print()
+    $[$x $y] ?:(y = 0-x):print()
+    $[$x $y]: print()
+}
+
+
+*/
     public class ExSwitch : INode {
         public INode item;
         public ExSwitchFn fn;
@@ -3173,7 +3532,7 @@ $(foo:int bar:int)
 	}
     public class ExCompose : INode{
         public ExTuple items;
-        public object Eval (IScope ctx) => throw new Exception();
+        public object Eval (IScope ctx) => throw new Exception("87");
     }
     public class ExFilter : INode {
         public INode lhs;
@@ -3190,7 +3549,7 @@ $(foo:int bar:int)
                     }) switch {
                         true => item,
                         false => VEmpty.VALUE,
-                        _ => throw new Exception()
+                        _ => throw new Exception("9")
                     };
 				return ExMap.Map(seq, ctx, null, null, (Transform)tr);
 			}
@@ -3214,7 +3573,7 @@ $(foo:int bar:int)
                 case VRange r: return Map(r.GetInt());
 				case VDictScope vds: {
 						if(vds._seq(out var seq) && seq is VFn vf) return Map(vf.CallPars(ctx, ExTuple.Empty));
-						throw new Exception();
+						throw new Exception("777");
 					}
 				case VTuple vt: {
 						//TO DO: rewrite
@@ -3297,8 +3656,8 @@ $(foo:int bar:int)
                 var r = tr(inner_ctx, item);
 				switch(r) {
 					case VEmpty: continue;
-					case ValKeyword.CONTINUE: continue;
-					case ValKeyword.BREAK: goto Done;
+					case VKeyword.CONTINUE: continue;
+					case VKeyword.BREAK: goto Done;
 					case VRet vr: return vr.Up();
 					default:
 						result.Add(r);
@@ -3313,7 +3672,7 @@ $(foo:int bar:int)
         public delegate void Process (IScope inner_ctx, object item);
 		public static object ForEach (dynamic seq, IScope ctx, INode cond, Func<Type> t, Process tr) {
 			if(tr == null) {
-                throw new Exception();
+                throw new Exception("134234");
 			}
 			int index = 0;
 			foreach(var item in seq) {
@@ -3355,9 +3714,8 @@ $(foo:int bar:int)
         public XElement ToXML () => new("KeyVal", new XAttribute("key", key), value.ToXML());
         public string Source => $"{key}:{value?.Source ?? "null"}";
         public object Eval (IScope ctx) {
-
             if(value == null) {
-                var val = new VDeclared { name = key, type = criteria.Eval(ctx) };
+                var val = new VMember { name = key, type = criteria.Eval(ctx), mut = true, pub = true, ready = false, val = null };
                 if(first) {
                     Define(ctx, key, val);
 					first = false;
@@ -3369,22 +3727,24 @@ $(foo:int bar:int)
                 if(val is VError ve) {
 					throw new Exception(ve.msg);
 				}
+                var mem = new VMember { pub = true, mut = true, name = key, val = val, ready = true, type = val.GetType() };
 				if(first) {
-					Define(ctx, key, val);
+					Define(ctx, key, mem);
                     first = false;
 				} else {
-					Set(ctx, key, val);
+					Set(ctx, key, mem);
 				}
 			}
-
 			return VEmpty.VALUE;
-
 		}
         public static object DefineFrom (IScope ctx, string key, IScope from) => Define(ctx, key, from.Get(key));
         public static object Define (IScope ctx, string key, object val) {
             var curr = ctx.GetLocal(key);
             if(curr is not VError) {
-                throw new Exception();
+                throw new Exception($"Key already defined: {key} = {curr} := {val}");
+            }
+            if(ctx is VDictScope vds) {
+                //vds.KeyList.Add(key);
             }
             Set(ctx, key, val);
             return VEmpty.VALUE;
@@ -3396,7 +3756,7 @@ $(foo:int bar:int)
             var _static = block.MakeScope(f);
             block.StagedApply(_static);
             var c = new VClass { name = "unknown", parent_ctx = f, source_expr = block, _static = _static };
-            _static.locals["__kind__"] = ValKeyword.CLASS;
+            _static.locals["__kind__"] = VKeyword.CLASS;
             _static.SetClass(c);
             return c;
         }
@@ -3409,7 +3769,7 @@ $(foo:int bar:int)
                 _static = _static
             };
             f.SetLocal(key, c);
-			_static.locals["__kind__"] = ValKeyword.CLASS;
+			_static.locals["__kind__"] = VKeyword.CLASS;
 			_static.SetClass(c);
             return _static;
         }
@@ -3417,7 +3777,7 @@ $(foo:int bar:int)
             var _static = block.MakeScope(f);
             var vi = new VInterface {_static = _static};
             f.SetLocal(key, vi);
-			_static.locals["__kind__"] = ValKeyword.INTERFACE;
+			_static.locals["__kind__"] = VKeyword.INTERFACE;
 			_static.AddInterface(vi);
             return _static;
         }
@@ -3523,7 +3883,20 @@ $(foo:int bar:int)
             return lhs;
         }
 	}
+    public class ExEnumTuple :INode {
+        public object type;
+        public ExTuple val;
+        public object Eval(IScope ctx) {
+            var vt = val.EvalTuple(ctx);
+			return new VEnumTuple { type = type, val = vt};
+        }
+    }
+    public class VEnumTuple {
+        public object type;
+        public VTuple val;
+    }
     public class ExTuple : INode {
+
         /*, LVal*/
 		public (string key, INode value)[] items;
         public IEnumerable<INode> vals => items.Select(i => i.value);
@@ -3561,7 +3934,7 @@ $(foo:int bar:int)
 							//it.Add((key, va));
 							break;
                         case VGet vg:
-                            throw new Exception();
+                            throw new Exception("32778");
 						default:
 							it.Add((key, v));
 							break;
@@ -3619,7 +3992,7 @@ $(foo:int bar:int)
         public void Inherit(IScope ctx) {
             foreach(var(k, v) in items) {
                 if(k == null) {
-                    throw new Exception();
+                    throw new Exception("95485");
                 }
                 ctx.SetLocal(k, v);
 
@@ -3631,6 +4004,9 @@ $(foo:int bar:int)
         public EFn fn;
 		public object Eval (IScope ctx) {
             var r = rhs.Eval(ctx);
+            if(r is VMember vm) {
+                r = vm.val;
+            }
             switch(fn) {
                 case EFn.range:
                     return Enumerable.Range(0, (int)r);
@@ -3644,7 +4020,19 @@ $(foo:int bar:int)
                     return new Random().Next((dynamic)r);
                 case EFn.keyboard:
                     return((string)r)[0];
-				default:throw new Exception();
+				case EFn.first:
+					return (r as IEnumerable<object>).First();
+				case EFn.last:
+					return (r as IEnumerable<object>).Last();
+				case EFn.index_ascend: {
+                        var src = r as Array;
+                        return Enumerable.Range(0, src.Length).OrderBy(i => ((dynamic)r)[i]);
+                    }
+                case EFn.index_descend:{
+                        var src = r as Array;
+                        return Enumerable.Range(0, src.Length).OrderByDescending(i => ((dynamic)r)[i]);
+                    }
+				default: throw new Exception("845834");
             }
 		}
 		public enum EFn {
@@ -3658,14 +4046,63 @@ $(foo:int bar:int)
 
 			index_ascend, index_descend,
             dice,
-            keyboard
+            keyboard,
+
+            first, last
 		}
 	}
+
+    public class ExDyadicSeq : INode {
+        public INode lhs, rhs;
+        public bool lseq, rseq;
+        public ExDyadic.EFn fn;
+        public object Eval (IScope ctx) {
+            switch(lseq, rseq) {
+                case (true, true): {
+                        var l = (Array)lhs.Eval(ctx);
+                        var r = (Array)rhs.Eval(ctx);
+                        var ret = Array.CreateInstance(typeof(object), l.Length);
+                        for(int i = 0; i < l.Length; i++) {
+                            ret.SetValue(Fn(l.GetValue(i), r.GetValue(i)), i);
+                        }
+                        return ret;
+                    }
+                case (true, false): {
+						var l = (Array)lhs.Eval(ctx);
+						var r = rhs.Eval(ctx);
+						var ret = Array.CreateInstance(typeof(object), l.Length);
+						for(int i = 0; i < l.Length; i++) {
+							ret.SetValue(Fn(l.GetValue(i), r), i);
+						}
+						return ret;
+					}
+                case (false, true): {
+						var l = lhs.Eval(ctx);
+						var r = (Array)rhs.Eval(ctx);
+						var ret = Array.CreateInstance(typeof(object), r.Length);
+						for(int i = 0; i < r.Length; i++) {
+							ret.SetValue(Fn(l, r.GetValue(i)), i);
+						}
+						return ret;
+					}
+				default:
+                    throw new Exception("34546565");
+            }
+        }
+        public object Fn(dynamic l, dynamic r) {
+            switch(fn) {
+                case ExDyadic.EFn.add: return l + r;
+                case ExDyadic.EFn.sub: return l - r;
+                case ExDyadic.EFn.mul: return l * r;
+                case ExDyadic.EFn.div: return l / r;
+                default:throw new Exception("3434345345");
+            }
+        }
+    }
     public class ExDyadic : INode {
         public INode lhs;
         public INode rhs;
         public EFn fn;
-
 		public object Eval (IScope ctx) {
             bool and(){
                 foreach(var b in (INode[])[lhs, rhs]) {
@@ -3673,7 +4110,7 @@ $(foo:int bar:int)
 					switch(r) {
                         case false: return false;
                         case true:  continue;
-                        default:    throw new Exception();
+                        default:    throw new Exception("13283482384");
                     }
                 }
                 return true;
@@ -3683,7 +4120,7 @@ $(foo:int bar:int)
                     switch(b.Eval(ctx)) {
                         case true:  return true;
                         case false: continue;
-                        default:    throw new Exception();
+                        default:    throw new Exception("34348375345");
                     }
                 }
                 return true;
@@ -3693,8 +4130,6 @@ $(foo:int bar:int)
                 var r = (bool)rhs.Eval(ctx);
                 return l ^ r;
             };
-
-
 			var _lhs = () => (dynamic)lhs.Eval(ctx);
 			var _rhs = () => (dynamic)rhs.Eval(ctx);
 			switch(fn) {
@@ -3719,7 +4154,7 @@ $(foo:int bar:int)
 									_ => VTuple.Single(item)
 								}) switch {
 									false => r = false,
-									_ => throw new Exception()
+									_ => throw new Exception("23123857")
 								};
 							}
 							ExMap.ForEach(seq, ctx, null, null, (Process)tr);
@@ -3737,34 +4172,43 @@ $(foo:int bar:int)
 						return !Exists(l, r);
 					}
 				case EFn.count: {
-						var l = lhs.Eval(ctx);
-						var r = rhs.Eval(ctx);
-						return Count(r, l);
-						int Count (dynamic seq, object o) {
+						var l = _lhs();
+						var r = _rhs();
+						return Count(l, r);
+						int Count (dynamic lhs, object rhs) {
 							var r = 0;
 							void tr (IScope inner_ctx, object item) {
-                                if(object.Equals(o, item)) {
+                                if(Equals(rhs, item)) {
                                     r += 1;
                                 }
                             } 
-							ExMap.ForEach(seq, ctx, null, null, (Process)tr);
+							ExMap.ForEach(lhs, ctx, null, null, (Process)tr);
 							return r;
 						}
 					}
 				case EFn.concat:return new ExSeq { items = [new ExSpread { value = lhs }, new ExSpread{ value = rhs}]};
 				case EFn.add: return (_lhs() + _rhs());
 				case EFn.sub: return (_lhs() - _rhs());
-
 				case EFn.mul: return (_lhs() * _rhs());
-
 				case EFn.div: return (_lhs() / _rhs());
 				case EFn.gt: return (_lhs() > _rhs());
 				case EFn.lt: return (_lhs() < _rhs());
 				case EFn.geq:   return (_lhs() >= _rhs());
                 case EFn.leq:   return (_lhs() <= _rhs());
-				default:        throw new Exception();
+                case EFn.construct: {
+                        var l = (VClass)_lhs();
+                        var r = (VTuple)_rhs();
+                        var result = l.MakeInstance();
+                        var i = 0;
+                        foreach(var k in l._static.KeyList) {
+                            result.SetAt(k, r.vals[i], 0);i++;
+                        }
+                        return result;
+					}
+				case EFn.union: return new VInterType { intersect = false, items = [_lhs(), _rhs()] };
+				case EFn.intersect: return new VInterType { intersect = true, items = [_lhs(), _rhs()] };
+				default:            throw new Exception("92391293");
 			}
-
 			bool Exists (dynamic seq, VFn f) {
 				var r = false;
 				void tr (IScope inner_ctx, object item) {
@@ -3773,7 +4217,7 @@ $(foo:int bar:int)
                         _ => VTuple.Single(item)
                     }) switch {
                         true => r = true,
-                        _ => throw new Exception()
+                        _ => throw new Exception("943848")
                     };
                 }
 				ExMap.ForEach(seq, ctx, null, null, (Process)tr);
@@ -3785,24 +4229,21 @@ $(foo:int bar:int)
             neq,
             and, or, xor,
             nand, nor, xnor,
-
             add, sub, mul, div,
-
             gt,lt,geq, leq,
-
-
             max, min,
             front, back,
-
             for_all, exists, not_exists, concat, count,
-
             log,index_of,
-
             take, drop,
             deal, assign,
-
             select_element,
-            insert_zero
+            insert_zero,
+            construct,
+            range,
+            compose,
+
+            union, intersect,
             };
     }
     public class StDefFn : INode {
@@ -3866,7 +4307,7 @@ $(foo:int bar:int)
 						throw new Exception("unknown");
 					}
             }
-            throw new Exception();
+            throw new Exception("9465958234");
         }
     }
 	public class StAssignSymbol : INode {
@@ -3879,8 +4320,9 @@ $(foo:int bar:int)
 			var inner_ctx = ctx.MakeTemp(curr);
 			inner_ctx.locals["_curr"] = curr;
 			switch(curr) {
-				case VDeclared vd:
-					inner_ctx.locals["_type"] = vd.type;
+				case VMember va:
+					inner_ctx.locals["_type"] = va.type;
+					inner_ctx.locals["_name"] = va.name;
 					break;
 			}
 			object GetVal () {
@@ -3898,42 +4340,69 @@ $(foo:int bar:int)
 				case VError ve:         throw new Exception(ve.msg);
 				case VSet vs:           return vs.Set(getNext());
 				case VAlias va:         return va.Set(getNext);
-				case VDeclared vd:      return Assign(vd.type);
+				case VMember vm:        return AssignMember(vm);
 				case VClass vc:         return AssignClass(vc);
 				case VDictScope vds:    return ctx.Set(key, getNext(), up);
-				case ValKeyword.AUTO:   return ctx.Set(key, getNext(), up);
+				case VKeyword.AUTO:   return ctx.Set(key, getNext(), up);
 				default:                return AssignType(curr?.GetType());
+			}
+            object AssignMember(VMember m) {
+                if(!m.mut) {
+                    throw new Exception("Variable is immutable");
+                }
+				var next = Validate(m.type);
+				m.ready = true;
+                m.val = next;
+                return next;
 			}
 			object Assign (object type) {
 				switch(type) {
 					case Type t:        return AssignType(t);
 					case VClass vc:     return AssignClass(vc);
 				}
-				throw new Exception();
+				throw new Exception("213823");
+			}
+			object Validate(object type) {
+				switch(type) {
+					case Type t: return ValidateType(t);
+					case VClass vc: return ValidateClass(vc);
+				}
+				throw new Exception("2351");
 			}
 			object AssignClass (VClass cl) {
+                var next = ValidateClass(cl);
+                return ctx.Set(key, next, up);
+			}
+			object ValidateClass (VClass cl) {
 				var next = getNext();
 				switch(next) {
-					case VDictScope vds:return ctx.Set(key, vds, up);
-					case VError ve:     throw new Exception(ve.msg);
-					default:            return ctx.Set(key, next, up);
+					case VDictScope vds: return next;
+					case VError ve: throw new Exception(ve.msg);
+					default: return next;
 				}
 			}
+
 			object AssignType (Type prevType) {
+                var next = ValidateType(prevType);
+				return ctx.Set(key, next, up);
+			}
+			object ValidateType (Type prevType) {
 				var next = getNext();
-                if(next is VError e) {
-                    throw new Exception(e.msg);
+				if(next is VError e) {
+					throw new Exception(e.msg);
+				}
+                if(next is VMember vm) {
+                    next = vm.val;
                 }
 
-
 				if(prevType == null) {
-					goto Do;
+                    return next;
 				}
 				switch(curr) {
 					case VInterface vi:
 						if(next is VDictScope vds) {
 							if(vds.HasInterface(vi)) {
-								goto Do;
+                                return next;
 							}
 							throw new Exception("Does not implement interface");
 						}
@@ -3946,14 +4415,13 @@ $(foo:int bar:int)
 				switch(next) {
 					case VError ve: throw new Exception(ve.msg);
 				}
-				Do:
-				return ctx.Set(key, next, up);
+                return next;
 			}
 		}
 		public static bool CanAssign (object prev, object next) {
 			switch(prev) {
 				case VError ve:     throw new Exception(ve.msg);
-				case VDeclared vd:  return Match(vd.type);
+				case VMember vm:    return Match(vm.type);
 				case VClass vc:     return MatchClass(vc);
 				case VDictScope vds:return true;
 				default:            return MatchType(prev?.GetType());
@@ -3963,7 +4431,7 @@ $(foo:int bar:int)
 					case Type t:    return MatchType(t);
 					case VClass vc: return MatchClass(vc);
 				}
-				throw new Exception();
+				throw new Exception("34997465");
 			}
 			bool MatchClass (VClass prevClass) {
 				switch(next) {
@@ -4018,7 +4486,7 @@ $(foo:int bar:int)
                     }
                     return VEmpty.VALUE;
             }
-            throw new Exception();
+            throw new Exception("2929349");
         }
         public static object AssignTuple (IScope ctx, ExUpKey[] symbols, object val) {
 			switch(val) {
@@ -4031,7 +4499,7 @@ $(foo:int bar:int)
 						}
 						return VEmpty.VALUE;
 					} else {
-						throw new Exception();
+						throw new Exception("43853845");
 					}
 				case Args a:
 					if(a.Length == symbols.Length) {
@@ -4040,7 +4508,7 @@ $(foo:int bar:int)
 						}
 						return VEmpty.VALUE;
 					} else {
-						throw new Exception();
+						throw new Exception("93545332");
 					}
 				case Array a:
 					if(a.Length == symbols.Length) {
@@ -4050,10 +4518,10 @@ $(foo:int bar:int)
 						}
 						return VEmpty.VALUE;
 					} else {
-						throw new Exception();
+						throw new Exception("123345");
 					}
 			}
-            throw new Exception();
+            throw new Exception("123123");
 		}
     }
     public class StAssignDynamic:INode {
@@ -4078,11 +4546,11 @@ $(foo:int bar:int)
                     vs.Set(r);
                     return r;
             }
-            throw new Exception();
+            throw new Exception("89922");
 		}
 	}
-    public record Var {
-
+    public record VMember {
+        public string name = "";
         public List<VAttribute> attributes = [];
 		public bool pub = true;
 		public bool mut = true;
@@ -4090,11 +4558,11 @@ $(foo:int bar:int)
         public object type = typeof(int);
         public object val = 0;
         public void Init(VCast vc) {
-            this.type = vc.type;
-            this.val = vc.val;
+            type = vc.type;
+            val = vc.val;
         }
         public void Assign(VCast vc) {
-            this.val = vc.val;
+            val = vc.val;
         }
     }
     public record VCast {
@@ -4140,34 +4608,26 @@ $(foo:int bar:int)
 				}
 			}
             return tokens;
-        }
-
-        public IToken Next () {
-
+		}
+		int row = 0;
+		public IToken Next () {
 			string str (params char[] c) => string.Join("", c);
 			void inc () => index += 1;
-
 			Check:
 			if(index >= src.Length) {
                 return new Token { type = TokenType.eof };
             }
-
             var c = src[index];
             switch(c) {
                 case '/': {
-
                         if(src[index + 1] == '/') {
                             var start = index;
-
                             inc();
                             inc();
-
 							while(index < src.Length && src[index] != '\n') {
 								inc();
 							}
-
                             var st = src[start..index];
-
 							return new StrToken { str = st, src = st, type = TokenType.comment };
                         } else if(src[index + 1] == '*') {
                             var start = index;
@@ -4240,7 +4700,7 @@ $(foo:int bar:int)
                         var st = "";
                         while(dest < src.Length) {
                             if(src[dest] == '\\') {
-								var ss = src[(dest - 10)..(dest + 10)];
+								//var ss = src[(dest - 10)..(dest + 10)];
 								dest += 1;
                                 var ch = src[dest];
 								st += ch switch {
@@ -4268,6 +4728,11 @@ $(foo:int bar:int)
                     throw new Exception("Illegal token");
                     */
                 case (' ' or '\r' or '\n' or '\t'): {
+
+                        if(c == '\n') {
+                            row++;
+                        }
+
                         var st = $"{c}";
                         inc();
                         return new StrToken { str = st, src = st, type = TokenType.space };
@@ -4335,34 +4800,21 @@ $(foo:int bar:int)
                 inc();
 				return new Token { type = _t };
 			}
-            throw new Exception();
+            throw new Exception($"Unknown token {c} at row {row}, index {index}: {src[(index - 5)..(index + 5)]}");
 		}
-		bool a = ('⟨' == '〈');
 	}
-
-
 	public enum TokenType : ulong {
         comma = ',',
         colon = ':',
-		block_l = '{',
-		block_r = '}',
-		tuple_l = '(',
-        tuple_r = ')',
-        array_l = '[',
-        array_r = ']',
-        angle_l = '<',
-        angle_r = '>',
-		brack_l = '⟨',
-		brack_r = '⟩',
-
+		block_l = '{',  block_r = '}',
+		tuple_l = '(',  tuple_r = ')',
+        array_l = '[',  array_r = ']',
+        angle_l = '<',  angle_r = '>',
+		brack_l = '⟨',  brack_r = '⟩',
         i_beam = '⌶',
-
-
 		//•
-		//⟦ 	⟧ ⟨⟩	
-		//〈〉
-
-
+		square_brack_l = '⟦',
+		square_brack_r = '⟧',
 		kronecker_product = '⊗',
 		double_brack_l = '⟪',
         double_brack_r = '⟫',
@@ -4395,36 +4847,26 @@ $(foo:int bar:int)
         hash = '#',
         repeat = '¨',
 		times = '×',
-		range = '↕',
         divide = '÷',
-
+		range = '↕',
 		divides = '∣',
         ceil = '⌈',
 		floor = '⌊',
-
         ellipsis = '…',
         h_ellipsis = '⋯',
 		v_ellipsis = '⋮',
         ne_ellipsis = '⋰',
         se_ellipsis = '⋱',
-
         numero = '№',
         irony = '⸮',
-
         reference = '※',
         asterism = '⁂',
-
         radical = '√',
-
         guillemet_l = '‹',
         guillemet_r = '›',
         guillemet_ll = '«',
         guillemet_rr = '»',
-
-
         exponent = '⋆',
-
-
 		manicule = '☞',
         pilcrow = '¶',
         copyright = '©',
@@ -4434,8 +4876,6 @@ $(foo:int bar:int)
         bullet= '•',
         double_hyphen = '⹀',
         double_oblique_hyphen = '⸗',
-
-        colon_equals = '≔',
 
 		before = '≺',
         after = '≻',
@@ -4472,7 +4912,8 @@ $(foo:int bar:int)
         section = '§',
         lozenge = '◊',
         circle = '○',
-        inv_bang = '¡',
+        compose = '∘',
+		inv_bang = '¡',
         triangle_n = '▲',
         triangle_s = '▼',
         small_triangle_n = '▴',
@@ -4483,15 +4924,18 @@ $(foo:int bar:int)
         PTR_L = '◄',
         interrobang = '‽',
         double_bang = '‼',
-		
 
-        member_of = '∈',
+
+        first = '⋖',
+        last = '⋗',
+
+		member_of = '∈',
         not_member_of = '∉',
 
         empty = '∅',
 
         double_plus = '⧺',
-        count = '⧣',
+        //count = '⧣',
 
         is_subset_eq = '⊆',
         has_subset_eq = '⊇',
@@ -4534,7 +4978,8 @@ $(foo:int bar:int)
         iff= '⇔',
 
         maps_to = '↦',
-        is_proportional_to = '∝',
+
+		is_proportional_to = '∝',
         such_that = '∋',
         dice = '⚄',
         deal = '⧂',
@@ -4542,8 +4987,13 @@ $(foo:int bar:int)
 		therefore = '∴',
         because = '∵',
 
-        yes = '⊤',
-        no = '⊥',
+        yes = '⟙',
+        no = '⟘',
+
+        count = '⌗',
+        loopedsquare= '⌘',
+
+        position_indicator = '⌖',
 
 
 		proves = '⊢',
@@ -4567,9 +5017,9 @@ $(foo:int bar:int)
         square_fill_r = '◨',
 
 
-
-		intersection = '∩',
-        union = '∪',
+		//
+		intersection = '⋂',
+        union = '⋃',
 
         co_product = '⊔',
         AAA = '⊓',
@@ -4577,6 +5027,8 @@ $(foo:int bar:int)
         keyboard = '⌨',
 
 
+        construct = '⫷',
+        deconstruct = '⫸',
 
 
 		name = 0xFFFFFFFFFFFFFFF0,

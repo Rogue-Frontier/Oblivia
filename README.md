@@ -101,8 +101,12 @@ The following code implements a Conway's Game of Life and updates until the coun
 Oblivia has 3 basic structures.
 - Array: Contains a sequence of items and nothing more.
 - Tuple: Contains a sequence of items, some with string keys.
-- Block: Contains a set of variables with string keys. Supports advanced operations such as `ret`
+- Block: Contains a set of variables with string keys. Supports operations like `ret`
 
+Oblivia has these basic data types:
+- `bit`: Boolean, `yes` and `no`
+- `i8`: 8 byte signed integer
+- `f8`: 8 byte signed float
 ### Arithmetic
 Infix arithmetic is available for common operations:
 - `A + B`

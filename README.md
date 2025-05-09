@@ -1,6 +1,5 @@
 # Oblivia: Object-Building Language Intended for Very Idiosyncratic Articulations
 Oblivia (OBL) is an esolang that aims to do with objects what Lisp does with lists. Oblivia follows these ideas:
-
 - **Terse syntax**:
   - A small set of primitive operations are given the most terse syntax.
   - Casting values is as easy as `A(B)` with type `A` and value `B`.
@@ -14,9 +13,16 @@ Oblivia (OBL) is an esolang that aims to do with objects what Lisp does with lis
 - **Same syntax everywhere**:
   - `:` is the define operator
   - `A(B), A[B], A{C}` is a function call.
-  - Patterns can be stored in objects
+  - Patterns can be stored in variables: `Some$(val)`
 - **Classes are objects too**: Classes can have a static `companion` (or not) that implements interfaces and behaves just like regular singleton objects.
-- **Term and Expression scoping**:
+- **Term and Expression scoping**: The right hand side of an operator has either term scope or expression scope. A term is a single item and an expression is a sequence of terms connected by operators. A term is one of the following.
+  - A name
+  - A number
+  - A string
+  - A tuple
+  - An array
+  - An object
+  - A monadic function and its operands
 
 ## Inspiration
 
@@ -29,65 +35,63 @@ The following code implements a Conway's Game of Life and updates until the coun
 
 ```
 {
+    print:Console/WriteLine
     Life:class {
-        width:int height:int grid:Grid.bool
-        adj(n:int max:int): modi(lt(n 0) ?+ addi(n max) ?- n max)
-        at(x:int y:int): array_at(grid adj.|[(x width),(y height)] |:int ?(i:int) i)    
-        get(x:int y:int): at(x y)/Get!
-        set(x:int y:int b:bool): at(x y)/Set.b
-        new(width:int height:int): Life {
-            (width height) := ^^(width height)
-            grid := Grid.bool/ctor(width height)
-            debug!
+        #@dbg["width:" w]
+        w->i4
+        #@dbg["height:" h]
+        h->i4
+        grid->Grid(bit)
+        mod(n:i4 max:i4):(%: (<: n 0) ?+ (+:n max) ?- n max)
+        # xy: (x:i4 y:i4)
+        # %xy
+        at(x:i4 y:i4):grid(mod.|[x:w y:h]|i4)
+        get(x:i4 y:i4):at(x y)/Get()
+        set(x:i4 y:i4 b:bit):at(x y)/Set(b)
+        new(w:i4 h:i4): Life {
+            print*cat["args: " _0 ", " _1],
+            (w h) := ^^/(w h),
+            grid := Grid(bit)/ctor(w h)
+            debug()
         }
-        debug!: {
-            print*cat["width: " width]
-            print*cat["height: " height]
-        }
-        activeCount:0
-        txt: StringBuilder/ctor!
-        update!: {
-            activeCount := 0
-            g: get
-            txt/Clear!
-            range(0 height) | ?(y:int) {
-                range(0 width) | ?(x:int) {
-                    w:subi(x 1) n:addi(y 1) e:addi(x 1) s:subi(y 1)
-                    c: count(g.|[
-                        (w n),(x n),(e n),
-                        (w y),      (e y),
-                        (w s),(x s),(e s),
-                    ] true)
-                    active:g(x y)
-                    active:= _ ?+ {
-                        lt(c 2) ?+ false ?-
-                        gt(c 3) ?+ false ?- _
-                    } ?- {
-                        eq(c 3) ?+ true ?- _
-                    }
+        debug(): print*|cat*|[["width: " w],["height: " h]]
+        activeNum:0
+        txt:StrBuild/ctor()
+        update(): {
+            activeNum := 0
+            g:get
+            txt/Clear()
+            ta: txt/Append,
+            ɩh | ?(y:i4){
+                ɩw | ?(x:i4){
+                    w:(-:x 1) n:(+:y 1) e:(+:x 1) s:(-:y 1)
+                    c:count(g.|[w:n x:n e:n w:y e:y w:s x:s e:s] ⊤)
+                    active: g(x y) ?+ not((<:c 2)∨(>:c 3)) ?- eq(c 3)
                     set(x y active)
-                    activeCount := active ?+ addi(_ 1) ?- _
-                    str_append(txt active ?+ "+" ?- "-")
+                    active ?+ { activeNum := (+:_ 1) }
+                    ta(active ?+ "*" ?- " ")
                 }
-                str_append(txt newline)
+                ta(newline)
             }
-            print*cat["active: " activeCount]
+            print*cat["active: " activeNum]
         }
     }
-    main(args:string): int* {
+    main(args:str) -> i4: {
         life:Life/new(32 32)
-        print*array_at(life/grid, [:int 0 0])/Get!
-        range(0 life/width) | ?(x:int) range(0 life/height) | ?(y:int)
-            life/set(x y rand_bool!)
-        count:1 prevCount:0 run:true
-        Console/Clear!
-        run ?% { 
-            life/update!
-            prevCount := count
-            count := life/activeCount
-            run := neq(count prevCount)
-            Console/SetCursorPosition(0 0)
-            print*str*life/txt
+        print*life/grid[:i4 0 0]/Get(),
+        ɩ(life/w) | ?(x:i4)ɩ(life/h) | ?(y:i4) life/set(x y rand_bool())
+        num:1 prevNum:0 run:⊤ i:1
+        Console/Clear()
+        run ?++ {
+            life/update()
+            prevNum := num
+            num := life/activeNum
+            run := neq(num prevNum)
+            print*cat["time: " i]
+            Console/{
+                SetCursorPosition(0 0)
+                Write*life/txt/ToString()
+            }
         }
         ^: 0
     }
@@ -100,6 +104,14 @@ Oblivia has 3 basic structures.
 - Block: Contains a set of variables with string keys. Supports advanced operations such as `ret`
 
 ### Arithmetic
+Infix arithmetic is available for common operations:
+- `A + B`
+- `A - B`
+- `A × B`
+- `A ÷ B`
+- `A > B`
+- `A < B`
+
 Lisp-like arithmetic allows you to spread operands. Operators are converted to reductions e.g. `[+: a b c] = a/\+(b)/\+(c) = reduce([a b c] ?(a b) a/\+(b))`
 - `[+: a b]`
 - `[-: a b]`
@@ -119,18 +131,17 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `[|: a b]`
 - `[&&: a b]`
 - `[||: a b]`
-
 ### Define
 - `A:B`: field A has value B. If `B` is a type, then the value is a *placeholder*
 - `A -> B`: Declare field A with type B
 - `A() -> B`: Declare method A has type B`
-- `A -> B: C`
-- `A() -> B: C`
+- `A -> B: C`:
+- `A() -> B: C`:
 - `A!:B`: function A with no args has output B
 - `A(B, C): D`: function A with args B,C has output D
-- `A[B C]: D`
-- `A{B C}: D`
-### Statement
+- `A[B C]: D`:
+- `A{B C}: D`:
+### Assign
 - `A := B`: reassign field A to B (same type). You can use `_` for the current value of `A`
 - `^: A`: Return `A` from the current scope.
 - `^^: A`: Return `A` from the parent scope.
@@ -201,8 +212,7 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `A = B`: Returns true if `A` matches pattern `B`
 - `A = B:C`: Returns true if `A` matches pattern `B` and assigns the value to `C`
 - `A =: B`: if `A = typeof(B)`, then sets `A := B` and returns true
-
-- `$A(B)`
+### Pattern
 - `$(A:B)`
 - `$[A B C]`: Array
 - `$[A:B C:D]`: 
@@ -210,8 +220,37 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `${ A = B }`: Object member `A` of type `B`
 - `${ A = B:C }`: Object member `A` of type `B`; make local `C:B(A)`
 - `${ A:B }`: Object member `A` of type `B`; define `A:B`
-
-
+### Constants
+- `yes`: True
+- `no`: False
+- `⟙`: True
+- `⟘`: False
+- `∅`: Empty
+- `empty`: Automatically removed when added to a tuple or array
+### Monadic functions
+- `↕A`: Returns `[0 1 2 ... A]`
+- `⍋A`: Returns `[n n+1 n+2 ... m]` where `[A(n) A(n+1) A(n+2) ... A(m)] = sorted(A)`
+- `⍒A`: Returns `[n n+1 n+2 ... m]` where `[A(m) ... A(n+2) A(n+1) A(n)] = sorted(A)`
+- `⌈A`: `ceil(A)`
+- `⌊A`: `floor(A)`
+- `A⋖`: First element of `A`
+- `A⋗`: Last element of `A`
+- `A⌗`: Returns length of `A`
+- `⚄A`: Returns a random item from `[0 1 2 ... A]`
+- `⌨A`: Returns the value of the first char of `A`
+- `¬A`: Returns `not(A)`
+### Dyadic functions
+- `A⌗B`: Returns count of `B` in `A`
+- `A∀B`: Returns `A ?| B⌗ = A⌗`
+- `A∃B`: Returns `A ?| B⌗ > 0`
+- `A∄B`: Returns `A |? B⌗ = 0`
+- `A⫷B`: Constructs class `A` with data `B`
+- `A∨B`: Returns `[||:A B]`
+- `A∧B`: Returns `[&&:A B]`
+- `A⋃B`: Returns `any(A B)`
+- `A⋂B`: Returns `all(A B)`
+- `A≤B`:
+- `A≥B`:
 ## Design philosophy
 - Whitespace is the simplest operator.
   - Two adjacent identifiers `A B` simply means that `A` occurs before `B` in a sequence. Identifiers are never grouped together outside of tuples and arrays. `{ A B:C D } = { A:A, B:C, D:D }`, `{ (A B):(C D) } = { A:C, B:D }` 
@@ -222,8 +261,6 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 
 ## Rejected features.
 OBL emphasizes **generality** and **terseness**, rejecting features that are not versatile enough to justify the syntax cost.
-- Infix arithmetic: Fails when you need to reduce an array, making the procedure unnecessarily verbose.
-  - `(+: a b)` Lisp-like arithmetic solves this by making arithmetic spreadable.
 - Partial application / *whatever-priming* (Raku): Scope-constrained to simple expressions. Cannot control argument order.
   - `?(<par>) <expr>` Lambdas solve this problem by forward declaring arguments and allowing any size scope.
 - `=`-based assignment: This function is often confused between assignments and boolean comparisons.

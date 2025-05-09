@@ -7,7 +7,13 @@ Any code snippets presented are to be fully supported by Oblivia.
 - `import(module)` embeds the object into the current scope.
 ```
 # From misc, import bar as foo
-import*module("misc.obl")/{ foo:bar }
+import*module."misc.obl"/{ foo:bar }
+# Import foo and bar
+import*module."misc.obl"/{ foo bar }
+# Import all
+import*module."misc.obl"
+# Import misc as Misc
+Misc:module."misc.obl)
 ```
 
 # Control flow
@@ -168,7 +174,7 @@ Things that represent a location.
 - Variable struct `{ a b c }`
 - Member access `a/b`
 - Function call `a/b()`
-- Alias of Locator
+- Alias of Locatable
 
 A literal such as `7` is not a locator.
 
@@ -180,10 +186,10 @@ Things that can be assigned to
 
 # Keyable values
 Things for which we can implicitly generate a key
-- Variable name `{a} = {a:a}`, `{'a} = {a:'a}`
+- Variable name `{a b c} = {a:a b:b c:c}`, `{'a 'b 'c} = {a:'a b:'b c:'c}`
 - Tuple of keys `{(a b c)} = {a:a b:b c:c}`, `{('a 'b 'c)} = {a:'a b:'b c:'c}` (maybe require spread?)
 - Struct of keys `{{a b c}} = {a:a b:b c:c}`, `{{'a 'b 'c}} = {a:'a b:'b c:'c}` (maybe require spread?)
-- Member access `{a/b} = {b:a/b}`, `{'a/b} = {b:'a/b}`
+- Member access `{c/a a/b b/c} = {a:c/a b:a/b c:b/c}`, `{'c/a 'a/b 'b/c} = {a:'c/a b:'a/b c:'b/c}`
 - Alias of keyable
   - `{'a} = {a:'a}`
   - `{('a 'b 'c)} = {a:'a b:'b c:'c}`

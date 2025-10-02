@@ -12,6 +12,15 @@
 		caret:  "^" period: "." bang:   "!" question:   "?"
 		plus:   "+" minus:  "-" star:   "*" slash:  "/"
 		equal:  "=" at:     "@" amp:    "&" pipe:   "|"
+
+        coloneqq:   "≔"
+        range:  "↕"
+
+        count:  "⌗"
+        yes:    "⟙",
+        no:     "⟘"
+        not:    "¬"
+
         quote:  "\'"
         cash:   "$" percent:"%" hash:   "#"
         repeat: "¨" 
@@ -49,30 +58,62 @@
     }
     Tokenizer:class {
         src->str:""     index->i4:0
-        new(src:str): _class {
-            src:=^^src
+        new(src:str): Tokenizer {
+            ^src := ^^src
+            Console/WriteLine(^src/Length)
         }
         GetAllTokens (): {
             tokens: List.IToken/ctor(),
-            (Next()=sat(?(token) not(token/type="eof")): t)?++{
-	            Console/WriteLine(cat[t/type " " t/text])
+
+            Read:label,
+            t:Next(),
+            not(t/type/val = "eof") ?+ {
+	            //Console/WriteLine(cat[t/type " " t/text])
+                Console/WriteLine(index)
+                Console/WriteLine(cat["TokenVal:" t/type/val])
+                Console/WriteLine(cat["token/text:" t/text/val])
                 tokens/Add(t)
+                Console/WriteLine(cat["TokenCount: " tokens/Count])
+                go(Read)
             }
             ^: tokens
         }
         Next():{
             str(c:Row.char): str/Join("" c)
             inc():{index:=(+:_ 1)}
-            alphanumeric:sat(?(c:char)((c≥⌨"a")∧(c≤⌨"z"))∨((c≥⌨"A")∧(c≤⌨"Z"))∨(c = numeric)∨(c=⌨"_"))
-            numeric:sat(?(n:char)(n≥⌨"0")∧(n≤⌨"9"))
-            Check:label
-            //pr("Check")
-            index≥(src/Length)?+{
-                ^^: StrToken {
-                    type:=TokenType/eof
+            
+            alphanumeric:sat(
+                ?(c:char):(
+                    (((c≥⌨"a") ∧ (c≤⌨"z")) ?+ { Console/WriteLine(cat["az: " c]), ^:yes } ?- no)∨
+                    (((c≥⌨"A") ∧ (c≤⌨"Z")) ?+ { Console/WriteLine(cat["AZ: " c]), ^:yes } ?- no)∨
+                    ((c = numeric) ?+ { Console/WriteLine(cat["09: " c]), ^:yes } ?- no) ∨
+                    ((c=⌨"_") ?+ { Console/WriteLine(cat["_: " c]), ^:yes } ?- no) ?+ {
+                        Console/WriteLine(cat["ALPHANUMERIC: " c])
+                        ^:yes
+                    } ?- no
+                )
+            )
+            numeric:sat(?(n:char):
+                ((n≥⌨"0") ∧ (n≤⌨"9")) ?+ {
+                    Console/WriteLine(cat["NUMERIC: " c])
+                    ^:yes
                 }
+            )
+            Check:label
+            //Console/WriteLine(cat["Check" src])
+            ,(index≥(src/Length))?+{
+                Console/WriteLine(cat["index: " index])
+                Console/WriteLine(cat["src/Length: " src/Length])
+                Console/WriteLine("EOF")
+                ^^: StrToken {
+                    type := TokenType/eof
+                }
+            } ?- {
+                Console/WriteLine("not EOF")
             }
+            Console/WriteLine("Read")
             c:src(index)
+            Console/WriteLine(c)
             c?{
                 ⌨"/":{
                     src((+:index 1))?{
@@ -148,12 +189,12 @@
                         ch:src.dest
                         ch?{
                             numeric:{
-                                val:=(+:(*:_ 10),(-:ch ⌨"0"))
-                                dest:=(+:_ 1)
+                                val := (*:_ 10)+(-:ch ⌨"0")
+                                dest := _+1
                                 go.Read
                             }
                             ⌨"_":{
-                                dest:=(+:_ 1)
+                                dest := _+1
                                 go.Read
                             }
                             _:{}
@@ -166,27 +207,41 @@
                         measure:=""
                     }
                 }
+                sat(?(c:char) TokenType/_valToKey(c/ToString())/can_get):{
+                    Console/WriteLine("TOKEN")
+                    _t:TokenType/_valToKey(c/ToString())
+                    index := _+1
+                    ^^:StrToken{
+                        type:=_t
+                        text:=c/ToString()
+                    }
+                }
+
+
                 alphanumeric:{
                     dest:index  escape:no   v:""
+
                     Read:label,
                     (<:dest src/Length)?+{
                         ch:src(dest)
+                        Console/WriteLine(ch)
                         ch?{
                             alphanumeric:{
+                                Console/WriteLine(cat["alphanumeric: " ch])
                                 v:=(+:v ch)
-                                dest:=(+:_ 1)
+                                dest := _+1
                                 go.Read
                             }
                             ⌨"\\\\":{
-                                dest:=(+:_ 1)
+                                dest := _+1
                                 escape:=yes
                                 go.Read
                             }
                             _:{
                                 escape?+{
-                                    v:=(+:v ch)
+                                    v := v+ch
                                     escape:=false
-                                    dest:=(+:_ 1)
+                                    dest := _+1
                                     go.Read
                                 } ?- go.Done
                             }
@@ -197,14 +252,6 @@
                     ^^:StrToken{
                         type:=TokenType/name
                         text:=^^v
-                    }
-                }
-                sat(?(c:char) TokenType/_valToKey(c/ToString())/can_get):{
-                    _t:TokenType/_valToKey(c/ToString())
-                    index:=(+:_ 1)
-                    ^^:StrToken{
-                        type:=_t
-                        text:=c/ToString()
                     }
                 }
             }

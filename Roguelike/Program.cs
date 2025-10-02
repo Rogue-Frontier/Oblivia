@@ -7,7 +7,7 @@ using SadConsole.Effects;
 using SadConsole.Input;
 using System.Collections.Concurrent;
 
-var tokenizer = new Tokenizer(File.ReadAllText("Mainframe.obl"));
+var tokenizer = new Lexer(File.ReadAllText("Mainframe.obl"));
 var parser = new Parser(tokenizer.GetAllTokens());
 var block = parser.NextBlock();
 T _<T> (T t) => t;
@@ -131,7 +131,7 @@ var global = new VDictScope {
 		["Array"] = _((Type type, int dim) => type.MakeArrayType(dim)),
 		["arr_get"] = _((Array a, int[] ind) => a.GetValue(ind)),
 		["arr_set"] = _((Array a, int[] ind, object value) => a.SetValue(value, ind)),
-		["arr_at"] = _((Array a, int[] ind) => new ValRef { src = a, index = ind }),
+		["arr_at"] = _((Array a, int[] ind) => new VRef { src = a, index = ind }),
 		["str_append"] = _((StringBuilder sb, object o) => sb.Append(o)),
 		["row_from"] = _((Type t, object[] items) => {
 			var result = Array.CreateInstance(t, items.Length);

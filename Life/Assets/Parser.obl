@@ -1,18 +1,39 @@
 {
-    import*module."Assets/Tokenizer.obl"
+    import*module."Assets/Lexer.obl"
 
-    main(arg):Console/WriteLine("MAIN")
+    main(arg):{
+        scope:Parser/FromFile("Assets/Life.obl")
+    }
     Parser:class{
         index->i4:0
-        tokens:List.IToken/ctor()
-        new(tokens:List.IToken):_class{tokens := ^^tokens}
-
+        tokens:List(IToken)/ctor()
+        new(tokens:List(IToken)):_class{tokens := ^^tokens}
         //@static
         FromFile(path:str):{
-            tokenizer:Tokenizer/new(File/ReadAllText(path))
-            ^:Parser/new(tokenizer/GetAllTokens())/NextBlock()
+            Console/WriteLine*cat["path:"path]
+            src:File/ReadAllText(path)
+            Console/WriteLine*cat["src:"src]
+            tk:Tokenizer/new(src)
+            tokens:tk/GetAllTokens()
+            //src:=str/Join("" tokens|?(t):t/src)
+            //File/WriteAllText(path src)
+            i:0,
+            Console/WriteLine(cat["Token Count: " tokens/Count]),
+            Remove:label,
+            (<:i tokens/Count) ?+ {
+                Console/WriteLine(cat["get index: " i])
+                t:tokens(i),
+                Console/WriteLine(t/text/val),
+                (t/type = any(TokenType/space TokenType/comment)) ?+{
+                    Console/WriteLine("REMOVE")
+                    tokens/RemoveAt(i)
+                } ?- {
+                    i := _+1
+                }
+                go(Remove)
+            }
+            //^:Parser/new(tokens)/NextBlock()
         }
-
         inc():{index := (+:_ 1)}
         dec():{index := (-:_ 1)}
         currToken:'tokens.index
@@ -464,7 +485,9 @@
             }
         }
         NextBlock():{
+            Console/WriteLine("NextBlock")
             inc()
+            Console/WriteLine*cat["index " index]
             ele:List.INode/ctor()
             Check:label
             currTokenType?{

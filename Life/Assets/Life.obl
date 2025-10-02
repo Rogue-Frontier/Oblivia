@@ -60,6 +60,14 @@
         print(5 = $(boo:i4))
 
         print(boo)
+
+        //moo(a:2)
+        //noo:bind(moo a:5)
+        //noo:bind(moo a:abc)
+
+        qoo(a:5 b:rest*i4): print(a %b)
+        qoo(1 2 3)
+
         ^:{}
         life:Life/new(32 32)
         print*life/grid(0 0)/Get(),

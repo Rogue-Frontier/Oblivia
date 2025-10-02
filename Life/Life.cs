@@ -2,7 +2,7 @@
 using System.Collections;
 using System.Text;
 using Oblivia;
-var scope = Parser.FromFile("Assets/Parser.obl");
+var scope = Parser.FromFile("Assets/Life.obl");
 T Val<T> (T t) => t;
 var global = new VDictScope();
 global.locals = new() {
@@ -20,7 +20,7 @@ global.locals = new() {
 	["Array"] = Val((Type type, int dim) => type.MakeArrayType(dim)),
 	["array_get"] = Val((Array a, int[] ind) => a.GetValue(ind)),
 	["array_set"] = Val((Array a, int[] ind, object value) => a.SetValue(value, ind)),
-	["array_at"] = Val((Array a, int[] ind) => new ValRef { src = a, index = ind }),
+	["array_at"] = Val((Array a, int[] ind) => new VRef { src = a, index = ind }),
 
 	["str_append"] = Val((StringBuilder sb, object o) => sb.Append(o)),
 	

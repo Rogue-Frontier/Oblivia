@@ -749,8 +749,12 @@ namespace Oblivia;
 			inc();
 			var expr = NextTerm();
 			switch(expr) {
-				case ExVal { value: string { } str } ev:
+				case ExVal { value: string { } str } ev: {
 					return new ExVal { value = new Regex(str) };
+				}
+			case ExVal { value: int i }: {
+					return new ExVal { value = i };
+				}
 				case ExTuple et:
 					var binds = et.items.Select(p => (p.key, (Node?)p.value)).ToList();
 					return new ExTuplePattern {

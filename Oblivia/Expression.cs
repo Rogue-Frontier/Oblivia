@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using static Oblivia.ExMap;
+using System.Threading.Tasks.Dataflow;
 
 namespace Oblivia;
 
@@ -182,13 +183,15 @@ public class ExInvokeBlock : Node {
 					return obj;
 				}
 			case VKeyword.MUT: {
-
 					attribute = true;
 					var obj = (VDictScope)evalSrc();
 					foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..] && l.Value is VMember)) {
 						((VMember)l.Value).mut = true;
 					};
 					return obj;
+				}
+			case VEnumRecordType vert: {
+					throw new Exception();
 				}
 			case Type tt: {
 					var v = evalSrc();
@@ -233,7 +236,7 @@ public class ExInvokeBlock : Node {
 					var keys = new string[source_block.statements.Count];
 					var vals = new object[source_block.statements.Count];
 
-					var type = new VDictScope();
+					var parent = new VDictScope();
 					var i = 0;
 					foreach(var st in source_block.statements) {
 						void Add (string k, dynamic v) {
@@ -250,9 +253,7 @@ public class ExInvokeBlock : Node {
 								}
 							case ExInvoke { target: ExUpKey { up: -1, key: { } k }, args: { } args }: {
 									var pars = args.EvalTuple(ctx);
-
-									var arg = ExTuple.SpreadExpr(new ExUpKey { key = "_arg", up = 1 });
-									var v = new VFn { pars = pars, expr = new ExEnumTuple { type = type, val = arg } };
+									var v = new VEnumRecordType { parent= parent, name = k, pars = pars };
 									Add(k, v);
 									break;
 								}
@@ -269,10 +270,10 @@ public class ExInvokeBlock : Node {
 					keyToVal["_keys"] = keys;
 					keyToVal["_vals"] = vals;
 
-					type.locals = keyToVal;
-					type.parent = ctx;
-					type.temp = false;
-					return type;
+					parent.locals = keyToVal;
+					parent.parent = ctx;
+					parent.temp = false;
+					return parent;
 				}
 			default:
 				return ExInvoke.InvokeFunc(ctx, t, getArgs);
@@ -334,6 +335,18 @@ public class ExIs : Node {
 				return vcr.Accept(v);
 			case (var v, VInterface vi): {
 					return (v is VDictScope vds && vds.HasInterface(vi));
+				}
+			case (var v, VEnumRecordType vert): {
+					if(v is VEnumRecord ver) {
+						if(ver.recordType.name == vert.name) {
+							return true;
+						}
+						//I guess we're lying now
+						if(ver.recordType == vert) {
+							return true;
+						}
+					}
+					return false;
 				}
 			case (var v, null):
 				return v == null;
@@ -649,6 +662,11 @@ public class ExInvoke : Node {
 					});
 					var at = tt.MakeGenericType(argTypes);
 					return new VType(tt.MakeGenericType(argTypes)).Cast(aa, at);
+				}
+
+			case VEnumRecordType vert: {
+					return vert.Make(evalArgs(), ctx);
+					throw new Exception();
 				}
 			case VFn vf: {
 					return vf.CallFunc(evalArgs);
@@ -1449,14 +1467,6 @@ public class ExLisp : Node {
 			}
 		}
 		return lhs;
-	}
-}
-public class ExEnumTuple : Node {
-	public object type;
-	public ExTuple val;
-	public object Eval (IScope ctx) {
-		var vt = val.EvalTuple(ctx);
-		return new VEnumTuple { type = type, val = vt };
 	}
 }
 public class ExTuple : Node {

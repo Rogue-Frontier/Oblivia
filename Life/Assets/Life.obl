@@ -53,19 +53,21 @@
         }
         foo: Either(i4 str)/Left(5)
         print(foo)
-        print*foo = Either(i4 str)/Left
+        print*foo = Either(i4 str)/Left$(val:5)
+
+        print*foo = Either$(a b)/Left$(val:5)
+
         Bar:class{ a:0 }
         print*Bar{ a := 1 } = Bar${ a:1 }
         print(a)
         print(5 = $(boo:i4))
-
         print(boo)
 
         //moo(a:2)
         //noo:bind(moo a:5)
         //noo:bind(moo a:abc)
 
-        qoo(a:5 b:rest*i4): print(a %b)
+        qoo(a:5 b:rest(List(obj))): print([a %b])
         qoo(1 2 3)
 
         ^:{}

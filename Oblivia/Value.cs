@@ -247,8 +247,6 @@ public record VLazy {
 	public object value;
 	public object Eval () => expr.Eval(ctx);
 }
-
-
 public record VFn {
 	public Node expr;
 	public VTuple pars;
@@ -260,6 +258,8 @@ public record VFn {
 		foreach(var (k, v) in pars.items) {
 			StDefKey.Define(ctx, k, v switch {
 				VClass or Type => new VMember { name = k, type = v, mut = true, pub = true, ready = false },
+
+				VRest rest => new VMember { name = k, type = rest.type, mut = true, pub = true, ready = false},
 				_ => v
 
 			});
@@ -278,33 +278,33 @@ public record VFn {
 		func_ctx.locals["_func"] = this;
 		InitPars(func_ctx);
 		int ind = 0;
-		bool startRest = true;
 		var args = evalArgs();
-
-		foreach(var (k, v) in args.items) {
-			if(k != null) {
-				ind = -1;
-				var val = StAssignSymbol.AssignLocal(func_ctx, k, () => v);
-			} else {
+		while(ind < args.items.Length) {
+			var (k, v) = args.items.ElementAt(ind);
+			if(k == null) {
 				if(ind == -1) {
 					throw new Exception("Cannot have positional arguments after named arguments");
 				}
 				var p = pars.items[ind];
-				
-
 				if(p.val is VRest) {
-
-					if(startRest) {
-						startRest = false;
-
-					} else {
-
+					List<object> items = new();
+					Add:
+					items.Add(v);
+					ind += 1;
+					if(ind < args.items.Length) {
+						(k, v) = args.items.ElementAt(ind);
+						if(k == null) {
+							goto Add;
+						}
 					}
-					continue;
+					var val = StAssignSymbol.AssignLocal(func_ctx, p.key, () => items);
 				} else {
+					ind += 1;
 					var val = StAssignSymbol.AssignLocal(func_ctx, p.key, () => v);
 				}
-				ind += 1;
+			} else {
+				ind = -1;
+				var val = StAssignSymbol.AssignLocal(func_ctx, k, () => v);
 			}
 		}
 		ReadPars(func_ctx, argData);
@@ -848,9 +848,19 @@ public record VCast {
 	public object val;
 }
 
-public class VEnumTuple {
-	public object type;
-	public VTuple val;
+
+public class VEnumRecord {
+	public VEnumRecordType recordType;
+	public VTuple args;
+}
+public class VEnumRecordType {
+	public string name;
+	public VTuple pars;
+
+	public object parent;
+	public VEnumRecord Make(VTuple args, IScope ctx) {
+		return new VEnumRecord { recordType = this, args = args };
+	}
 }
 
 public class VTypeFn : IType {
@@ -862,6 +872,8 @@ public class VTypeFn : IType {
 public class VTuple : Node {
 	public int Length => items.Length;
 	public (string key, object val)[] items;
+
+	public Dictionary<string, object> dict => items.Where(pair => pair.key != null).ToDictionary(p => p.key, p => p.val);
 	public object[] vals => items.Select(i => i.val).ToArray();
 	public object Eval (IScope ctx) => this;
 	public static VTuple Single (object v) => new() { items = [(null, v)] };
@@ -906,6 +918,32 @@ public class VStructurePattern : IPattern {
 			}
 			return true;
 		}
+		/*
+		if(o is VTuple{ dict:{}dict }) {
+			for(var i = 0; i < binds.Count; i++) {
+				var b = binds[i];
+				var lhs = b.lhs;
+				var val = dict[lhs];
+				var rhs = b.rhs ?? VKeyword.ANYTHING;
+				if(!ExIs.Is(val, rhs)) {
+					return false;
+				}
+			}
+			return true;
+		}
+		*/
+		if(o is VEnumRecord { args: { dict: { }dict } } ver) {
+			for(var i = 0; i < binds.Count; i++) {
+				var b = binds[i];
+				var lhs = b.lhs;
+				var val = dict[lhs];
+				var rhs = b.rhs ?? VKeyword.ANYTHING;
+				if(!ExIs.Is(val, rhs)) {
+					return false;
+				}
+			}
+			return true;
+		}
 		return false;
 	}
 	public void Bind (IScope ctx, object o) {
@@ -926,23 +964,49 @@ public class VStructurePattern : IPattern {
 		}
 	}
 }
+public class VArrayPattern : IPattern {
+	public void Bind (IScope ctx, object o) {
+		throw new Exception();
+	}
+	public bool Accept(object o) {
+		throw new Exception();
+	}
+}
 public class VTuplePattern : IPattern {
 	public bool rest;
 	public List<(string key, object type)> binds;
 	public bool Accept (object o) {
 		if(binds.Count == 1) {
-			return ExIs.Is(o, binds[0].type);
-		}
-		if(o is VTuple vt) {
-			for(var i = 0; i < binds.Count; i++) {
-				var b = binds[i];
-				var val = vt.items[i].val;
-				var type = b.type;
-				if(!ExIs.Is(val, type)) {
-					return false;
-				}
+			var v = binds[0].type;
+			if(o is VEnumRecord {args:{Length:1 } } ver) {
+				return ExIs.Is(ver.args.items[0].val, v);
 			}
-			return true;
+			var b = ExIs.Is(o, v);
+			return b;
+		} else {
+			if(o is VTuple vt) {
+				for(var i = 0; i < binds.Count; i++) {
+					var b = binds[i];
+					var val = vt.items[i].val;
+					var type = b.type;
+					if(!ExIs.Is(val, type)) {
+						return false;
+					}
+				}
+				return true;
+			}
+
+			if(o is VEnumRecord ver) {
+				for(var i = 0; i < binds.Count; i++) {
+					var b = binds[i];
+					var val = ver.args.items[i].val;
+					var type = b.type;
+					if(!ExIs.Is(val, type)) {
+						return false;
+					}
+				}
+				return true;
+			}
 		}
 		return false;
 	}

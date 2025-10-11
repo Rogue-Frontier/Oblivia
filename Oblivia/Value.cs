@@ -272,6 +272,24 @@ public record VFn {
 		return CallFunc(() => args);
 	}
 	public object CallFunc (Func<VTuple> evalArgs) {
+		//Need a way to add vars that only exist in all-parameter context
+		//As well as parameter-specific contexts
+		/*
+		@(par_ctx{
+			a:10
+			b:20
+			c:30
+		})
+		foo(a b c):{}
+		*/
+
+		//Maybe use enum instead
+		/*
+		baz(@(par_ctx{low:5 high:10}) a)
+		baz(low)
+		 */
+
+		
 		var func_ctx = new VFnScope(this, parent_ctx, false);
 		var argData = new VArgs { };
 		func_ctx.locals["_arg"] = argData;
@@ -1041,12 +1059,13 @@ public class VWildcardPattern : IPattern {
 	public bool Accept (object o) => true;
 	public void Bind (IScope ctx, object o) => ctx.SetLocal(key, o);
 }
-/*
 public class VGuardPattern : IPattern {
 	public Node cond;
-	public bool Accept (IScope ctx, object o) => ((bool)cond.Eval(ctx));
+	public IScope ctx;
+	public bool Accept (IScope ctx, object o) => (bool)cond.Eval(ctx);
+	public bool Accept (object o) => (bool)cond.Eval(ctx);
+	public void Bind (IScope ctx, object o) {}
 }
-*/
 public record VSet {
 	public Node set;
 	public IScope ctx;

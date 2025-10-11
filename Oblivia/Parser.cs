@@ -403,7 +403,11 @@ namespace Oblivia;
 							case TokenType.angle_r: {
 									inc();
 									var rhs = NextExpr();
-									return CompoundExpr(new ExFn { pars = (ExTuple)lhs, result = rhs });
+								var pars = lhs switch {
+									ExTuple et => et,
+									ExUpKey euk => new ExTuple { items = [(euk.key, new ExVal { })] }
+								};
+									return CompoundExpr(new ExFn { pars = pars, result = rhs });
 								}
 							case TokenType.colon: {
 									throw new Exception();
@@ -484,7 +488,7 @@ namespace Oblivia;
 								return CompoundExpr(new ExFilter { lhs = lhs, rhs = rhs });
 							case TokenType.colon: {
 								inc();
-								//return new ExDyadic { lhs = lhs, rhs = new ExGuardPattern { cond = NextExpr() }, fn = ExDyadic.EFn.intersect };
+								return new ExDyadic { lhs = lhs, rhs = new ExGuardPattern { cond = NextExpr() }, fn = ExDyadic.EFn.intersect };
 
 								throw new Exception();
 								//return new ExCriteria { item = lhs, cond = NextExpr() };

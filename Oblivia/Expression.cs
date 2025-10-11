@@ -146,8 +146,8 @@ public class ExInvokeBlock : Node {
 				}
 			case VKeyword.CTX: {
 					attribute = true;
-					var o = (IScope)source_block.Eval(ctx);
-					return new VAttCtx { ctx = o };
+					var inner = (IScope)source_block.Eval(ctx);
+					return new VAttCtx { ctx = inner };
 				}
 			case VAttCtx att_ctx: {
 					return source_block.Eval(att_ctx.ctx);
@@ -584,21 +584,17 @@ public class ExInvoke : Node {
 				}
 			case VKeyword.SAT:
 				var a = args.Eval(ctx);
-
 				return new VPredicate { predicate = (VFn)a };
 			case VKeyword.KEYS_OF: {
 					var a_ = args.Eval(ctx);
 					var obj = (VDictScope)a_;
-
 					List<string> keys = [];
 					foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..] && l.Value is VMember)) {
 						keys.Add(l.Key);
 					};
 					return keys;
 				}
-
 			case VKeyword.FN:
-
 			default: return InvokePars(ctx, f, args);
 		}
 	}
@@ -727,7 +723,6 @@ public class ExInvoke : Node {
 					if(s.locals.TryGetValue("_call", out var f) && f is VFn vf) {
 						return vf.CallFunc(evalArgs);
 					}
-
 					throw new Exception("Illegal");
 				}
 			case VObjScope vos: {
@@ -741,8 +736,6 @@ public class ExInvoke : Node {
 						can_get = true
 					};
 				}
-
-
 			case IDictionary d: {
 					var ind = evalArgs().vals.Single();
 					return new VIndex {
@@ -798,9 +791,7 @@ public class ExBlock : Node {
 			return VEmpty.VALUE;
 		var f = new VDictScope(ctx, false);
 		object r = VEmpty.VALUE;
-
 		var labels = new HashSet<int>();
-
 		for(int i = 0; i < statements.Count; i++) {
 			if(statements[i] is StDefKey { value: ExUpKey { key: "label" }, key: { } k }) {
 				var l = new VLabel { home = f, index = i };
@@ -809,7 +800,6 @@ public class ExBlock : Node {
 				//statements[i] = new ExVal { value = l };
 			}
 		}
-
 		for(int i = 0; i < statements.Count; i++) {
 			if(labels.Contains(i)) {
 				continue;
@@ -869,6 +859,7 @@ public class ExBlock : Node {
 			case ExUpKey { key: { } key } es:
 				StDefKey.Define(f, key, r);
 				break;
+			//If block is an attribute, inherit all members
 			case ExInvokeBlock { attribute: true } eib: {
 					foreach(var l in (r as VDictScope).locals.Where(l => l.Key is not ['_', '_', ..])) {
 						f.SetLocal(l.Key, l.Value);
@@ -1795,12 +1786,10 @@ public class ExDyadic : Node {
 		union, intersect,
 	};
 }
-/*
 public class ExGuardPattern : Node {
 	public Node cond;
-	public object Eval (IScope ctx) => new VGuardPattern { cond = cond };
+	public object Eval (IScope ctx) => new VGuardPattern { cond = cond, ctx = ctx };
 }
-*/
 public class ExStructurePattern : Node {
 	public bool rest;
 	public List<(string lhs, Node rhs, string key)> binds;

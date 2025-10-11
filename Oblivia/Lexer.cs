@@ -41,6 +41,23 @@ namespace Oblivia {
             }
             var c = src[index];
             switch(c) {
+				/*
+				case '?': {
+						//String interpolation
+						if(src[index+1] == '"') {
+							inc();
+							inc();
+							List<IToken> tree = [];
+							var text = "";
+							while(src[index] != '"') {
+								tree.Add(Next());
+							}
+							inc();
+							return new TreeToken { tree = tree };
+						}
+						break;
+					}
+					*/
                 case '/': {
                         if(src[index + 1] == '/') {
                             var start = index;
@@ -462,6 +479,7 @@ namespace Oblivia {
 		measure,
 		eof,
 		comment,
+		tree,
 	}
 	//≣
 	//«µ»əɅʌΘ∕❮❯❰❱
@@ -469,8 +487,13 @@ namespace Oblivia {
 	//Ⱶⱻ♪♫↔↕↨∟
 
 	public interface IToken { TokenType type { get; } string src { get; } }
-	public class StrToken : IToken {
 
+	public class TreeToken : IToken {
+		public TokenType type { get; set; } = TokenType.tree;
+		public List<IToken> tree;
+		public string src => string.Join("", tree.Select(token => token.src));
+	}
+	public class StrToken : IToken {
 		public TokenType type { get; set; }
 		public string str;
 		public string src { get; set; }

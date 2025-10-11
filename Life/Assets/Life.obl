@@ -47,21 +47,45 @@
         }
     }
     main(args:str)→i4: {
+        //@ctx{pub:yes priv:no}
+
+        //@(argctx{})
+
+        print*"abc" = $$(a => a/Length = 3)
+
+        print*$"abc"/Match("ab")
+
+        print*"ABC" = transform(a => tolower(a))
+
+        //a ?: true
+
+        ^:()
+
+        @(ctx{val:10})
+        bee():print*(val+val)
+        bee()
+
+        baa:{
+            ^():print."aaaa"
+        }
+        baa()
+
+        //var(read:bit write:bit T)
+
         Either(L, R):enum{
             Left(val:L),
             Right(val:R)
         }
         foo: Either(i4 str)/Left(5)
-        print(foo)
-        print*foo = Either(i4 str)/Left$(val:5)
-
-        print*foo = Either$(a b)/Left$(val:5)
+        print.foo
+        //print*foo = Either(i4 str)/Left$(val:5)
+        //print*foo = Either$(a b)/Left$(val:5)
 
         Bar:class{ a:0 }
         print*Bar{ a := 1 } = Bar${ a:1 }
-        print(a)
-        print(5 = $(boo:i4))
-        print(boo)
+        print.a
+        print*5 = $(boo:i4)
+        print.boo
 
         //moo(a:2)
         //noo:bind(moo a:5)

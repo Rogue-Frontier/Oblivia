@@ -164,7 +164,17 @@ public record VPredicate {
 	public VFn predicate;
 	public bool Accept (object args) => predicate.CallData([args]) is true;
 }
-public record VInterType : IPattern {
+
+public record VTransformPattern : IBindPattern {
+	public object lhs, rhs;
+	public bool Accept (object args) => ExIs.Is(((VFn)lhs).CallData([args]), rhs);
+	public void Bind (IScope ctx, object o) {
+		if(rhs is IBindPattern ibp) {
+			ibp.Bind(ctx, o);
+		}
+	}
+}
+public record VInterType : IBindPattern {
 	public object[] items;
 	public bool intersect = false;
 	public bool Accept (object val) {
@@ -178,13 +188,13 @@ public record VInterType : IPattern {
 	public void Bind (IScope ctx, object o) {
 		if(intersect) {
 			foreach(var i in items) {
-				if(i is IPattern ip) {
+				if(i is IBindPattern ip) {
 					ip.Bind(ctx, o);
 				}
 			}
 		} else {
 			foreach(var i in items) {
-				if(i is IPattern ip && ExIs.Is(i, o)) {
+				if(i is IBindPattern ip && ExIs.Is(i, o)) {
 					ip.Bind(ctx, o);
 					return;
 				}
@@ -914,11 +924,13 @@ public class VTuple : Node {
 	}
 }
 
-public interface IPattern {
+//Problem: We need partial binding for guard patterns
+//Solution: Use predicates instead?
+public interface IBindPattern {
 	public bool Accept (object o);
 	public void Bind (IScope ctx, object o);
 }
-public class VStructurePattern : IPattern {
+public class VStructurePattern : IBindPattern {
 	public bool rest;
 	public List<(string lhs, object rhs, string key)> binds;
 	public bool Accept (object o) {
@@ -976,13 +988,13 @@ public class VStructurePattern : IPattern {
 				ctx.SetLocal(key, val);
 			}
 			var type = b.rhs;
-			if(type is IPattern ip) {
+			if(type is IBindPattern ip) {
 				ip.Bind(ctx, val);
 			}
 		}
 	}
 }
-public class VArrayPattern : IPattern {
+public class VArrayPattern : IBindPattern {
 	public void Bind (IScope ctx, object o) {
 		throw new Exception();
 	}
@@ -990,7 +1002,7 @@ public class VArrayPattern : IPattern {
 		throw new Exception();
 	}
 }
-public class VTuplePattern : IPattern {
+public class VTuplePattern : IBindPattern {
 	public bool rest;
 	public List<(string key, object type)> binds;
 	public bool Accept (object o) {
@@ -1036,7 +1048,7 @@ public class VTuplePattern : IPattern {
 			if(b.key is { } key) {
 				ctx.SetLocal(key, val);
 			}
-			if(b.type is IPattern ip) {
+			if(b.type is IBindPattern ip) {
 				ip.Bind(ctx, val);
 			}
 			return;
@@ -1048,18 +1060,18 @@ public class VTuplePattern : IPattern {
 			if(b.key is { } key) {
 				ctx.SetLocal(key, val);
 			}
-			if(b.type is IPattern ip) {
+			if(b.type is IBindPattern ip) {
 				ip.Bind(ctx, val);
 			}
 		}
 	}
 }
-public class VWildcardPattern : IPattern {
+public class VWildcardPattern : IBindPattern {
 	public string key;
 	public bool Accept (object o) => true;
 	public void Bind (IScope ctx, object o) => ctx.SetLocal(key, o);
 }
-public class VGuardPattern : IPattern {
+public class VGuardPattern : IBindPattern {
 	public Node cond;
 	public IScope ctx;
 	public bool Accept (IScope ctx, object o) => (bool)cond.Eval(ctx);

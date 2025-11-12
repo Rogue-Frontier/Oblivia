@@ -51,14 +51,37 @@
 
         //@(argctx{})
 
-        print*"abc" = $$(a => a/Length = 3)
+        print*"abc" = sat(a => a/Length = 3)
 
-        print*$"abc"/Match("ab")
+        print*"abc" = $|(a => a/Length = 3)
 
-        print*"ABC" = transform(a => tolower(a))
+        //print*$"abc"/Match("ab")
 
+        //print*((a:i4) => a+1)(2),
+
+        //print*"ABC" = transform(a => tolower(a))
+        print*1 = 1 ?: yes,
+
+        (1 = ((a:i4)=>a+0) $= $|(a => a < 2) $: yes) ?+ print(5000),
+
+        time:2
+        and[((x + 2) > 0) time=2] ?+ print("ok")
+        x ?{
+            ($|(a => (a + 2) > 0) $: time = 2):print("ok")
+        }
+
+
+        1 ?{
+            ((a:i4)=>a+0) $= $|(a => a < 2) $: yes:print(5000),
+            $i:print(i+50),
+            $(a:i4) $: yes:print*a
+        }
+
+        //$| ?(i:i4): i+5
+        ,
+
+        
         //a ?: true
-
         ^:()
 
         @(ctx{val:10})

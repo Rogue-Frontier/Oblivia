@@ -309,7 +309,7 @@ public class ExIs : Node {
 	public static bool Match (IScope ctx, object lhs, object rhs) {
 		if(Is(lhs, rhs)) {
 			switch(rhs) {
-				case IPattern ip:
+				case IBindPattern ip:
 					ip.Bind(ctx, lhs);
 					return true;
 			}
@@ -327,8 +327,6 @@ public class ExIs : Node {
 				}
 			case (var v, VComplement co):
 				return !Is(v, co.on);
-			case (var v, VInterType vmp):
-				return vmp.Accept(v);
 			case (var v, VPredicate sat):
 				return sat.Accept(v);
 			case (var v, VCriteria vcr):
@@ -356,7 +354,7 @@ public class ExIs : Node {
 				return true;
 			case (var v, VKeyword.NOTHING):
 				return false;
-			case (var v, IPattern ip):
+			case (var v, IBindPattern ip):
 				return ip.Accept(v);
 			case (var v, var k):
 				return Equals(v, k);
@@ -1148,6 +1146,7 @@ public class ExSwitchFn : Node {
 			}
 		};
 	}
+	//Add lambda/subswitch support
 	public List<(Node cond, Node yes)> branches;
 	public object Call (IScope ctx, Node item) {
 		var val = item.Eval(ctx);
@@ -1573,6 +1572,9 @@ public class ExMonadic : Node {
 					var src = r as Array;
 					return Enumerable.Range(0, src.Length).OrderByDescending(i => ((dynamic)r)[i]);
 				}
+			case EFn.sat: {
+					return new VPredicate { predicate = (VFn)r };
+				}
 			default: throw new Exception("845834");
 		}
 	}
@@ -1589,7 +1591,8 @@ public class ExMonadic : Node {
 		dice,
 		keyboard,
 
-		first, last
+		first, last,
+		sat
 	}
 }
 public class ExDyadicSeq : Node {
@@ -1747,6 +1750,7 @@ public class ExDyadic : Node {
 				}
 			case EFn.union: return new VInterType { intersect = false, items = [_lhs(), _rhs()] };
 			case EFn.intersect: return new VInterType { intersect = true, items = [_lhs(), _rhs()] };
+			case EFn.transform: return new VTransformPattern { lhs = _lhs(), rhs = _rhs() };
 			default: throw new Exception("92391293");
 		}
 		bool Exists (dynamic seq, VFn f) {
@@ -1784,6 +1788,8 @@ public class ExDyadic : Node {
 		compose,
 
 		union, intersect,
+
+		transform
 	};
 }
 public class ExGuardPattern : Node {

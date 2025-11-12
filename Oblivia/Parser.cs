@@ -598,8 +598,20 @@ namespace Oblivia;
 						}
 						break;
 					}
-				case TokenType.cash:
+				case TokenType.cash: {
+
+					inc();
+					switch(currTokenType) {
+						case TokenType.equal:
+							inc();
+
+							return CompoundExpr(new ExDyadic { lhs = lhs, rhs = NextExpr(), fn = ExDyadic.EFn.transform });
+							throw new Exception();
+					}
+
+					dec();
 					return CompoundExpr(new ExDyadic { lhs = lhs, rhs = NextPattern(), fn = ExDyadic.EFn.intersect });
+				}
 				case TokenType.ellipsis: return DyadicTerm(ExDyadic.EFn.range);
 				case TokenType.neq: return DyadicTerm(ExDyadic.EFn.neq);
 				case TokenType.and: return DyadicTerm(ExDyadic.EFn.and);
@@ -751,6 +763,16 @@ namespace Oblivia;
 		}
 		public Node NextPattern () {
 			inc();
+			switch(currTokenType) {
+				case TokenType.pipe: {
+						inc();
+						return new ExMonadic { rhs = NextTerm(), fn = ExMonadic.EFn.sat };
+					}
+				case TokenType.colon: {
+					inc();
+						return new ExGuardPattern { cond = NextExpr() };
+					}
+			}
 			var expr = NextTerm();
 			switch(expr) {
 				case ExVal { value: string { } str } ev: {
@@ -775,6 +797,10 @@ namespace Oblivia;
 							StDefKey sdk => (sdk.key, sdk.value, sdk.key),
 						}).ToList()
 					};
+
+			case ExUpKey euk: {
+					return new ExWildcardPattern { key = euk.key };
+				}
 				/*
 				foreach(var st in eb.statements) {
 					switch(st) {
@@ -793,7 +819,6 @@ namespace Oblivia;
 					}
 				}
 				*/
-
 
 				case ExInvokeBlock eib:
 				default:
@@ -1038,11 +1063,23 @@ namespace Oblivia;
 		}
 		Node NextFn () {
 			var pars = NextArgTuple().ParTuple();
+
+		object retType = null;
+			Check:
 			switch(currTokenType) {
+			
+				case TokenType.arrow_e: {
+						inc();
+
+						retType = NextExpr();
+						goto Check;
+						//?(a:i4) -> i4:{}
+					}
 				case TokenType.period:
 					inc();
 					return new ExFn {
 						pars = pars,
+						
 						result = NextTerm()
 					};
 				case TokenType.colon:

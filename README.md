@@ -217,13 +217,16 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `A = B:C`: Returns true if `A` matches pattern `B` and assigns the value to `C`
 - `A =: B`: if `A = typeof(B)`, then sets `A := B` and returns true
 ### Pattern
-- `$(A:B)`
-- `$[A B C]`: Array
-- `$[A:B C:D]`: 
-- `$[A=B C=D]`: 
+- `$A`: Object `A`
+- `$(A:B)`: Object `A` of type `B`
+- `$(A)`: Object of type `A`
+- `$[A B C]`: Items `A`, `B`, `C`
+- `$[A:B C:D]`: Items `A` of type `B` and `C` of type `D`; make local `A:B` and `C:D`
+- `$[A=B C=D]`: Items `A`, `C` such that `A = B` and `C = D`
 - `${ A = B }`: Object member `A` of type `B`
 - `${ A = B:C }`: Object member `A` of type `B`; make local `C:B(A)`
 - `${ A:B }`: Object member `A` of type `B`; define `A:B`
+- `A${ B:C } = all(A, ${ B:C })`
 ### Constants
 - `yes`: True
 - `no`: False

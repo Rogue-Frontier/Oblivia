@@ -13,15 +13,15 @@ Oblivia (OBL) is an esolang that aims to do with objects what Lisp does with lis
 - **Same syntax everywhere**:
   - `:` is the define operator
   - `A(B), A[B], A{C}` is a function call.
-  - Patterns can be stored in variables: `Some$(val)`
+  - Patterns can be stored in variables: `foo: ${ bar = 2, qux: i4 }`
 - **Classes are objects too**: Classes can have a static `companion` (or not) that implements interfaces and behaves just like regular singleton objects.
-- **Term and Expression scoping**: The right hand side of an operator has either term scope or expression scope. A term is a single item and an expression is a sequence of terms connected by operators. A term is one of the following.
+- **Term and Expression scoping**: The right hand side of an operator has either term scope (short right) or expression scope (long right). A term is a single item and an expression is a sequence of terms connected by operators. A term is one of the following.
   - A name
   - A number
   - A string
   - A tuple
   - An array
-  - An object
+  - A block
   - A monadic function and its operands
 
 ## Inspiration
@@ -108,7 +108,7 @@ Oblivia has these basic data types:
 - `i8`: 8 byte signed integer
 - `f8`: 8 byte signed float
 ### Arithmetic
-Infix arithmetic is available for common operations:
+Infix arithmetic is available for common operations (see dyadic functions). Note that `B` is termwise.
 - `A + B`
 - `A - B`
 - `A × B`
@@ -226,7 +226,7 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `${ A = B }`: Object member `A` of type `B`
 - `${ A = B:C }`: Object member `A` of type `B`; make local `C:B(A)`
 - `${ A:B }`: Object member `A` of type `B`; define `A:B`
-- `A${ B:C } = all(A, ${ B:C })`
+- `A${ B:C } = all($(A), ${ B:C })`
 ### Constants
 - `yes`: True
 - `no`: False
@@ -247,6 +247,7 @@ Lisp-like arithmetic allows you to spread operands. Operators are converted to r
 - `⌨A`: Returns the value of the first char of `A`
 - `¬A`: Returns `not(A)`
 ### Dyadic functions
+All term-scoped
 - `A⌗B`: Returns count of `B` in `A`
 - `A∀B`: Returns `A ?| B⌗ = A⌗`
 - `A∃B`: Returns `A ?| B⌗ > 0`

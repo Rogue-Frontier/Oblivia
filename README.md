@@ -37,63 +37,48 @@ The following code implements a Conway's Game of Life and updates until the coun
 {
     print:Console/WriteLine
     Life:class {
-        #@dbg["width:" w]
-        w->i4
-        #@dbg["height:" h]
-        h->i4
-        grid->Grid(bit)
-        mod(n:i4 max:i4):(%: (<: n 0) ?+ (+:n max) ?- n max)
-        # xy: (x:i4 y:i4)
-        # %xy
-        at(x:i4 y:i4):grid(mod.|[x:w y:h]|i4)
-        get(x:i4 y:i4):at(x y)/Get()
-        set(x:i4 y:i4 b:bit):at(x y)/Set(b)
-        new(w:i4 h:i4): Life {
-            print*cat["args: " _0 ", " _1],
-            (w h) := ^^/(w h),
-            grid := Grid(bit)/ctor(w h)
-            debug()
+        w->i4, h->i4, grid->Grid(bit)
+        mod(n:i4 max:i4):{
+            n<0 ?++ n<-(_+max),
+            n≥max ?++ n<-(_-max),
+            ^:n
         }
-        debug(): print*|cat*|[["width: " w],["height: " h]]
-        activeNum:0
+        at(x:i4 y:i4): grid(mod(x w) mod(y h))
+        get(x:i4 y:i4): at(x y)/Get()
+        set(x:i4 y:i4 b:bit): at(x y)/Set(b)
+        new(w:i4 h:i4):Life{
+            {w h} := _arg,
+            grid := Grid(bit)/ctor(w h),
+        }
         txt:StrBuild/ctor()
         update(): {
-            activeNum := 0
-            g:get
-            txt/Clear()
+            g:get,
+            txt/Clear(),
             ta: txt/Append,
-            ɩh | ?(y:i4){
-                ɩw | ?(x:i4){
-                    w:(-:x 1) n:(+:y 1) e:(+:x 1) s:(-:y 1)
-                    c:count(g.|[w:n x:n e:n w:y e:y w:s x:s e:s] ⊤)
-                    active: g(x y) ?+ not((<:c 2)∨(>:c 3)) ?- eq(c 3)
-                    set(x y active)
-                    active ?+ { activeNum := (+:_ 1) }
-                    ta(active ?+ "*" ?- " ")
+            nextGrid:Grid(bit)/ctor(w h),
+            ↕h|?(y:i4){
+                ↕w|?(x:i4){
+                    w:x-1 n:y+1 e:x+1 s:y-1,
+                    c:[w:n x:n e:n w:y e:y w:s x:s e:s]|g⌗⟙,
+                    live:(c=3)∨(g(x y)∧(c=2)),
+                    nextGrid(x y)/Set(live),
+                    ta(live ?+ "█" ?- " ")
                 }
                 ta(newline)
             }
-            print*cat["active: " activeNum]
+            grid := nextGrid
         }
     }
-    main(args:str) -> i4: {
-        life:Life/new(32 32)
-        print*life/grid[:i4 0 0]/Get(),
-        ɩ(life/w) | ?(x:i4)ɩ(life/h) | ?(y:i4) life/set(x y rand_bool())
-        num:1 prevNum:0 run:⊤ i:1
-        Console/Clear()
-        run ?++ {
-            life/update()
-            prevNum := num
-            num := life/activeNum
-            run := neq(num prevNum)
-            print*cat["time: " i]
-            Console/{
-                SetCursorPosition(0 0)
-                Write*life/txt/ToString()
-            }
-        }
-        ^: 0
+    main(args:str)→i4: {
+        life:Life/new(24 24),
+        [0:2 1:2 2:2 2:1 1:0]|?(x y):life/set(x+4 y+4 yes),
+        run:label,
+        life/update(),
+        Console/{
+            Clear(),
+            Write*life/txt/val,
+        },
+        go(run)
     }
 }
 ```

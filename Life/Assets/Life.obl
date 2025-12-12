@@ -50,8 +50,19 @@
         [1 2 3] ?| (x => x > 0) | print,
         print*$"a+bc+"/Match("aaaaabcccccccccccccccccccccccccc"),
         // "aaaaabcccccccccccccccccccccccccc" = $[a:a+],
+        ("hello_world" = $/word1:.+ "_" word2:world|old/) ?+ {
+            print(word1)
+            print(word2)
+        },
 
-        print*"hello_world" = $/word1:hello, "_", word2:world/,
+        ("hello_123" = $/
+            p1:.+
+            "_"
+            p2:$/num1:.+/|$/num2:.+/ /
+            ) ?+ {
+            print(p1)
+            print(num2)
+        }
 
         ^:0,
         life:Life/new(24 24),

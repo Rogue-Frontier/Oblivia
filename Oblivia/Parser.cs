@@ -30,7 +30,7 @@ namespace Oblivia;
 			var tokens = tokenizer.GetAllTokens();
 			var src = string.Join("", tokens.Select(t => t.src));
 			File.WriteAllText(path, src);
-			tokens.RemoveAll(t => t.type is TokenType.space or TokenType.comment);
+			//tokens.RemoveAll(t => t.type is TokenType.space or TokenType.comment);
 			return new Parser(tokens).NextBlock();
 		}
 		void inc () => index++;
@@ -600,16 +600,13 @@ namespace Oblivia;
 						break;
 					}
 				case TokenType.cash: {
-
 					inc();
 					switch(currTokenType) {
 						case TokenType.equal:
 							inc();
-
 							return CompoundExpr(new ExDyadic { lhs = lhs, rhs = NextExpr(), fn = ExDyadic.EFn.transform });
 							throw new Exception();
 					}
-
 					dec();
 					return CompoundExpr(new ExDyadic { lhs = lhs, rhs = NextPattern(), fn = ExDyadic.EFn.intersect });
 				}
@@ -773,50 +770,63 @@ namespace Oblivia;
 					return new ExGuardPattern { cond = NextExpr() };
 				}
 			case TokenType.slash: {
-					List<VStringPattern> seq = new();
-
 
 					//
 					//	Valid examples
 					//	$/abc abc/
 					//  $/abc:.+ abc/
-
-					inc();
-					Read:
-					switch(currTokenType) {
-						case TokenType.name: {
-								var key = currTokenStr;
-								inc();
-								if(currTokenType == TokenType.colon) {
+					return new ExVal {
+						value = ReadRegex()
+					};
+					PatternString ReadRegex(){
+						List<string> seq = new();
+						inc();
+						Read:
+						switch(currTokenType) {
+							case TokenType.name: {
+									var key = currTokenStr;
 									inc();
-									var pattern = "";
-									Read2:
-									if(currTokenType == TokenType.comma) {
-										seq.Add(new PatternString { key = key, pattern = pattern, regex = true });
+									if(currTokenType == TokenType.colon) {
 										inc();
-										goto Read;
+										var pattern = "";
+										Read2:
+										if(currTokenType == TokenType.space) {
+											seq.Add(PatternString.MakePattern(pattern, key));
+											inc();
+											goto Read;
+										}
+										if(currTokenType == TokenType.slash) {
+											seq.Add(PatternString.MakePattern(pattern, key));
+											goto Read;
+										}
+										if(currTokenType == TokenType.cash) {
+											inc();
+											if(currTokenType == TokenType.slash) {
+												var rr = ReadRegex();
+												pattern += rr.RegexPattern;
+												goto Read2;
+											}
+											dec();
+										}
+										pattern += currTokenText;
+										inc();
+										goto Read2;
+									} else {
+										seq.Add(PatternString.MakePattern(key));
 									}
-									if(currTokenType == TokenType.slash) {
-										seq.Add(new PatternString { key = key, pattern = pattern, regex = true });
-										goto Read;
-									}
-									pattern += currTokenText;
-									inc();
-									goto Read2;
-								} else {
-									seq.Add(new PatternString { key = null, pattern = key, regex = false });
+									goto Read;
 								}
-								goto Read;
-							}
-						case TokenType.slash: {
+							case TokenType.slash: {
+									inc();
+									var res = string.Join("", seq);
+									return new PatternString { pattern = res };
+								}
+							case TokenType.space: inc(); goto Read;
+							default:
+								seq.Add(PatternString.MakePattern(currTokenText));
 								inc();
-								return new ExVal { value = new AllString { seq = seq } };
-							}
-						case TokenType.comma:inc(); goto Read;
-						default:
-							seq.Add(new PatternString { pattern = currTokenText, regex = true });
-							inc();
-							goto Read;
+								goto Read;
+						}
 					}
 				}
 		}

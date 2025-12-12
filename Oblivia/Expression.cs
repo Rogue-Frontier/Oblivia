@@ -1828,31 +1828,34 @@ public interface VStringPattern {
 
 	public string RegexPattern { get; }
 }
+
+
+
 public class PatternString : VStringPattern {
 	public string pattern;
-	public bool regex;
-
-	public string key;
+	public string key = "";
 	public string val;
-
-	public string RegexPattern => $"({(key is { }s ? $"?<{key}>" : "")}{pattern})";
+	public string RegexPattern => MakePattern(pattern, key);
+	public static string MakePattern (string pattern, string key = "") => $"({(key != "" ? $"?<{key}>" : "")}{pattern})";
+	GroupCollection groups;
 	public bool Accept (string str) {
-		var r = false;
-		if(regex) { r = Regex.IsMatch(str, pattern); } else r = str == pattern;
-		if(r) {
-			val = pattern;
-		}
-		return r;
+		var rr = new Regex(RegexPattern);
+		var m = rr.Match(str);
+		groups = m.Groups;
+		return m.Success;
 	}
 	public void Bind (IScope scope) {
-		scope.SetAt(key, val, 1);
+		foreach(var k in groups.Keys) {
+			if(int.TryParse(k, out int _)) {
+				continue;
+			}
+			scope.SetAt(k, groups[k].Value, 1);
+		}
 	}
 }
 public class AnyString : VStringPattern {
 	List<VStringPattern> seq;
 	public VStringPattern bound;
-
-
 	public string RegexPattern => $"({string.Join("|", seq.Select(s => s.RegexPattern))})";
 	public bool Accept (string str) {
 		foreach(var s in seq) {
@@ -1869,20 +1872,25 @@ public class AnyString : VStringPattern {
 }
 public class AllString : VStringPattern {
 	public List<VStringPattern> seq;
-
+	
 	public string RegexPattern => $"({string.Join("", seq.Select(s => s.RegexPattern))})";
+
+	string[] groupNames;
+	GroupCollection groups;
 	public bool Accept (string str) {
-		foreach(var s in seq) {
-			if(!s.Accept(str)) {
-				return false;
-			}
-		}
-		return true;
+		var rr = new Regex(RegexPattern);
+		var m = rr.Match(str);
+		groups = m.Groups;
+		return m.Success;
 	}
 	public void Bind (IScope scope) {
-		foreach(var s in seq) {
-			s.Bind(scope);
+		foreach(var k in groups.Keys) {
+			if(int.TryParse(k, out int _)){
+				continue;
+			}
+			scope.SetAt(k, groups[k].Value, 1);
 		}
+		return;
 	}
 }
 public class ExGuardPattern : Node {

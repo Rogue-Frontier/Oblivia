@@ -672,7 +672,6 @@ public class VAttCtx {
 }
 public record VDictScope : IScope {
 	public bool temp = false;
-
 	public bool inherit = false;
 	public IScope parent { get; set; } = null;
 	public ConcurrentDictionary<string, dynamic> locals = new() { };

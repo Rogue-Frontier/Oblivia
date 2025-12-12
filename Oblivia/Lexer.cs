@@ -167,11 +167,9 @@ namespace Oblivia {
                     throw new Exception("Illegal token");
                     */
                 case (' ' or '\r' or '\n' or '\t'): {
-
                         if(c == '\n') {
                             row++;
                         }
-
                         var st = $"{c}";
                         inc();
                         return new StrToken { str = st, src = st, type = TokenType.space };
@@ -179,7 +177,6 @@ namespace Oblivia {
                 case (>= '0' and <= '9'): {
                         int dest = index;
 						int val = 0;
-
                         var measure = "";
 						Read:
                         if(dest < src.Length) {
@@ -242,9 +239,6 @@ namespace Oblivia {
             throw new Exception($"Unknown token {c} at row {row}, index {index}: {src[(index - 5)..(index + 5)]}");
 		}
 	}
-
-
-
 	public enum TokenType : ulong {
 		comma = ',',
 		colon = ':',

@@ -164,7 +164,6 @@ public record VPredicate {
 	public VFn predicate;
 	public bool Accept (object args) => predicate.CallData([args]) is true;
 }
-
 public record VTransformPattern : IBindPattern {
 	public object lhs, rhs;
 	public bool Accept (object args) => ExIs.Is(((VFn)lhs).CallData([args]), rhs);
@@ -174,34 +173,39 @@ public record VTransformPattern : IBindPattern {
 		}
 	}
 }
-public record VInterType : IBindPattern {
+public record VAllType : IBindPattern {
 	public object[] items;
-	public bool intersect = false;
 	public bool Accept (object val) {
-		if(intersect) {
-			return items.All(i => ExIs.Is(val, i));
-		} else {
-			var r = items.Any(i => ExIs.Is(val, i));
-			return r;
-		}
+		return items.All(i => ExIs.Is(val, i));
 	}
 	public void Bind (IScope ctx, object o) {
-		if(intersect) {
-			foreach(var i in items) {
-				if(i is IBindPattern ip) {
-					ip.Bind(ctx, o);
-				}
-			}
-		} else {
-			foreach(var i in items) {
-				if(i is IBindPattern ip && ExIs.Is(i, o)) {
-					ip.Bind(ctx, o);
-					return;
-				}
+		foreach(var i in items) {
+			if(i is IBindPattern ip) {
+				ip.Bind(ctx, o);
 			}
 		}
 	}
 }
+public record VAnyType : IBindPattern {
+	public object[] items;
+	public object bound;
+	public bool Accept (object val) {
+		foreach(var i in items) {
+			if(ExIs.Is(val, i)) {
+				bound = i;
+				return true;
+			}
+		}
+		return false;
+	}
+	public void Bind (IScope ctx, object o) {
+		if(bound is IBindPattern ip) {
+			ip.Bind(ctx, o);
+			return;
+		}
+	}
+}
+
 public record VEmpty {
 	public static readonly VEmpty VALUE = new();
 }
@@ -982,7 +986,6 @@ public class VStructurePattern : IBindPattern {
 			var b = binds[i];
 			var lhs = b.lhs;
 			var val = vd.GetAt(lhs, 1);
-
 			string key = b.key;
 			if(key is { }) {
 				ctx.SetLocal(key, val);
@@ -1005,6 +1008,7 @@ public class VArrayPattern : IBindPattern {
 public class VTuplePattern : IBindPattern {
 	public bool rest;
 	public List<(string key, object type)> binds;
+	public bool accepted { get; set; }
 	public bool Accept (object o) {
 		if(binds.Count == 1) {
 			var v = binds[0].type;
@@ -1025,7 +1029,6 @@ public class VTuplePattern : IBindPattern {
 				}
 				return true;
 			}
-
 			if(o is VEnumRecord ver) {
 				for(var i = 0; i < binds.Count; i++) {
 					var b = binds[i];
@@ -1041,7 +1044,6 @@ public class VTuplePattern : IBindPattern {
 		return false;
 	}
 	public void Bind (IScope ctx, object o) {
-
 		if(binds.Count == 1) {
 			var b = binds[0];
 			var val = o;
@@ -1068,6 +1070,7 @@ public class VTuplePattern : IBindPattern {
 }
 public class VWildcardPattern : IBindPattern {
 	public string key;
+	public bool accepted { get; set; }
 	public bool Accept (object o) => true;
 	public void Bind (IScope ctx, object o) => ctx.SetLocal(key, o);
 }

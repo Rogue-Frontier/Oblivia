@@ -153,11 +153,12 @@ public class StAssignSymbol : Node {
 	XElement ToXML () => new("Reassign", symbol.ToXML(), value.ToXML());
 	public string Source => $"{symbol.Source} := {value.Source}";
 	public object Eval (IScope ctx) {
-		var curr = symbol.Eval(ctx);
+		var currMember = symbol.Get(ctx);
+		var curr = symbol.Deref(currMember);
 		var inner_ctx = ctx.MakeTemp(curr);
 		inner_ctx.locals["_curr"] = curr;
 		switch(curr) {
-			case VMember va:
+			case VMember {ready:true } va:
 				inner_ctx.locals["_type"] = va.type;
 				inner_ctx.locals["_name"] = va.name;
 				break;
@@ -218,7 +219,6 @@ public class StAssignSymbol : Node {
 				default: return next;
 			}
 		}
-
 		object AssignType (Type prevType) {
 			var next = ValidateType(prevType);
 			return ctx.Set(key, next, up);
@@ -231,7 +231,6 @@ public class StAssignSymbol : Node {
 			if(next is VMember vm) {
 				next = vm.val;
 			}
-
 			if(prevType == null) {
 				return next;
 			}

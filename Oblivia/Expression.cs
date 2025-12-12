@@ -1,14 +1,15 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 using System.Xml.Linq;
 using static Oblivia.ExMap;
-using System.Threading.Tasks.Dataflow;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Oblivia;
 
@@ -156,37 +157,55 @@ public class ExInvokeBlock : Node {
 					attribute = true;
 					return evalSrc();
 				}
+			case VKeyword.DECLARE: {
+					attribute = true;
+					var obj = (VDictScope)evalSrc();
+					foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..])) {
+						if(l.Value is VMember vm) {
+							vm.type = vm.val;
+							vm.ready = false;
+							
+						}
+					};
+					return obj;
+				}
 			case VKeyword.PUB: {
 					attribute = true;
 					var obj = (VDictScope)evalSrc();
-					foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..] && l.Value is VMember)) {
-						((VMember)l.Value).pub = true;
+					foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..])) {
+						if(l.Value is VMember vm) {
+							vm.pub = true;
+						}
 					};
 					return obj;
 				}
 			case VKeyword.PRIV: {
-
 					attribute = true;
 					var obj = (VDictScope)evalSrc();
-					foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..] && l.Value is VMember)) {
-						((VMember)l.Value).pub = false;
+					foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..])) {
+						if(l.Value is VMember vm) {
+							vm.pub = false;
+						}
 					};
 					return obj;
 				}
 			case VKeyword.VAL: {
-
 					attribute = true;
 					var obj = (VDictScope)evalSrc();
-					foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..] && l.Value is VMember)) {
-						((VMember)l.Value).mut = false;
+					foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..])) {
+						if(l.Value is VMember vm) {
+							vm.mut = false;
+						}
 					};
 					return obj;
 				}
 			case VKeyword.MUT: {
 					attribute = true;
 					var obj = (VDictScope)evalSrc();
-					foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..] && l.Value is VMember)) {
-						((VMember)l.Value).mut = true;
+					foreach(var l in obj.locals.Where(l => l.Key is not ['_', '_', ..])) {
+						if(l.Value is VMember vm) {
+							vm.mut = true;
+						}
 					};
 					return obj;
 				}
@@ -312,6 +331,9 @@ public class ExIs : Node {
 				case IBindPattern ip:
 					ip.Bind(ctx, lhs);
 					return true;
+				case VStringPattern vsp:
+					vsp.Bind(ctx);
+					return true;
 			}
 			return true;
 		}
@@ -356,6 +378,9 @@ public class ExIs : Node {
 				return false;
 			case (var v, IBindPattern ip):
 				return ip.Accept(v);
+			case (var v, VStringPattern vsp):
+
+				return vsp.Accept((string)v);
 			case (var v, var k):
 				return Equals(v, k);
 			default:
@@ -484,8 +509,8 @@ public class ExInvoke : Node {
 			case VKeyword.GET: return new VGet { ctx = ctx, get = args };
 			case VKeyword.ANY:
 				var at = args.EvalTuple(ctx);
-				return new VInterType { items = at.vals, intersect = false };
-			case VKeyword.ALL: return new VInterType { items = args.EvalTuple(ctx).vals, intersect = true };
+				return new VAnyType { items = at.vals };
+			case VKeyword.ALL: return new VAllType { items = args.EvalTuple(ctx).vals };
 			case VKeyword.EXTEND: return new VExtend { on = args.EvalExpression(ctx), inherit = true };
 			case VKeyword.COMPLEMENT: return new VComplement { on = args.EvalExpression(ctx) };
 			case VKeyword.UNALIAS: {
@@ -545,7 +570,6 @@ public class ExInvoke : Node {
 						}
 					}
 					return VEmpty.VALUE;
-
 				}
 			case VKeyword.EMBED: {
 					var vds = (VDictScope)ctx;
@@ -955,12 +979,13 @@ public class ExUpKey : Node, LVal {
 	public bool publicOnly;
 	public XElement ToXML () => new("Symbol", new XAttribute("key", key), new XAttribute("level", $"{up}"));
 	public string Source => $"{new string('^', up)}{key}";
-	public object Eval (IScope ctx) => GetValue(ctx);
+	public object Eval (IScope ctx) => GetValueDeref(ctx);
 	public object Get (IScope ctx) => ctx.Get(key, up);
-	public object GetValue (IScope ctx) {
+	public object GetValueDeref (IScope ctx) {
 		var r = ctx.Get(key, up);
 		return Deref(r);
-		object Deref (object r) =>
+	}
+	public object Deref (object r) =>
 			r switch {
 				VGet vg => Deref(vg.Get()),
 				VIndex vi => Deref(vi.Get()),
@@ -968,7 +993,6 @@ public class ExUpKey : Node, LVal {
 				VMember vm => Deref(vm.val),
 				_ => r,
 			};
-	}
 	public object Assign (IScope ctx, Func<object> getNext) {
 		return StAssignSymbol.Assign(ctx, key, up, getNext);
 	}
@@ -1003,7 +1027,9 @@ public class ExMemberKey : Node, LVal {
 			if(publicOnly && v is VMember { pub: false }) {
 				throw new Exception("6885");
 			}
-
+			if(v is VMember { ready: false }) {
+				throw new Exception("6886");
+			}
 			return Deref(v);
 			object Deref (object v) =>
 				v switch {
@@ -1748,9 +1774,13 @@ public class ExDyadic : Node {
 					}
 					return result;
 				}
-			case EFn.union: return new VInterType { intersect = false, items = [_lhs(), _rhs()] };
-			case EFn.intersect: return new VInterType { intersect = true, items = [_lhs(), _rhs()] };
+			case EFn.union: return new VAnyType { items = [_lhs(), _rhs()] };
+			case EFn.intersect: return new VAllType { items = [_lhs(), _rhs()] };
 			case EFn.transform: return new VTransformPattern { lhs = _lhs(), rhs = _rhs() };
+			case EFn.assign: {
+				return new StAssignSymbol { symbol = (ExUpKey)lhs, value = rhs }.Eval(ctx);
+				
+			}
 			default: throw new Exception("92391293");
 		}
 		bool Exists (dynamic seq, VFn f) {
@@ -1791,6 +1821,69 @@ public class ExDyadic : Node {
 
 		transform
 	};
+}
+public interface VStringPattern {
+	public bool Accept (string str);
+	public void Bind (IScope scope);
+
+	public string RegexPattern { get; }
+}
+public class PatternString : VStringPattern {
+	public string pattern;
+	public bool regex;
+
+	public string key;
+	public string val;
+
+	public string RegexPattern => $"({(key is { }s ? $"?<{key}>" : "")}{pattern})";
+	public bool Accept (string str) {
+		var r = false;
+		if(regex) { r = Regex.IsMatch(str, pattern); } else r = str == pattern;
+		if(r) {
+			val = pattern;
+		}
+		return r;
+	}
+	public void Bind (IScope scope) {
+		scope.SetAt(key, val, 1);
+	}
+}
+public class AnyString : VStringPattern {
+	List<VStringPattern> seq;
+	public VStringPattern bound;
+
+
+	public string RegexPattern => $"({string.Join("|", seq.Select(s => s.RegexPattern))})";
+	public bool Accept (string str) {
+		foreach(var s in seq) {
+			if(s.Accept(str)) {
+				bound = s;
+				return true;
+			}
+		}
+		return false;
+	}
+	public void Bind (IScope scope) {
+		bound?.Bind(scope);
+	}
+}
+public class AllString : VStringPattern {
+	public List<VStringPattern> seq;
+
+	public string RegexPattern => $"({string.Join("", seq.Select(s => s.RegexPattern))})";
+	public bool Accept (string str) {
+		foreach(var s in seq) {
+			if(!s.Accept(str)) {
+				return false;
+			}
+		}
+		return true;
+	}
+	public void Bind (IScope scope) {
+		foreach(var s in seq) {
+			s.Bind(scope);
+		}
+	}
 }
 public class ExGuardPattern : Node {
 	public Node cond;

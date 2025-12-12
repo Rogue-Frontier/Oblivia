@@ -38,6 +38,7 @@ namespace Oblivia;
 		public IToken currToken => tokens[index];
 		public TokenType currTokenType => currToken.type;
 		public string currTokenStr => (currToken as StrToken).str;
+	public string currTokenText => (currToken is StrToken st ? st.str : $"{(char)currTokenType}");
 		public Node NextStatement () {
 			switch(currTokenType) {
 				case TokenType.at:
@@ -612,35 +613,34 @@ namespace Oblivia;
 					dec();
 					return CompoundExpr(new ExDyadic { lhs = lhs, rhs = NextPattern(), fn = ExDyadic.EFn.intersect });
 				}
-				case TokenType.ellipsis: return DyadicTerm(ExDyadic.EFn.range);
-				case TokenType.neq: return DyadicTerm(ExDyadic.EFn.neq);
-				case TokenType.and: return DyadicTerm(ExDyadic.EFn.and);
-				case TokenType.or: return DyadicTerm(ExDyadic.EFn.or);
-				case TokenType.xor: return DyadicTerm(ExDyadic.EFn.xor);
-				case TokenType.nand: return DyadicTerm(ExDyadic.EFn.nand);
-				case TokenType.nor: return DyadicTerm(ExDyadic.EFn.nor);
-				case TokenType.plus:
-					return DyadicTerm(ExDyadic.EFn.add);
+				case TokenType.ellipsis:	return DyadicTerm(ExDyadic.EFn.range);
+				case TokenType.neq:			return DyadicTerm(ExDyadic.EFn.neq);
+				case TokenType.and:			return DyadicTerm(ExDyadic.EFn.and);
+				case TokenType.or:			return DyadicTerm(ExDyadic.EFn.or);
+				case TokenType.xor:			return DyadicTerm(ExDyadic.EFn.xor);
+				case TokenType.nand:		return DyadicTerm(ExDyadic.EFn.nand);
+				case TokenType.nor:			return DyadicTerm(ExDyadic.EFn.nor);
+				case TokenType.plus:		return DyadicTerm(ExDyadic.EFn.add);
 				//case TokenType.minus: return DyadicTerm(ExDyadic.EFn.sub);
-				case TokenType.times: return DyadicTerm(ExDyadic.EFn.mul);
-				case TokenType.divide: return DyadicTerm(ExDyadic.EFn.div);
-				case TokenType.gt: return DyadicTerm(ExDyadic.EFn.gt);
+				case TokenType.times:		return DyadicTerm(ExDyadic.EFn.mul);
+				case TokenType.divide:		return DyadicTerm(ExDyadic.EFn.div);
+				case TokenType.gt:			return DyadicTerm(ExDyadic.EFn.gt);
 				//case TokenType.lt:    return DyadicTerm(ExDyadic.EFn.lt);
-				case TokenType.geq: return DyadicTerm(ExDyadic.EFn.geq);
-				case TokenType.leq: return DyadicTerm(ExDyadic.EFn.leq);
-				case TokenType.ceil: return DyadicTerm(ExDyadic.EFn.max);
-				case TokenType.floor: return DyadicTerm(ExDyadic.EFn.min);
-				case TokenType.exists: return DyadicTerm(ExDyadic.EFn.exists);
-				case TokenType.not_exists: return DyadicTerm(ExDyadic.EFn.not_exists);
-				case TokenType.for_all: return DyadicTerm(ExDyadic.EFn.for_all);
+				case TokenType.geq:			return DyadicTerm(ExDyadic.EFn.geq);
+				case TokenType.leq:			return DyadicTerm(ExDyadic.EFn.leq);
+				case TokenType.ceil:		return DyadicTerm(ExDyadic.EFn.max);
+				case TokenType.floor:		return DyadicTerm(ExDyadic.EFn.min);
+				case TokenType.exists:		return DyadicTerm(ExDyadic.EFn.exists);
+				case TokenType.not_exists:	return DyadicTerm(ExDyadic.EFn.not_exists);
+				case TokenType.for_all:		return DyadicTerm(ExDyadic.EFn.for_all);
 				//case TokenType.double_plus:             return DyadicTerm(ExDyadic.EFn.concat);
-				case TokenType.count: return DyadicTerm(ExDyadic.EFn.count);
-				case TokenType.log: return DyadicTerm(ExDyadic.EFn.log);
-				case TokenType.range: return DyadicTerm(ExDyadic.EFn.range);
+				case TokenType.count:		return DyadicTerm(ExDyadic.EFn.count);
+				case TokenType.log:			return DyadicTerm(ExDyadic.EFn.log);
+				case TokenType.range:		return DyadicTerm(ExDyadic.EFn.range);
 				case TokenType.square_fill_l: return DyadicTerm(ExDyadic.EFn.take);
-				case TokenType.square_fill_r: return DyadicExpr(ExDyadic.EFn.drop);
-				case TokenType.deal: return DyadicTerm(ExDyadic.EFn.deal);
-				case TokenType.arrow_w: return DyadicExpr(ExDyadic.EFn.assign);
+				case TokenType.square_fill_r: return DyadicTerm(ExDyadic.EFn.drop);
+				case TokenType.deal:		return DyadicTerm(ExDyadic.EFn.deal);
+				case TokenType.arrow_w:		return DyadicExpr(ExDyadic.EFn.assign);
 				case TokenType.first: inc(); return CompoundExpr(new ExMonadic { rhs = lhs, fn = ExMonadic.EFn.first });
 				case TokenType.last: inc(); return CompoundExpr(new ExMonadic { rhs = lhs, fn = ExMonadic.EFn.last });
 				case TokenType.construct: return DyadicTerm(ExDyadic.EFn.construct);
@@ -761,69 +761,115 @@ namespace Oblivia;
 			inc();
 			return new ExAlias { expr = NextExpr() };
 		}
-		public Node NextPattern () {
-			inc();
-			switch(currTokenType) {
-				case TokenType.pipe: {
-						inc();
-						return new ExMonadic { rhs = NextTerm(), fn = ExMonadic.EFn.sat };
-					}
-				case TokenType.colon: {
+	public Node NextPattern () {
+		inc();
+		switch(currTokenType) {
+			case TokenType.pipe: {
 					inc();
-						return new ExGuardPattern { cond = NextExpr() };
-					}
-			}
-			var expr = NextTerm();
-			switch(expr) {
-				case ExVal { value: string { } str } ev: {
-					return new ExVal { value = new Regex(str) };
+					return new ExMonadic { rhs = NextTerm(), fn = ExMonadic.EFn.sat };
 				}
-			case ExVal { value: int i }: {
-					return new ExVal { value = i };
+			case TokenType.colon: {
+					inc();
+					return new ExGuardPattern { cond = NextExpr() };
 				}
-				case ExTuple et:
-					var binds = et.items.Select(p => (p.key, (Node?)p.value)).ToList();
-					return new ExTuplePattern {
-						rest = true,
-						binds = binds
-					};
-				case ExSeq es:
-					throw new Exception();
-				case ExBlock eb:
-					return new ExStructurePattern {
-						rest = true,
-						binds = eb.statements.Select(p => p switch {
-							ExIs ei => ((ei.lhs as ExUpKey).key, ei.rhs, ei.key),
-							StDefKey sdk => (sdk.key, sdk.value, sdk.key),
-						}).ToList()
-					};
+			case TokenType.slash: {
+					List<VStringPattern> seq = new();
 
-			case ExUpKey euk: {
-					return new ExWildcardPattern { key = euk.key };
-				}
-				/*
-				foreach(var st in eb.statements) {
-					switch(st) {
-						case StDefKey sdk: {
-								var lhs = sdk.key;
-								var key = sdk.key;
-								var rhs = sdk.criteria;
-								throw new Exception();
+
+					//
+					//	Valid examples
+					//	$/abc abc/
+					//  $/abc:.+ abc/
+
+					inc();
+					Read:
+					switch(currTokenType) {
+						case TokenType.name: {
+								var key = currTokenStr;
+								inc();
+								if(currTokenType == TokenType.colon) {
+									inc();
+									var pattern = "";
+									Read2:
+									if(currTokenType == TokenType.comma) {
+										seq.Add(new PatternString { key = key, pattern = pattern, regex = true });
+										inc();
+										goto Read;
+									}
+									if(currTokenType == TokenType.slash) {
+										seq.Add(new PatternString { key = key, pattern = pattern, regex = true });
+										goto Read;
+									}
+									pattern += currTokenText;
+									inc();
+									goto Read2;
+								} else {
+									seq.Add(new PatternString { key = null, pattern = key, regex = false });
+								}
+								goto Read;
 							}
-						case ExIs eis: {
-								var lhs = eis.lhs;
-								var key = eis.key;
-								var rhs = eis.rhs;
-								throw new Exception();
+						case TokenType.slash: {
+								inc();
+								return new ExVal { value = new AllString { seq = seq } };
 							}
+						case TokenType.comma:inc(); goto Read;
+						default:
+							seq.Add(new PatternString { pattern = currTokenText, regex = true });
+							inc();
+							goto Read;
 					}
 				}
-				*/
+		}
+				var expr = NextTerm();
+				switch(expr) {
+					case ExVal { value: string { } str } ev: {
+							return new ExVal { value = new Regex(str) };
+						}
+					case ExVal { value: int i }: {
+							return new ExVal { value = i };
+						}
+					case ExTuple et:
+						var binds = et.items.Select(p => (p.key, (Node?)p.value)).ToList();
+						return new ExTuplePattern {
+							rest = true,
+							binds = binds
+						};
+					case ExSeq es:
+						throw new Exception();
+					case ExBlock eb:
+						return new ExStructurePattern {
+							rest = true,
+							binds = eb.statements.Select(p => p switch {
+								ExIs ei => ((ei.lhs as ExUpKey).key, ei.rhs, ei.key),
+								StDefKey sdk => (sdk.key, sdk.value, sdk.key),
+							}).ToList()
+						};
+					case ExUpKey euk: {
+							return new ExWildcardPattern { key = euk.key };
+						}
+					/*
+					foreach(var st in eb.statements) {
+						switch(st) {
+							case StDefKey sdk: {
+									var lhs = sdk.key;
+									var key = sdk.key;
+									var rhs = sdk.criteria;
+									throw new Exception();
+								}
+							case ExIs eis: {
+									var lhs = eis.lhs;
+									var key = eis.key;
+									var rhs = eis.rhs;
+									throw new Exception();
+								}
+						}
+					}
+					*/
 
-				case ExInvokeBlock eib:
-				default:
-					throw new Exception();
-			}
+					case ExInvokeBlock eib:
+					default:
+						throw new Exception();
+				}
 		}
 		string ReadLispOp () {
 			var start = index;
@@ -1003,7 +1049,6 @@ namespace Oblivia;
                             goto Check;
                     }
                     */
-
 					goto Check;
 			}
 		}
@@ -1022,15 +1067,11 @@ namespace Oblivia;
 				case TokenType.str:
 					var str = currTokenStr;
 					inc();
-
 					List<Node> parts = [];
-
 					var text = "";
 					var i = 0;
-
 					Read:
 					if(i < str.Length) {
-
 						switch(str[i]) {
 							case '{':
 								parts.Add(new ExVal { value = text });
@@ -1063,38 +1104,44 @@ namespace Oblivia;
 		}
 		Node NextFn () {
 			var pars = NextArgTuple().ParTuple();
-
-		object retType = null;
+			object retType = null;
 			Check:
 			switch(currTokenType) {
-			
 				case TokenType.arrow_e: {
 						inc();
-
 						retType = NextExpr();
 						goto Check;
 						//?(a:i4) -> i4:{}
 					}
+				case TokenType.array_l:
+				case TokenType.tuple_l:
+				case TokenType.block_l: {
+						return new ExFn {
+
+							//retType = retType,
+							pars = pars,
+							result = NextTerm()
+						};
+					}
 				case TokenType.period:
 					inc();
 					return new ExFn {
+						//retType = retType,
 						pars = pars,
-						
 						result = NextTerm()
 					};
+				case TokenType.star:
 				case TokenType.colon:
 					inc();
 					return new ExFn {
+
+						//retType = retType,
 						pars = pars,
 						result = NextExpr()
 					};
-				case TokenType.star:
-					inc();
-					return new ExFn {
-						pars = pars,
-						result = NextExpr()
-					};
-				default: return new ExFn { pars = pars, result = NextExpr() };
+				default:
+					//We do not accept floating form
+					throw new Exception("deprecated");
 			}
 		}
 		ExUpKey NextSymbol () {

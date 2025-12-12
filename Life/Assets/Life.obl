@@ -1,138 +1,67 @@
 ﻿{
     print:Console/WriteLine
     Life:class {
-        //@(Debug["width:" w])
-        w→i4
-        //@(Debug("height:{w}"))
-        h→i4
-        grid→Grid(bit)
-
-        mod(n:i4 max:i4):(%:(n<0)?+(n+max)?-n max)
-        // xy: (x:i4 y:i4)
-        // %xy
-        at(x:i4 y:i4):{
-            ^:grid(%mod.|[x:w y:h]|i4)
+        w->i4, h->i4, grid->Grid(bit)
+        mod(n:i4 max:i4):{
+            n<0 ?++ n<-(_+max),
+            n≥max ?++ n<-(_-max),
+            ^:n
         }
-        get(x:i4 y:i4):at(x y)/Get()
-        set(x:i4 y:i4 b:bit):at(x y)/Set(b)
+        at(x:i4 y:i4): grid(mod(x w) mod(y h))
+        get(x:i4 y:i4): at(x y)/Get()
+        set(x:i4 y:i4 b:bit): at(x y)/Set(b)
         new(w:i4 h:i4):Life{
-            print*cat["args: "_0","_1],
-            {w h} ≔ _arg,
-            grid ≔ Grid(bit)/ctor(w h),
-            debug()
+            {w h} := _arg,
+            grid := Grid(bit)/ctor(w h),
         }
-        debug():print*|cat*|[["width: "w],["height: "h]]
-        activeNum:0
         txt:StrBuild/ctor()
         update(): {
-            print("start")
-            activeNum ≔ 0,
             g:get,
             txt/Clear(),
             ta: txt/Append,
             nextGrid:Grid(bit)/ctor(w h),
             ↕h|?(y:i4){
                 ↕w|?(x:i4){
-                    print("update")
-                    w:x-1 n:y+1 e:x+1 s:y-1
-                    c:g.|[w:n x:n e:n w:y e:y w:s x:s e:s]⌗⟙
-                    active: g(x y) ?+ ¬((c<2)∨(c>3)) ?- (c=3)
-                    set(x y active)
-                    active ?+ { activeNum := (_ + 1) }
-                    ta(active ?+ "*" ?- " ")
+                    w:x-1 n:y+1 e:x+1 s:y-1,
+                    c:[w:n x:n e:n w:y e:y w:s x:s e:s]|g⌗⟙,
+                    live:(c=3)∨(g(x y)∧(c=2)),
+                    nextGrid(x y)/Set(live),
+                    ta(live ?+ "█" ?- " ")
                 }
                 ta(newline)
             }
-            print*cat["active: " activeNum]
+            grid := nextGrid
         }
     }
     main(args:str)→i4: {
-        //@ctx{pub:yes priv:no}
+        foo: {
+            msg:"Hello World"
+            ^(): print(msg)
+        },
+        
+        foo(),
+        ↕100|?(i:i4){
+            Console/WriteLine *
+                ((%:i 15) = 0) ?+ "FizzBuzz" ?-
+                ((%:i 5) = 0) ?+ "Buzz" ?-
+                ((%:i 3) = 0) ?+ "Fizz" ?-
+                i
+        },
+        [1 2 3] ?| (x => x > 0) | print,
+        print*$"a+bc+"/Match("aaaaabcccccccccccccccccccccccccc"),
+        // "aaaaabcccccccccccccccccccccccccc" = $[a:a+],
 
-        //@(argctx{})
+        print*"hello_world" = $/word1:hello, "_", word2:world/,
 
-        print*"abc" = sat(a => a/Length = 3)
-
-        print*"abc" = $|(a => a/Length = 3)
-
-        //print*$"abc"/Match("ab")
-
-        //print*((a:i4) => a+1)(2),
-
-        //print*"ABC" = transform(a => tolower(a))
-        print*1 = 1 ?: yes,
-
-        (1 = ((a:i4)=>a+0) $= $|(a => a < 2) $: yes) ?+ print(5000),
-
-        time:2
-        x:0
-        and[((x + 2) > 0) time=2] ?+ print("ok")
-        x ?{
-            ($|(a => (a + 2) > 0) $: time = 2):print("ok")
-        }
-
-
-        1 ?{
-            ((a:i4)=>a+0) $= $|(a => a < 2) $: yes:print(5000),
-            $i:print(i+50),
-            $(a:i4) $: yes:print*a
-        }
-
-        //$| ?(i:i4): i+5,
-
-        //a ?: true
-        ^:()
-
-        @(ctx{val:10})
-        bee():print*(val+val)
-        bee()
-
-        baa:{
-            ^():print."aaaa"
-        }
-        baa()
-
-        //var(read:bit write:bit T)
-
-        Either(L, R):enum{
-            Left(val:L),
-            Right(val:R)
-        }
-        foo: Either(i4 str)/Left(5)
-        print.foo
-        //print*foo = Either(i4 str)/Left$(val:5)
-        //print*foo = Either$(a b)/Left$(val:5)
-
-        Bar:class{ a:0 }
-        print*Bar{ a := 1 } = Bar${ a:1 }
-        print.a
-        print*5 = $(boo:i4)
-        print.boo
-
-        //moo(a:2)
-        //noo:bind(moo a:5)
-        //noo:bind(moo a:abc)
-
-        qoo(a:5 b:rest(List(obj))): print([a %b])
-        qoo(1 2 3)
-
-        ^:{}
-        life:Life/new(32 32)
-        print*life/grid(0 0)/Get(),
-        ↕(life/w)|?(x:i4):↕(life/h)|?(y:i4):life/set(x y rand_bool())
-        num:1 prevNum:0 run:⟙ i:1
-        Console/Clear()
-        run ?++ {
-            life/update(),
-            prevNum ≔ num,
-            num ≔ life/activeNum,
-            run ≔ (num ≠ prevNum),
-            print*cat["time: " i]
-            Console/{
-                SetCursorPosition(0 0)
-                Write*life/txt/ToString()
-            }
-        }
-        ^: 0
+        ^:0,
+        life:Life/new(24 24),
+        [0:2 1:2 2:2 2:1 1:0]|?(x y):life/set(x+4 y+4 yes),
+        run:label,
+        life/update(),
+        Console/{
+            Clear(),
+            Write*life/txt/val,
+        },
+        go(run)
     }
 }

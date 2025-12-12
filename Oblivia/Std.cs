@@ -160,7 +160,7 @@ namespace Oblivia {
                     ["var"] = VKeyword.VAR,
                     ["yield"] = VKeyword.YIELD,
                     ["unmask"] = VKeyword.UNALIAS,
-                    ["declare"] = VKeyword.DECLARE,
+                    ["decl"] = VKeyword.DECLARE,
                     ["complement"] = VKeyword.COMPLEMENT,
                     ["any"] = VKeyword.ANY,
                     ["all"] = VKeyword.ALL,
